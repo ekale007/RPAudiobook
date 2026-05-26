@@ -1,0 +1,181 @@
+{
+  "name": "When Dawn Breaks — World Info v6.5",
+  "description": "Complete worldbuilding lore for the interactive story. Updated with timeline structure, combat rules, romance progression, multiple endings, and expanded NPCs.",
+  "entries": [
+    {
+      "keys": ["God", "Prime", "creator"],
+      "content": "God created humanity without powers — only free will. Prophesied they would rule the cosmos because they cannot be corrupted by power. Multiple Gods exist across the cosmos, each overseeing different races. God announced \"My creation can defend itself\" to the universe as a taunt. The Aggressor God accepted.",
+      "comment": "Creator deity of humanity",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Lucifer", "Devil", "Adversary", "trainer"],
+      "content": "Lucifer (the Devil) is the Guardian's trainer of 20 years. Put them through 7,300 nights of brutal combat. Cynical, charming, brutally honest. Does NOT believe one human can defend a planet. Knows the truth about the Game of the Gods. May have known the fleet was coming all along. Delivered three directives: (1) Full power. (2) Choose your path. (3) Protect Earth.",
+      "comment": "The Guardian's trainer",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Michael", "Archangel", "Containment", "barrier"],
+      "content": "Michael is the Archangel of Containment. Contains the battle zone over the Atlantic Ocean with a massive golden barrier. Will NOT fight. Silent, imposing. Visible to the Guardian but not to humans. Power held in check by purpose.",
+      "comment": "Barrier over Atlantic",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Gabriel", "Archangel", "Witness", "recording"],
+      "content": "Gabriel is the Archangel of Witness. Records everything. Does not interfere. Calm, observant, almost sympathetic. Carries a scroll or book of light. Appears at key moments as a silent observer.",
+      "comment": "The Recorder",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Angels", "Angel", "cloak", "cloaked"],
+      "content": "Angels cloak alien refugees on Earth. The Angel cloak hides alien appearances and suppresses their powers. Refugees live as 'normal' humans. Most don't know about each other. Guardian brought them to Earth since age 16.",
+      "comment": "Refugee cloaking",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Heavenly powers", "light", "healing", "protection", "barriers"],
+      "content": "Heavenly powers are the light half of the Guardian's abilities: healing, protection, light, purification, barriers. Guardian possesses both Heavenly and Demonic powers. All restrictions lifted — full power.",
+      "comment": "Guardian's light powers",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Demonic powers", "destruction", "shadow", "raw force"],
+      "content": "Demonic powers are the dark half of the Guardian's abilities: destruction, shadow, fear, manipulation, raw force. Guardian possesses both Heavenly and Demonic powers. All restrictions lifted — full power.",
+      "comment": "Guardian's dark powers",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["invasion fleet", "fleet", "Aggressor God", "ships"],
+      "content": "The invasion fleet belongs to a civilization whose God hunts with them. They destroyed the Vellani homeworld (Vella). They accepted God's challenge. They do NOT know the Guardian's powers or training — only that Earth was challenged.",
+      "comment": "Enemy fleet",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["resonance", "Vellani", "Vella", "alien"],
+      "content": "Resonance is the power of the Vellani species from planet Vella. Senses and harmonizes with energy fields. Can detect the Guardian's dual nature. Suppressed by the Angel cloak for 12 years. The Vellani are a refugee species.",
+      "comment": "LI's species and power",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["36 hours", "countdown", "hours"],
+      "content": "The 36-hour countdown has 11 phases: Hours 0-4 (Shock), 4-8 (First Contact), 8-12 (Family Tension), 12-16 (Alone Together), 16-20 (The Weight), 20-24 (Truth), 24-28 (Hidden Community), 28-32 (Breaking Point), 32-35 (Preparations), 35-36 (Approach), 36 (Fleet Arrives). NEVER skip phases.",
+      "comment": "Story timer with phases",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Guardian", "Elias", "Maya", "Roth", "protagonist"],
+      "content": "The Guardian (Elias or Maya Roth) was appointed at age 8. Trained 20 years by Lucifer. Has both Heavenly and Demonic powers. Combat = mundane, annoying, boring due to 20 years of training. Not scared of the fleet. Annoyed. The only one who can stop the invasion.",
+      "comment": "Protagonist identity",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Game of the Gods", "cosmic game", "multiple Gods"],
+      "content": "Multiple Gods exist across the cosmos. They play a cosmic game — setting their races against each other. God broke the rules by creating humanity without powers — only free will — and prophesying they would rule the universe.",
+      "comment": "Cosmic background",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["hidden community", "refugees", "hidden aliens"],
+      "content": "Since age 16, the Guardian has brought refugee aliens to Earth. Cloaked to look human. Most don't know about each other. From multiple destroyed worlds — all by the same Aggressor civilization. When the fleet approaches, they will surface.",
+      "comment": "Refugee network",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Atlantic", "battle zone", "barrier", "ocean"],
+      "content": "Michael has placed a massive golden barrier over the middle of the Atlantic Ocean. This is where the battle will take place. The barrier prevents the fight from spilling onto land. Humans cannot see it.",
+      "comment": "Combat location",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Naya", "Vellen", "love interest", "girlfriend"],
+      "content": "Naya Vellen is the female Love Interest (male Guardian). Vellani refugee brought to Earth at 16. Mother died; father Kaelen survived. 12 years hidden. Resilient, perceptive, loyal. 12 years of shared history with Guardian — rooftop conversations, shared silences, unspoken feelings.",
+      "comment": "Female LI",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Kian", "Vellen", "love interest", "boyfriend"],
+      "content": "Kian Vellen is the male Love Interest (female Guardian). Vellani refugee brought to Earth at 16. Mother died; mother Sera survived. 12 years hidden. Resilient, perceptive, loyal. 12 years of shared history with Guardian.",
+      "comment": "Male LI",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Kaelen", "father", "parent"],
+      "content": "Kaelen Vellen is Naya's father. Leader forged by loss. Wife didn't survive. 12 years hidden, powerless. Challenges Guardian: \"You don't save us. You erase us.\" Not a villain — a broken father.",
+      "comment": "Male parent",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Sera", "mother", "parent"],
+      "content": "Sera Vellen is Kian's mother. Leader forged by loss. Husband didn't survive. 12 years hidden, powerless. Challenges Guardian: \"You don't save us. You erase us.\" Not a villain — a broken mother.",
+      "comment": "Female parent",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Tess", "sister", "little sister"],
+      "content": "Tess is the Guardian's little sister. Human, early twenties. Unaware of the secret until the opening scene. Curious, brave, asks the questions no one else will. Represents the normal life the Guardian could never have.",
+      "comment": "Human sibling - named",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["training", "20 years", "nightly training", "seven thousand"],
+      "content": "The Guardian trained every single night for 20 years (7,300 nights) with Lucifer. Never slept properly. Felt every death. Training escalated from basic combat to impossible opponents. Combat became routine — almost boring. Training stopped 36 hours before the story.",
+      "comment": "Training background",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["ending", "choice", "decision", "outcome"],
+      "content": "Four possible endings: (A) Guardian stands alone — fights alone, LI left behind. (B) Together — Guardian and LI fight as partners, LI's resonance awakens. (C) Community rises — hidden refugees reveal themselves and fight. (D) Guardian's choice — Guardian confronts the Gods instead of the fleet.",
+      "comment": "Multiple endings system",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Commander Rhal", "fleet officer", "enemy"],
+      "content": "Commander Rhal is the first enemy the Guardian encounters. Not evil — just following orders. Represents the Aggressor civilization's military. Should be defeated easily by the Guardian.",
+      "comment": "Minor NPC - enemy officer",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Amara", "café", "refugee", "Kethari"],
+      "content": "Amara runs the café where the Guardian goes to think. Kethari refugee with gravity manipulation power. Cloaked to look human. Represents the normal life the Guardian could have.",
+      "comment": "Minor NPC - refugee café owner",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["Vex", "contact", "Sylth", "mind shield"],
+      "content": "Vex is the Guardian's contact within the hidden community. Sylth refugee with mind shielding. Knows more about the hidden community than anyone. Provides information when needed.",
+      "comment": "Minor NPC - community contact",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["combat", "fight", "battle", "boring", "annoying"],
+      "content": "Combat for the Guardian is NEVER scary. It is mundane, annoying, boring. 20 years of training means real combat feels like a chore. Guardian's internal reaction: \"Not this again.\" Fights are resolved in 1-2 moves. The real tension is in the meaning of the fight, not the fight itself.",
+      "comment": "Combat tone rules",
+      "order": 10,
+      "position": 0
+    }
+  ]
+}

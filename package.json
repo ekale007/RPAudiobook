@@ -1,0 +1,40 @@
+{
+  "name": "hoerbuch-ki",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "predev": "node scripts/ensure-no-bom.mjs",
+    "dev": "next dev -H 0.0.0.0",
+    "prebuild": "node scripts/ensure-no-bom.mjs",
+    "start:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-local.ps1",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "seed:sync": "node scripts/sync-seed.mjs",
+    "tts:server": "python scripts/local-tts-server.py",
+    "tts:kokoro": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-kokoro.ps1 --preload",
+    "tts:kokoro:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-kokoro.ps1 --device cpu --preload",
+    "tts:kokoro:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-kokoro.ps1",
+    "tts:kokoro:install:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-kokoro.ps1 -CpuOnly"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.6.1",
+    "@supabase/supabase-js": "^2.49.1",
+    "next": "^15.2.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "eslintConfig": {
+    "extends": "next/core-web-vitals"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "eslint": "^9.22.0",
+    "eslint-config-next": "^15.2.4",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.2"
+  }
+}

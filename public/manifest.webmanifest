@@ -1,0 +1,18 @@
+{
+  "name": "HörbuchKI",
+  "short_name": "HörbuchKI",
+  "description": "Interactive story roleplay",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0f12",
+  "theme_color": "#0f0f12",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

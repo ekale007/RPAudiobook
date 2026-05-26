@@ -1,0 +1,9 @@
+# Kokoro-82M local server (GPU optional, ~2GB VRAM on CUDA)
+# Requires espeak-ng on PATH — see scripts/install-kokoro.ps1
+
+kokoro>=0.9.4
+soundfile>=0.12.1
+numpy>=1.26.0
+torch>=2.2.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0

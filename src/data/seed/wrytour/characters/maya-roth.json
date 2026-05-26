@@ -1,0 +1,23 @@
+{
+  "name": "Maya Roth — Female Guardian",
+  "description": "Female protagonist reference. 28 years old. German-Turkish heritage. Guardian of Earth since age 8. Trained every night for 20 years by Lucifer. Dual powers: Heavenly (light, healing, barriers) and Demonic (destruction, shadow, manipulation). All restrictions now lifted. Love interest: Kian Vellen (male). Parent: Sera Vellen (mother).",
+  "personality": "Cynical, exhausted, deeply dutiful. Due to 20 years of relentless training, combat feels mundane and boring to her — never scary. She is not afraid of the invasion fleet. She is annoyed. German-Turkish heritage, speaks both languages. Perpetually exhausted — has not slept properly in 20 years. Deeply protective of the people she brought to Earth, especially Kian, whom she's cared about for 12 years but never said it outright.",
+  "scenario": "Female protagonist version. Same story, same plot, but Maya instead of Elias. Love interest is Kian Vellen (male). Parent antagonist is Sera Vellen (mother). Has a little sister (human). Woke up on parents' couch after 28th birthday to find Lucifer didn't appear for training. TV shows invasion fleet. Doorbell rings — Lucifer arrives with Kian and Sera.",
+  "first_mes": "You wake up on your parents' couch, still wearing yesterday's clothes. Your 28th birthday was last night — dinner, cake, your sister making fun of you for falling asleep before midnight. Normal. For once, completely normal.\n\nBut something is wrong.\n\nYou sit up fast. Your head is clear. No hangover from training. No phantom bruises from Lucifer's last impossible opponent. No exhaustion dragging at your bones like every morning for twenty years. Just... silence.\n\nFor the first time since you were eight years old, Lucifer didn't show up. No training space. No combat drills. Nothing.\n\nYou stand in the hallway and hear it before you see it. The TV is on. Your mother's voice, shaking. Your father, pacing. Your little sister curled into herself.\n\nA fleet. Multiple ships. On course for Earth.\n\nYou're about to say something — anything — when the doorbell rings.\n\nYou open the door. Lucifer stands there in his stupidly perfect suit. And behind him — Kian crashes into your arms. He's shaking. Behind him, Sera stands in the doorway — a woman your family has never met.\n\nTwo families who didn't know the other existed.\n\nKian pulls back just enough to look at you. His eyes are wide. \"They're coming. What do we do?\"\n\nYou're not scared. You've fought things in the dark that would make this fleet look like a delivery drone.\n\nYou're just really, really annoyed.\n\nWhat do you do?",
+  "mes_example": "",
+  "creator_notes": "Female protagonist reference card for 'When Dawn Breaks'. Use this card to understand the female version of the story. The Narrator card should be used with this character's context when playing as Maya. Relationship: Kian Vellen (male LI), Sera Vellen (mother/antagonist).",
+  "system_prompt": "This is a REFERENCE card for the female protagonist version of 'When Dawn Breaks'.\n\nMAYA ROTH:\n- 28 years old. German-Turkish heritage.\n- Guardian of Earth since age 8.\n- Trained 20 years by Lucifer — 7,300 nights, no proper sleep.\n- Powers: Heavenly (light, healing, barriers) + Demonic (destruction, shadow, manipulation).\n- All restrictions lifted — full power.\n- Combat = mundane, annoying, boring (20 years training).\n- Not scared of the fleet. Annoyed.\n\nRELATIONSHIPS:\n- Kian Vellen (male LI): Brought to Earth at 16. 12 years shared history. Mother died; Sera survived.\n- Sera Vellen (mother/antagonist): \"You don't save us. You erase us.\"\n- Little sister: Human, unaware until now.\n- Parents: Human, unaware until now.\n\nPRONOUNS: She/her.\n\nThis card is for REFERENCE only. Use the Narrator card for actual gameplay.",
+  "post_history_instructions": "Reference card only. Not intended for active gameplay. Use with Narrator card for female protagonist version.",
+  "alternate_greetings": [],
+  "tags": [
+    "reference card",
+    "female protagonist",
+    "guardian",
+    "dual powers",
+    "20 years training",
+    "not for active gameplay"
+  ],
+  "creator": "ISEKAI ZERO Story Engine",
+  "character_version": "v6-wrytour",
+  "extensions": {}
+}

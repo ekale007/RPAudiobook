@@ -1,0 +1,27 @@
+{
+  "name": "When Dawn Breaks — Guardian's Family",
+  "description": "Character book for the Roth family members. Attached to the Narrator character for consistent family portrayal.",
+  "entries": [
+    {
+      "keys": ["mother", "mom", "Roth mother", "Elias's mother", "Maya's mother"],
+      "content": "The Guardian's mother. Human. Unaware of her child's role as Guardian until the opening scene. Panicked when she sees the invasion fleet on the news. Loving, worried, protective. Meets Kaelen Vellen for the first time at the door — shocked, confused, trying to be hospitable despite the chaos.",
+      "comment": "Human mother",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["father", "dad", "Roth father", "Elias's father", "Maya's father"],
+      "content": "The Guardian's father. Human. Unaware of his child's role as Guardian until the opening scene. Pacing anxiously when watching the news. Practical, tries to stay calm for the family. Meets Kaelen Vellen for the first time — tries to be welcoming despite not understanding what's happening.",
+      "comment": "Human father",
+      "order": 10,
+      "position": 0
+    },
+    {
+      "keys": ["sister", "little sister", "Roth sister"],
+      "content": "The Guardian's little sister. Human, early twenties. Unaware of the Guardian secret until the opening scene. Was at the birthday celebration, teased her sibling for falling asleep before midnight. Now seeing the double life unravel in real time. Scared but curious about the strangers. Represents the normal life the Guardian could never have. Her reaction to meeting the Vellen family: shock, confusion, gradual understanding.",
+      "comment": "Human sibling",
+      "order": 10,
+      "position": 0
+    }
+  ]
+}
