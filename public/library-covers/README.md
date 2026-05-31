@@ -19,6 +19,16 @@ Weitere Vorlagen nutzen vorerst nur `coverGradient` (Farben am Regal). Optional 
 | `neon-witness.webp` | Neon Witness |
 | `desert-oath.webp` | Der Eid der Oase |
 | `tide-line.webp` | The Tide Line |
+| `schatten-kaiser.webp` | Schattenkaiser |
+| `akademie-arkanum.webp` | Akademie Arkanum |
+| `system-null.webp` | System Null |
+| `blutmond-pakt.webp` | Blutmond-Pakt |
+| `zug-47.webp` | Zug 47 |
+| `second-life-protocol.webp` | Second Life Protocol |
+| `guild-last-light.webp` | Guild of the Last Light |
+| `starlit-court.webp` | The Starlit Court |
+| `hexbound-academy.webp` | Hexbound Academy |
+| `ghost-signal.webp` | Ghost Signal |
 
 Empfohlen: Hochformat **2:3**, ca. 600×900 px, ohne Titel im Bild.
 

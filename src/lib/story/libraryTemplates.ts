@@ -1,5 +1,6 @@
 import type { WryTourSeedPack } from "@/lib/import/wrytour";
 import { loadWhenDawnBreaksSeed } from "@/lib/import/wrytour";
+import { EXTENDED_LIBRARY_TEMPLATES } from "@/lib/story/libraryTemplatesExtra";
 import { seedPackToStoryDraft } from "@/lib/story/seedPackDraft";
 import type { StoryDraft } from "@/lib/story/generateStoryDraft";
 import type { WryTourCharacter, WryTourLorebook } from "@/lib/types";
@@ -14,7 +15,17 @@ export type LibraryTemplateId =
   | "iron-republic"
   | "neon-witness"
   | "desert-oath"
-  | "tide-line";
+  | "tide-line"
+  | "schatten-kaiser"
+  | "akademie-arkanum"
+  | "system-null"
+  | "blutmond-pakt"
+  | "zug-47"
+  | "second-life-protocol"
+  | "guild-last-light"
+  | "starlit-court"
+  | "hexbound-academy"
+  | "ghost-signal";
 
 export interface LibraryTemplateDefinition {
   id: LibraryTemplateId;
@@ -910,6 +921,7 @@ export const PUBLIC_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
       "Book cover illustration, coastal drama audiobook, weathered seaside cottage, low tide exposing pier pilings, kelp and old phone in wrack line, overcast golden light, emotional mood, slate blue and sand tones, no text, vertical portrait 2:3",
     loadPack: loadTideLinePack,
   },
+  ...EXTENDED_LIBRARY_TEMPLATES,
 ];
 
 export function getLibraryTemplate(

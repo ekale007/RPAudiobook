@@ -790,6 +790,7 @@ export function ChatView({
       const options = await fetchStoryBeatSuggestions({
         settings: chatSettings,
         promptCtx: promptCtx(),
+        storyLocale,
         signal: beatsAbortRef.current.signal,
       });
       setBeatOptions(options);
