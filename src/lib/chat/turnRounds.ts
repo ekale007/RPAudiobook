@@ -25,3 +25,11 @@ export function nextTurnIndex(turns: TurnRow[]): number {
   if (!turns.length) return 0;
   return Math.max(...turns.map((t) => t.index_in_chapter)) + 1;
 }
+
+/** Prompt when rerolling (history may end on user or assistant). */
+export function rerollAssistantPrompt(endsOnUser: boolean): string {
+  if (endsOnUser) {
+    return "Write a fresh narrator response to the user's last message above. Same intent and story beat, new wording — do not repeat the previous reply verbatim.";
+  }
+  return "Rewrite your last narrator passage with the same story beat and tone, but fresh wording. Continue naturally from the scene.";
+}

@@ -23,6 +23,7 @@
 Thumbs.db
 .venv-tts/
 .venv-kokoro/
+.venv-qwen/
 __pycache__/
 *.py[cod]
 *.pem

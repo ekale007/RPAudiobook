@@ -6,8 +6,9 @@ import { AppHeader } from "@/components/AppHeader";
 import { ChatView } from "@/components/ChatView";
 import { createClient } from "@/lib/supabase/client";
 import { getStoryBundle } from "@/lib/db/stories";
-import { loadOpenRouterSettings } from "@/lib/storage/openRouterSettings";
+import { isLlmReady } from "@/lib/storage/openRouterSettings";
 import { isTtsReady, loadTtsSettings } from "@/lib/storage/ttsSettings";
+import { useServerCapabilities } from "@/lib/server/useServerCapabilities";
 import Link from "next/link";
 
 function StoryChatInner() {
@@ -15,6 +16,7 @@ function StoryChatInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const storyId = params.id as string;
+  const serverCaps = useServerCapabilities();
   const chapterParam = searchParams.get("chapter") ?? undefined;
 
   const [ready, setReady] = useState(false);
@@ -39,9 +41,10 @@ function StoryChatInner() {
     });
   }, [storyId, chapterParam, router]);
 
-  const hasKey = typeof window !== "undefined" && !!loadOpenRouterSettings();
+  const hasKey = typeof window !== "undefined" && isLlmReady();
   const hasTts =
     typeof window !== "undefined" && isTtsReady(loadTtsSettings());
+  const ttsProvider = loadTtsSettings().provider;
 
   if (error) {
     return (
@@ -60,15 +63,18 @@ function StoryChatInner() {
     );
   }
 
-  const priorSummaries = bundle.chapters
-    .filter(
-      (c) =>
-        c.status === "closed" &&
-        c.chapter_summary &&
-        c.index_in_band < bundle.activeChapter.index_in_band,
-    )
-    .map((c) => `${c.title}: ${c.chapter_summary}`)
-    .join("\n\n");
+  const bandSummary = (bundle.band.band_summary as string | null)?.trim();
+  const priorSummaries = bandSummary
+    ? null
+    : bundle.chapters
+        .filter(
+          (c) =>
+            c.status === "closed" &&
+            c.chapter_summary &&
+            c.index_in_band < bundle.activeChapter.index_in_band,
+        )
+        .map((c) => `### ${c.title}\n${c.chapter_summary}`)
+        .join("\n\n") || null;
 
   const readOnly = bundle.activeChapter.status !== "active";
 
@@ -80,10 +86,21 @@ function StoryChatInner() {
       />
       {readOnly ? (
         <p className="border-b border-zinc-700 bg-zinc-900 px-4 py-2 text-center text-xs text-zinc-400">
-          Archived chapter — read only.{" "}
+          Geschlossenes Kapitel — nur lesen &amp; anhören.{" "}
           <Link href={`/story/${storyId}`} className="text-accent underline">
-            Open active chapter
+            Alle Kapitel
           </Link>
+          {bundle.chapters.some((c) => c.status === "active") ? (
+            <>
+              {" · "}
+              <Link
+                href={`/story/${storyId}/chat?chapter=${bundle.chapters.find((c) => c.status === "active")!.id}`}
+                className="text-accent underline"
+              >
+                Aktives Kapitel
+              </Link>
+            </>
+          ) : null}
         </p>
       ) : null}
       {!hasKey ? (
@@ -98,21 +115,30 @@ function StoryChatInner() {
         <p className="border-b border-surface-border bg-surface-raised px-4 py-2 text-center text-xs text-zinc-400">
           <Link href="/settings" className="text-accent underline">
             Configure TTS
-          </Link>{" "}
-          (PC: npm run tts:server)
+          </Link>
+          {ttsProvider === "local" && !serverCaps.serverTts
+            ? " (PC: npm run tts:server)"
+            : null}
         </p>
       ) : null}
       <ChatView
         storyId={storyId}
         chapterId={bundle.activeChapter.id}
         character={bundle.narrator}
-        cast={bundle.cast}
+        cast={bundle.allCast}
         storySettings={bundle.storySettings}
         loreEntries={bundle.loreEntries}
         chapter={bundle.activeChapter}
-        bandSummary={bundle.band.band_summary as string | null}
-        priorChapterSummaries={priorSummaries || null}
+        bandSummary={bandSummary || null}
+        priorChapterSummaries={priorSummaries}
+        chapterTitle={bundle.activeChapter.title}
+        phaseHint={bundle.activeChapter.phase_hint ?? null}
+        chapterIndex={bundle.activeChapter.index_in_band}
+        closedChapterCount={
+          bundle.chapters.filter((c) => c.status === "closed").length
+        }
         readOnly={readOnly}
+        storyLocale={(bundle.story.locale as string) ?? "de"}
       />
     </main>
   );

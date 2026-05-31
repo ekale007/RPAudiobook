@@ -94,9 +94,9 @@ Then set **Settings → Custom** → Server URL `http://127.0.0.1:8880` and we�
 
 ---
 
-# Qwen3-TTS (later)
+# Qwen3-TTS
 
-Port **5125** reserved. Same `/speak` contract when you add a wrapper. See [alexandria-audiobook](https://github.com/Finrandojin/alexandria-audiobook) for reference.
+Siehe **`docs/QWEN-TTS.md`** — `npm run tts:qwen:install` dann `npm run tts:qwen` (Port **5125**).
 
 ## Multi-voice (Phase D)
 

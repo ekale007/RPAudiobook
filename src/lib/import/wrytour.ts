@@ -6,7 +6,6 @@ import kaelenCard from "@/data/seed/wrytour/characters/kaelen-vellen.json";
 import luciferCard from "@/data/seed/wrytour/characters/lucifer.json";
 import michaelCard from "@/data/seed/wrytour/characters/michael.json";
 import gabrielCard from "@/data/seed/wrytour/characters/gabriel.json";
-import mayaCard from "@/data/seed/wrytour/characters/maya-roth.json";
 import hiddenCommunityCard from "@/data/seed/wrytour/characters/hidden-community.json";
 import worldInfoBook from "@/data/seed/wrytour/lorebooks/world-info.json";
 import rothFamilyBook from "@/data/seed/wrytour/lorebooks/roth-family.json";
@@ -26,7 +25,6 @@ export function loadWhenDawnBreaksSeed(): WryTourSeedPack {
       { slug: "lucifer", role: "cast", card: luciferCard as WryTourCharacter },
       { slug: "michael", role: "cast", card: michaelCard as WryTourCharacter },
       { slug: "gabriel", role: "cast", card: gabrielCard as WryTourCharacter },
-      { slug: "maya-roth", role: "cast", card: mayaCard as WryTourCharacter },
       {
         slug: "hidden-community",
         role: "cast",

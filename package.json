@@ -15,7 +15,11 @@
     "tts:kokoro": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-kokoro.ps1 --preload",
     "tts:kokoro:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-kokoro.ps1 --device cpu --preload",
     "tts:kokoro:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-kokoro.ps1",
-    "tts:kokoro:install:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-kokoro.ps1 -CpuOnly"
+    "tts:kokoro:install:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-kokoro.ps1 -CpuOnly",
+    "tts:qwen": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-qwen.ps1 --preload",
+    "tts:qwen:large": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-qwen.ps1 --preload --model Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
+    "tts:qwen:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-qwen.ps1 --device cpu --preload",
+    "tts:qwen:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-qwen.ps1"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

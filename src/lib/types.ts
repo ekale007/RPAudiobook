@@ -43,6 +43,8 @@ export interface ChatTurn {
 export interface OpenRouterSettings {
   apiKey: string;
   model: string;
+  /** Optional override for storyteller chat generation. */
+  narratorModel?: string;
   maxTokens: number;
   temperature: number;
 }
@@ -53,20 +55,25 @@ export const DEFAULT_OPENROUTER: Omit<OpenRouterSettings, "apiKey"> = {
   temperature: 0.85,
 };
 
-export type ChatMode = "narrator" | "group";
-
 /** slug → Kokoro voice id or ElevenLabs voice id */
 export type VoiceMap = Record<string, string>;
+
+import type { StoryPlotState } from "@/lib/memory/plotState";
+import type { StoryPin } from "@/lib/memory/storyPins";
 
 export interface StorySettings {
   recentTurnCount: number;
   loreTokenBudget: number;
-  chatMode?: ChatMode;
   voiceMap?: VoiceMap;
+  /** Cast slugs that use their own voice; others use narrator. Omit = all cast enabled. */
+  voiceEnabledSlugs?: string[];
+  /** Structured RP memory (threats, time, resolved facts) — overrides stale countdowns */
+  plotState?: StoryPlotState | null;
+  /** Player-pinned facts for the narrator */
+  pinnedNotes?: StoryPin[];
 }
 
 export const DEFAULT_STORY_SETTINGS: StorySettings = {
-  recentTurnCount: 16,
+  recentTurnCount: 24,
   loreTokenBudget: 3500,
-  chatMode: "narrator",
 };

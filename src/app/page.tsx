@@ -3,20 +3,47 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
+import {
+  StoryLibraryShelf,
+  StoryListCard,
+} from "@/components/StoryHomeSections";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
-import { importWhenDawnBreaks, listStories } from "@/lib/db/stories";
-import { loadWhenDawnBreaksSeed } from "@/lib/import/wrytour";
+import {
+  deleteStory,
+  importFromLibraryTemplate,
+  isStoryArchived,
+  listStories,
+  setStoryArchived,
+  updateStoryTitle,
+  type StoryRow,
+} from "@/lib/db/stories";
+import type { LibraryTemplateId } from "@/lib/story/libraryTemplates";
+import {
+  getLibraryTemplateId,
+  getStoryOrigin,
+  storyOriginLabel,
+} from "@/lib/story/storyOrigin";
 import type { User } from "@supabase/supabase-js";
 
 export default function HomePage() {
   const [user, setUser] = useState<User | null>(null);
-  const [stories, setStories] = useState<
-    Array<{ id: string; title: string }>
-  >([]);
+  const [stories, setStories] = useState<StoryRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
+  const [importingId, setImportingId] = useState<LibraryTemplateId | null>(
+    null,
+  );
+  const [showArchived, setShowArchived] = useState(false);
+  const [busyStoryId, setBusyStoryId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const supabaseOk = isSupabaseConfigured();
+
+  const refreshStories = async (includeArchived = showArchived) => {
+    if (!user) return;
+    const rows = await listStories(includeArchived);
+    setStories(rows);
+  };
 
   useEffect(() => {
     if (!supabaseOk) {
@@ -38,26 +65,21 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!user) return;
-    listStories()
+    listStories(showArchived)
       .then(setStories)
       .catch((e) => setMessage(String(e)));
-  }, [user]);
+  }, [user, showArchived]);
 
-  const handleImport = async () => {
+  const handleLibraryImport = async (templateId: LibraryTemplateId) => {
     if (!user) return;
-    setImporting(true);
+    setImportingId(templateId);
     setMessage(null);
     try {
-      const pack = loadWhenDawnBreaksSeed();
-      const { storyId } = await importWhenDawnBreaks(user.id, pack);
-      const list = await listStories();
-      setStories(list);
-      setMessage("Story imported.");
+      const { storyId } = await importFromLibraryTemplate(user.id, templateId);
       window.location.href = `/story/${storyId}`;
     } catch (e) {
       setMessage(String(e));
-    } finally {
-      setImporting(false);
+      setImportingId(null);
     }
   };
 
@@ -109,54 +131,125 @@ export default function HomePage() {
 
   return (
     <main className="flex min-h-dvh flex-col">
-      <AppHeader title="Your stories" />
-      <div className="flex flex-1 flex-col gap-4 p-4">
-        <button
-          type="button"
-          onClick={async () => {
-            const supabase = createClient();
-            await supabase.auth.signOut();
-            setUser(null);
-            setStories([]);
-          }}
-          className="text-right text-xs text-zinc-500"
-        >
-          Sign out
-        </button>
-        <button
-          type="button"
-          onClick={handleImport}
-          disabled={importing}
-          className="w-full rounded-xl border border-accent/40 bg-accent/10 py-3 text-sm font-medium text-accent"
-        >
-          {importing ? "Importing…" : "Import When Dawn Breaks"}
-        </button>
+      <AppHeader
+        title="HörbuchKI"
+        centerSlot={
+          <Link
+            href="/story/new"
+            className="whitespace-nowrap rounded-full bg-accent px-3 py-1.5 text-[11px] font-semibold text-black shadow-sm sm:px-4 sm:text-xs"
+          >
+            + Neue Story
+          </Link>
+        }
+      />
+      <div className="flex flex-1 flex-col overflow-y-auto px-3 pb-8 pt-3 sm:px-4">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-medium text-zinc-200">Deine Geschichten</h2>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1.5 text-[10px] text-zinc-500">
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(e) => setShowArchived(e.target.checked)}
+                className="scale-90"
+              />
+              Archiv
+            </label>
+            <button
+              type="button"
+              onClick={async () => {
+                const supabase = createClient();
+                await supabase.auth.signOut();
+                setUser(null);
+                setStories([]);
+              }}
+              className="text-[10px] text-zinc-600 hover:text-zinc-400"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
 
         {message ? (
-          <p className="text-center text-sm text-zinc-400">{message}</p>
+          <p className="mb-2 text-center text-xs text-zinc-400">{message}</p>
         ) : null}
 
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-1.5">
           {stories.map((s) => (
             <li key={s.id}>
-              <Link
-                href={`/story/${s.id}`}
-                className="block rounded-xl border border-surface-border bg-surface-raised px-4 py-3"
-              >
-                <span className="font-medium">{s.title}</span>
-                <span className="mt-1 block text-xs text-zinc-500">
-                  Story hub · chapters · export
-                </span>
-              </Link>
+              <StoryListCard
+                story={s}
+                libraryTemplateId={getLibraryTemplateId(s.settings)}
+                originLabel={storyOriginLabel(getStoryOrigin(s.settings))}
+                busy={busyStoryId === s.id}
+                renaming={renamingId === s.id}
+                renameDraft={renameDraft}
+                onRenameDraftChange={setRenameDraft}
+                onStartRename={() => {
+                  setRenamingId(s.id);
+                  setRenameDraft(s.title);
+                }}
+                onCancelRename={() => setRenamingId(null)}
+                onSaveRename={async () => {
+                  setBusyStoryId(s.id);
+                  setMessage(null);
+                  try {
+                    await updateStoryTitle(s.id, renameDraft);
+                    setRenamingId(null);
+                    await refreshStories();
+                  } catch (e) {
+                    setMessage(String(e));
+                  } finally {
+                    setBusyStoryId(null);
+                  }
+                }}
+                onArchive={async () => {
+                  setBusyStoryId(s.id);
+                  setMessage(null);
+                  try {
+                    const archived = isStoryArchived(s.settings);
+                    await setStoryArchived(s.id, !archived);
+                    await refreshStories();
+                  } catch (e) {
+                    setMessage(String(e));
+                  } finally {
+                    setBusyStoryId(null);
+                  }
+                }}
+                onDelete={async () => {
+                  const ok = window.confirm(
+                    `Delete story "${s.title}" permanently? This cannot be undone.`,
+                  );
+                  if (!ok) return;
+                  setBusyStoryId(s.id);
+                  setMessage(null);
+                  try {
+                    await deleteStory(s.id);
+                    await refreshStories();
+                  } catch (e) {
+                    setMessage(String(e));
+                  } finally {
+                    setBusyStoryId(null);
+                  }
+                }}
+                isArchived={isStoryArchived(s.settings)}
+              />
             </li>
           ))}
         </ul>
 
         {stories.length === 0 ? (
-          <p className="text-center text-sm text-zinc-500">
-            No stories yet. Import the seed pack to start.
+          <p className="py-4 text-center text-xs text-zinc-500">
+            Noch keine Geschichten — tippe oben auf{" "}
+            <strong className="font-medium text-zinc-400">+ Neue Story</strong>{" "}
+            oder wähle unten aus der Bibliothek.
           </p>
         ) : null}
+
+        <StoryLibraryShelf
+          importingId={importingId}
+          onImport={handleLibraryImport}
+        />
       </div>
     </main>
   );

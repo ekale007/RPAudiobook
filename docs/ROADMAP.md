@@ -35,13 +35,15 @@ Ziel: WryTour-ähnliches RPG im Browser, PWA am Handy, Kokoro lokal am PC.
 
 - [ ] Supabase-Migrationen 001–003 auf Prod-Projekt angewendet?
 - [ ] `turns.speaker_slug` vorhanden (003) — Gruppenchat sonst ohne Sprecher-Spalte
-- [ ] Rolling summary nach Rewind/Reroll neu berechnen? (aktuell: alte Summary bleibt — **kritisch mittelfristig**)
+- [x] Rolling summary: Voll-Rebuild, Sync nach Rewind/Reroll/Edit, Story-State-Block
+- [x] Keine doppelte Kapitel-Memory (Band ODER Prior-Summaries)
 - [ ] Duplikat-Import verhindern (zweites „When Dawn Breaks“)
 
 ### 3. UX-Verbesserungen Chat
 
 - [ ] Rewind/Reroll: eigene Bestätigungstexte (Reroll ≠ Rewind)
-- [ ] Continue im Gruppenmodus testen (mehrere `<<speaker:…>>` Blöcke)
+- [x] „Schlag was vor“: KI schlägt 3 Story-Richtungen mit Intro vor, Spieler wählt
+- [ ] Story-Beat-Vorschläge im Gruppenchat + am Handy testen
 - [ ] Streaming-Abbruch (Stop-Button)
 - [ ] Gruppenchat: Reroll ganze „Runde“ visuell klarer
 
@@ -59,7 +61,8 @@ Ziel: WryTour-ähnliches RPG im Browser, PWA am Handy, Kokoro lokal am PC.
 
 ### 6. TTS / Audio
 
-- [ ] Qwen3-TTS (Port 5125, siehe `docs/KOKORO-QWEN.md`)
+- [x] **Kokoro** — produktiv (`npm run tts:kokoro`, Figuren-Stimmen, Autoplay)
+- [ ] Qwen3-TTS — **zurückgestellt**; Masterplan: [`docs/QWEN-MASTERPLAN.md`](./QWEN-MASTERPLAN.md) (Performance, Voice Design, Clone pro Figur)
 - [ ] WAV-Segmente sauber concat (Multi-Chunk) — bei langen Texten prüfen
 - [ ] ElevenLabs Multi-Voice (falls gewünscht)
 
@@ -79,7 +82,8 @@ Ziel: WryTour-ähnliches RPG im Browser, PWA am Handy, Kokoro lokal am PC.
 | **Rewind/Reroll** | `rolling_summary` passt nicht mehr zum Text | Kapitel schließen / Summary manuell ignorieren; Fix: Summary nach Truncate neu generieren |
 | **package.json BOM** | `npm run dev` bricht | `predev`/`prebuild` strippt BOM; Editor auf UTF-8 ohne BOM speichern |
 | **HF_TOKEN** | Kokoro-Download rate-limit | `HF_TOKEN` in `.env.local` |
-| **Gruppenchat Parsing** | Modell vergisst `<<speaker:…>>` | Narrator-Modus; Prompt nachschärfen |
+| **Gruppenchat Parsing** | Modell vergisst `<<speaker:…>>` oder mischt „You…“ unter Figuren | Strengerer Prompt + Auto-Fix (`normalizeSpeakerBlocks`); bei anhaltenden Fehlern Narrator-Modus |
+| **TTS ohne Sprechername** | Kokoro liest nur Fließtext | `prepareTextForTts`: „Naya Vellen: …“ vor Figur-Dialog |
 | **Supabase RLS** | Nur eigene Stories | Korrekt so; Anonymous-User = eigene Daten |
 | **Archivierte Kapitel** | Read-only, keine Edit-Buttons | By design |
 | **Git** | Repo war lokal ohne Git | Erstes Commit angelegt (siehe unten) |

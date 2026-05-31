@@ -105,7 +105,23 @@ def audio_to_numpy(audio: Any) -> np.ndarray:
     return np.asarray(audio, dtype=np.float32)
 
 
+import re
+
 def synthesize(text: str, voice: str, speed: float) -> bytes:
+    try:
+        return _synthesize_once(text, voice, speed)
+    except ValueError as e:
+        if "no audio chunks" not in str(e).lower():
+            raise
+        cleaned = re.sub(r"[^\w\s.,!?;:'\"-]", " ", text)
+        cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+        if cleaned and cleaned != text.strip() and len(re.sub(r"[^a-zA-Z]", "", cleaned)) >= 2:
+            log.warning("Retrying Kokoro with sanitized text (%d chars)", len(cleaned))
+            return _synthesize_once(cleaned, voice, speed)
+        raise
+
+
+def _synthesize_once(text: str, voice: str, speed: float) -> bytes:
     pipeline = get_pipeline()
     voice = normalize_voice(voice)
     parts: list[np.ndarray] = []

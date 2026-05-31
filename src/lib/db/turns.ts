@@ -18,7 +18,9 @@ async function reindexTurns(turns: TurnRow[]): Promise<void> {
   }
 }
 
-async function removeTurnAudio(path: string | null | undefined): Promise<void> {
+export async function removeTurnAudio(
+  path: string | null | undefined,
+): Promise<void> {
   if (!path) return;
   const supabase = createClient();
   await supabase.storage.from("tts-audio").remove([path]);

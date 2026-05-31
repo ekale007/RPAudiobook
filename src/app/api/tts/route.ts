@@ -1,18 +1,65 @@
 import { NextResponse } from "next/server";
+import {
+  getElevenLabsApiKey,
+  getRateLimitTtsPerHour,
+  isServerTtsConfigured,
+} from "@/lib/server/env";
+import { checkRateLimit } from "@/lib/server/rateLimit";
+import { requireUser } from "@/lib/server/requireUser";
+import {
+  getDefaultElevenLabsModel,
+  getElevenLabsVoiceSettings,
+} from "@/lib/tts/elevenLabsVoices";
 
 const ELEVEN_BASE = "https://api.elevenlabs.io/v1";
 
-/** Proxies ElevenLabs TTS so the API key stays client-side (header) and CORS is avoided. */
+export async function GET() {
+  return NextResponse.json({
+    serverTts: isServerTtsConfigured(),
+    model: getDefaultElevenLabsModel(),
+  });
+}
+
+/** ElevenLabs TTS — server key in production; optional client header for dev fallback. */
 export async function POST(req: Request) {
-  const apiKey = req.headers.get("xi-api-key");
-  if (!apiKey) {
+  const auth = await requireUser(req);
+  if ("error" in auth) return auth.error;
+
+  const limit = checkRateLimit(
+    `tts:${auth.user.id}`,
+    getRateLimitTtsPerHour(),
+  );
+  if (!limit.ok) {
     return NextResponse.json(
-      { error: "Missing xi-api-key header" },
-      { status: 401 },
+      { error: "TTS rate limit exceeded", retryAfterSec: limit.retryAfterSec },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } },
     );
   }
 
-  let body: { text?: string; voiceId?: string; modelId?: string };
+  const serverKey = getElevenLabsApiKey();
+  const devHeaderKey =
+    process.env.NODE_ENV !== "production"
+      ? req.headers.get("xi-api-key")?.trim()
+      : undefined;
+  const apiKey = serverKey ?? devHeaderKey;
+  if (!apiKey) {
+    return NextResponse.json(
+      {
+        error:
+          process.env.NODE_ENV === "production"
+            ? "TTS not configured. Set ELEVENLABS_API_KEY on the server."
+            : "TTS not configured. Set ELEVENLABS_API_KEY on the server or xi-api-key header (dev only).",
+      },
+      { status: 503 },
+    );
+  }
+
+  let body: {
+    text?: string;
+    voiceId?: string;
+    modelId?: string;
+    locale?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -21,7 +68,8 @@ export async function POST(req: Request) {
 
   const text = body.text?.trim();
   const voiceId = body.voiceId?.trim();
-  const modelId = body.modelId?.trim() || "eleven_multilingual_v2";
+  const modelId = body.modelId?.trim() || getDefaultElevenLabsModel();
+  const locale = body.locale?.startsWith("de") ? "de" : "en";
 
   if (!text) {
     return NextResponse.json({ error: "Missing text" }, { status: 400 });
@@ -36,6 +84,8 @@ export async function POST(req: Request) {
     );
   }
 
+  const voiceSettings = getElevenLabsVoiceSettings(locale);
+
   const upstream = await fetch(
     `${ELEVEN_BASE}/text-to-speech/${encodeURIComponent(voiceId)}`,
     {
@@ -48,12 +98,7 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         text,
         model_id: modelId,
-        voice_settings: {
-          stability: 0.45,
-          similarity_boost: 0.75,
-          style: 0.35,
-          use_speaker_boost: true,
-        },
+        voice_settings: voiceSettings,
       }),
     },
   );

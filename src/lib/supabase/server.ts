@@ -1,8 +1,22 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
 
-export async function createServerSupabase() {
+function cookiesFromRequest(req?: Request): ReturnType<
+  NextRequest["cookies"]["getAll"]
+> | null {
+  const nextReq = req as NextRequest | undefined;
+  if (nextReq?.cookies && typeof nextReq.cookies.getAll === "function") {
+    return nextReq.cookies.getAll();
+  }
+  return null;
+}
+
+/** Supabase server client — prefer request cookies in Route Handlers. */
+export async function createServerSupabaseFromRequest(req?: Request) {
   const cookieStore = await cookies();
+  const reqCookies = req ? cookiesFromRequest(req) : null;
+  const authHeader = req?.headers.get("Authorization") ?? undefined;
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,7 +24,7 @@ export async function createServerSupabase() {
     {
       cookies: {
         getAll() {
-          return cookieStore.getAll();
+          return reqCookies ?? cookieStore.getAll();
         },
         setAll(
           cookiesToSet: {
@@ -28,6 +42,14 @@ export async function createServerSupabase() {
           }
         },
       },
+      ...(authHeader
+        ? { global: { headers: { Authorization: authHeader } } }
+        : {}),
     },
   );
+}
+
+/** @deprecated Use createServerSupabaseFromRequest(req) in Route Handlers. */
+export async function createServerSupabase() {
+  return createServerSupabaseFromRequest();
 }

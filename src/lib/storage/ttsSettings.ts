@@ -1,4 +1,7 @@
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
+import type { PronunciationMap } from "@/lib/tts/pronunciation";
+
+import { isServerTtsAvailable } from "@/lib/server/serverCapabilities";
 
 export type TtsProvider = "local" | "elevenlabs";
 
@@ -12,16 +15,19 @@ export interface TtsSettings {
   elevenLabsApiKey: string;
   elevenLabsVoiceId: string;
   elevenLabsModelId: string;
+  /** Optional pronunciation overrides, e.g. "Elias" -> "Eh-LEE-as". */
+  pronunciationMap?: PronunciationMap;
 }
 
 export const DEFAULT_TTS: TtsSettings = {
-  provider: "local",
+  provider: "elevenlabs",
   localEngine: "edge",
   localServerUrl: "http://127.0.0.1:5123",
   localVoice: "en-US-AndrewNeural",
   elevenLabsApiKey: "",
   elevenLabsVoiceId: "JBFqnCBsd6RMkjVDRZzb",
   elevenLabsModelId: "eleven_multilingual_v2",
+  pronunciationMap: {},
 };
 
 const STORAGE_KEY = "hoerbuchki.tts";
@@ -75,22 +81,29 @@ export function loadTtsSettings(): TtsSettings {
   }
 }
 
-export function saveTtsSettings(settings: TtsSettings): void {
+export function saveTtsSettings(
+  settings: TtsSettings,
+  options?: { sync?: boolean },
+): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  // Old key forced provider: "elevenlabs" on every load — remove it
   localStorage.removeItem(LEGACY_ELEVEN_KEY);
+  if (options?.sync !== false && typeof window !== "undefined") {
+    void import("@/lib/storage/userPreferencesSync").then((m) =>
+      m.pushUserPreferencesToAccount(),
+    );
+  }
 }
 
 export function isTtsReady(settings: TtsSettings): boolean {
   if (settings.provider === "local") return true;
-  return Boolean(
-    settings.elevenLabsApiKey.trim() && settings.elevenLabsVoiceId.trim(),
-  );
+  if (!settings.elevenLabsVoiceId.trim()) return false;
+  if (isServerTtsAvailable()) return true;
+  return Boolean(settings.elevenLabsApiKey.trim());
 }
 
 export function ttsCacheVoiceKey(settings: TtsSettings): string {
   if (settings.provider === "local") {
     return `local:${settings.localEngine}:${settings.localVoice}`;
   }
-  return `el:${settings.elevenLabsVoiceId}:${settings.elevenLabsModelId}`;
+  return `el:${settings.elevenLabsVoiceId}:${settings.elevenLabsModelId}:v2`;
 }

@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { ServerCapabilitiesBootstrap } from "@/components/ServerCapabilitiesBootstrap";
+import { UserPreferencesBootstrap } from "@/components/UserPreferencesBootstrap";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -31,7 +33,11 @@ export default function RootLayout({
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icon.svg" />
       </head>
-      <body className="min-h-dvh antialiased">{children}</body>
+      <body className="min-h-dvh antialiased">
+        <ServerCapabilitiesBootstrap />
+        <UserPreferencesBootstrap />
+        {children}
+      </body>
     </html>
   );
 }

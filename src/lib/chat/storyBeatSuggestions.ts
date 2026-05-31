@@ -1,0 +1,102 @@
+import { buildChatMessages } from "@/lib/prompt/buildPrompt";
+import type { PromptContext } from "@/lib/prompt/buildPrompt";
+import { completeOpenRouter } from "@/lib/llm/openrouter";
+import type { OpenRouterSettings } from "@/lib/types";
+
+export type StoryBeatOption = {
+  id: string;
+  title: string;
+  /** Short player-facing teaser (2–3 sentences). */
+  intro: string;
+  /** Hidden writer instruction when this beat is chosen. */
+  direction: string;
+};
+
+const BEATS_USER_PROMPT = `You are a story beat advisor for an interactive RPG. Based on the conversation so far, propose exactly 3 meaningfully DIFFERENT directions the scene could go next (different focus, tone, or consequence).
+
+Return ONLY valid JSON (no markdown, no commentary):
+{"options":[{"id":"1","title":"Short headline (max 6 words)","intro":"2-3 sentences in second person as a teaser. Present tense. Do not resolve the scene or speak for the player.","direction":"One clear sentence telling the narrator what to write if the player picks this."},{"id":"2","title":"...","intro":"...","direction":"..."},{"id":"3","title":"...","intro":"...","direction":"..."}]}
+
+Rules:
+- "intro" = teaser only (what the player reads before choosing)
+- "direction" = writer brief only (not shown to the player)
+- Stay in story tone; no deus ex machina unless earned
+- Each option must feel like a real fork, not three versions of the same beat`;
+
+const DEFAULT_CONTINUE =
+  "[Continue the story from here. Write the next moments in scene. Do not repeat prior text. End at a natural pause for the player.]";
+
+export function defaultContinuePrompt(): string {
+  return DEFAULT_CONTINUE;
+}
+
+export function buildPlayBeatPrompt(beat: StoryBeatOption): string {
+  return `[The player chose this story direction: "${beat.title}".
+Narrator brief: ${beat.direction}
+Write the full next story beat. Do not repeat prior text. End at a natural pause for the player.]`;
+}
+
+export function parseStoryBeatOptions(raw: string): StoryBeatOption[] {
+  const trimmed = raw.trim();
+  const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
+  const candidate = jsonMatch ? jsonMatch[0] : trimmed;
+
+  try {
+    const parsed = JSON.parse(candidate) as {
+      options?: Array<Partial<StoryBeatOption>>;
+    };
+    const list = parsed.options ?? [];
+    return list
+      .map((o, i) => normalizeOption(o, i))
+      .filter((o): o is StoryBeatOption => o !== null);
+  } catch {
+    return [];
+  }
+}
+
+function normalizeOption(
+  o: Partial<StoryBeatOption>,
+  index: number,
+): StoryBeatOption | null {
+  const title = o.title?.trim();
+  const intro = o.intro?.trim();
+  const direction = o.direction?.trim();
+  if (!title || !intro || !direction) return null;
+  return {
+    id: String(o.id ?? index + 1),
+    title,
+    intro,
+    direction,
+  };
+}
+
+export type FetchBeatsParams = {
+  settings: OpenRouterSettings;
+  promptCtx: PromptContext;
+  signal?: AbortSignal;
+};
+
+export async function fetchStoryBeatSuggestions(
+  params: FetchBeatsParams,
+): Promise<StoryBeatOption[]> {
+  const { messages } = buildChatMessages(params.promptCtx);
+
+  const withRequest = [
+    ...messages,
+    { role: "user" as const, content: BEATS_USER_PROMPT },
+  ];
+
+  const raw = await completeOpenRouter(params.settings, withRequest, {
+    maxTokens: 900,
+    temperature: 0.88,
+    signal: params.signal,
+  });
+
+  const options = parseStoryBeatOptions(raw);
+  if (options.length < 3) {
+    throw new Error(
+      "Konnte keine 3 Vorschläge lesen. Nochmal tippen oder „Einfach weiterspielen“.",
+    );
+  }
+  return options.slice(0, 3);
+}

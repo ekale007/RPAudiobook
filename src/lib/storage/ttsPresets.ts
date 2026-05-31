@@ -18,9 +18,9 @@ export const LOCAL_TTS_PRESETS: Record<
     docs: "npm run tts:kokoro",
   },
   qwen: {
-    label: "Qwen3-TTS (GPU, install later)",
+    label: "Qwen3-TTS (GPU, voice design)",
     serverUrl: "http://127.0.0.1:5125",
-    defaultVoice: "default",
-    docs: "docs/KOKORO-QWEN.md",
+    defaultVoice: "Ryan",
+    docs: "npm run tts:qwen",
   },
 };

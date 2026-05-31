@@ -1,23 +1,15 @@
 import { buildChatMessages } from "@/lib/prompt/buildPrompt";
-import { buildGroupChatMessages } from "@/lib/prompt/buildGroupPrompt";
-import { parseSpeakerBlocks } from "@/lib/chat/parseSpeakerBlocks";
+import { ensureSpeakerScript } from "@/lib/chat/dialogueScript";
+import { preprocessAssistantMarkup } from "@/lib/chat/parseSpeakerBlocks";
 import { streamOpenRouterChat } from "@/lib/llm/openrouter";
 import type { OpenRouterSettings } from "@/lib/types";
-import type {
-  ChatMode,
-  ChatTurn,
-  LoreEntry,
-  StorySettings,
-  WryTourCharacter,
-} from "@/lib/types";
+import type { ChatTurn, LoreEntry, StorySettings, WryTourCharacter } from "@/lib/types";
 import type { CharacterRow } from "@/lib/db/stories";
-
-const CONTINUE_USER =
-  "[Continue the story from here. Write the next moments in scene. Do not repeat prior text. End at a natural pause for the player.]";
+import type { StoryPlotState } from "@/lib/memory/plotState";
+import { defaultContinuePrompt } from "@/lib/chat/storyBeatSuggestions";
 
 export type GenerateReplyParams = {
   settings: OpenRouterSettings;
-  chatMode: ChatMode;
   character: WryTourCharacter;
   cast: CharacterRow[];
   loreEntries: LoreEntry[];
@@ -26,8 +18,17 @@ export type GenerateReplyParams = {
   bandSummary?: string | null;
   chapterSummary?: string | null;
   rollingSummary?: string | null;
+  chapterTitle?: string | null;
+  phaseHint?: string | null;
+  chapterIndex?: number;
+  closedChapterCount?: number;
+  plotState?: StoryPlotState | null;
+  allCast?: CharacterRow[];
   continuation?: boolean;
+  /** Overrides default “continue” prompt (e.g. chosen story beat). */
+  continuationPrompt?: string;
   onToken?: (chunk: string) => void;
+  onStreamError?: (error: Error) => void;
   onLoreCount?: (n: number) => void;
   signal?: AbortSignal;
 };
@@ -38,7 +39,11 @@ export async function streamAssistantReply(
   const history = params.continuation
     ? [
         ...params.turns,
-        { role: "user" as const, content: CONTINUE_USER },
+        {
+          role: "user" as const,
+          content:
+            params.continuationPrompt ?? defaultContinuePrompt(),
+        },
       ]
     : params.turns;
 
@@ -49,17 +54,20 @@ export async function streamAssistantReply(
     bandSummary: params.bandSummary,
     chapterSummary: params.chapterSummary,
     rollingSummary: params.rollingSummary,
+    chapterTitle: params.chapterTitle,
+    phaseHint: params.phaseHint,
+    chapterIndex: params.chapterIndex,
+    closedChapterCount: params.closedChapterCount,
+    plotState: params.plotState,
+    allCast: params.allCast ?? params.cast,
     settings: params.storySettings,
   };
 
-  const { messages, activeLoreCount } =
-    params.chatMode === "group"
-      ? buildGroupChatMessages(promptCtx, params.cast)
-      : buildChatMessages(promptCtx);
-
+  const { messages, activeLoreCount } = buildChatMessages(promptCtx);
   params.onLoreCount?.(activeLoreCount);
 
   let full = "";
+  let streamError: Error | null = null;
   await new Promise<void>((resolve) => {
     streamOpenRouterChat(
       params.settings,
@@ -70,22 +78,26 @@ export async function streamAssistantReply(
           params.onToken?.(t);
         },
         onDone: () => resolve(),
-        onError: () => resolve(),
+        onError: (e) => {
+          streamError = e;
+          params.onStreamError?.(e);
+          resolve();
+        },
       },
       params.signal,
     );
   });
 
+  if (streamError) throw streamError;
+
   return full;
 }
 
-export function parseAssistantBlocks(
-  chatMode: ChatMode,
-  full: string,
-): Array<{ speakerSlug: string; content: string }> {
-  if (chatMode === "group") {
-    const blocks = parseSpeakerBlocks(full);
-    if (blocks.length) return blocks;
-  }
-  return [{ speakerSlug: "narrator", content: full }];
+/** Storyteller mode: one narrator turn per reply (content keeps script tags). */
+export function parseAssistantBlocks(full: string): Array<{
+  speakerSlug: string;
+  content: string;
+}> {
+  const cleaned = ensureSpeakerScript(preprocessAssistantMarkup(full));
+  return [{ speakerSlug: "narrator", content: cleaned }];
 }
