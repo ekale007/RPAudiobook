@@ -1,6 +1,10 @@
 import type { MessageAudioPlayerHandle } from "@/lib/tts/messageAudioPlayerHandle";
 import { isAutoplayBlockedError } from "@/lib/tts/autoplayPolicy";
 
+const PLAYER_WAIT_MS = 4000;
+const PLAYER_POLL_MS = 50;
+const PREWARM_AHEAD = 4;
+
 /** Serial TTS playback — new turns, manual ▶ with autoplay, and follow-up buffering. */
 export class TtsAutoplayQueue {
   private queue: string[] = [];
@@ -30,6 +34,7 @@ export class TtsAutoplayQueue {
       seen.add(id);
     }
     if (!this.queue.length) return;
+    this.prewarmQueue(PREWARM_AHEAD);
     this.notify();
     this.notifyQueue();
     void this.drain();
@@ -46,6 +51,7 @@ export class TtsAutoplayQueue {
       if (id !== turnId) player.stop();
     }
     this.queue = order.slice(idx);
+    this.prewarmQueue(PREWARM_AHEAD);
     this.notify();
     this.notifyQueue();
     void this.drain();
@@ -113,6 +119,19 @@ export class TtsAutoplayQueue {
     this.enqueue(this.assistantOrder.slice(idx + 1));
   }
 
+  private async waitForPlayer(
+    turnId: string,
+    maxMs = PLAYER_WAIT_MS,
+  ): Promise<MessageAudioPlayerHandle | null> {
+    const deadline = Date.now() + maxMs;
+    while (Date.now() < deadline && !this.stopped) {
+      const player = this.players.get(turnId);
+      if (player) return player;
+      await new Promise((r) => setTimeout(r, PLAYER_POLL_MS));
+    }
+    return this.players.get(turnId) ?? null;
+  }
+
   private async drain() {
     if (this.draining) return;
     this.draining = true;
@@ -121,12 +140,9 @@ export class TtsAutoplayQueue {
     while (this.queue.length > 0 && !this.stopped) {
       const turnId = this.queue[0]!;
       this.enqueueFollowing(turnId);
-      this.prewarmUpcoming(2, 1);
-      let player = this.players.get(turnId);
-      if (!player) {
-        await new Promise((r) => setTimeout(r, 80));
-        player = this.players.get(turnId);
-      }
+      this.prewarmQueue(PREWARM_AHEAD);
+
+      const player = await this.waitForPlayer(turnId);
       if (!player || this.stopped) {
         this.queue.shift();
         this.notifyQueue();
@@ -154,8 +170,9 @@ export class TtsAutoplayQueue {
     }
   }
 
-  private prewarmUpcoming(maxCount: number, startOffset = 0) {
-    const candidates = this.queue.slice(startOffset, startOffset + maxCount);
+  /** Buffer TTS for upcoming queue items while the current clip plays. */
+  private prewarmQueue(maxCount: number) {
+    const candidates = this.queue.slice(0, maxCount);
     for (const turnId of candidates) {
       if (this.preparing.has(turnId)) continue;
       const player = this.players.get(turnId);

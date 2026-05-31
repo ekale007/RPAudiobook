@@ -47,6 +47,7 @@ import {
   autoplayBlockedHint,
   isAutoplayBlockedError,
 } from "@/lib/tts/autoplayPolicy";
+import { unlockAudioForAutoplay } from "@/lib/tts/audioUnlock";
 
 type Status = "idle" | "loading" | "ready" | "playing" | "paused" | "error";
 
@@ -101,6 +102,9 @@ export const MessageAudioPlayer = forwardRef<
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const ensurePromiseRef = useRef<Promise<HTMLAudioElement | null> | null>(
+    null,
+  );
   const tickRef = useRef<number | null>(null);
   const playEndRef = useRef<(() => void) | null>(null);
 
@@ -177,6 +181,7 @@ export const MessageAudioPlayer = forwardRef<
     cleanupUrl();
     audioRef.current?.pause();
     audioRef.current = null;
+    ensurePromiseRef.current = null;
     setStatus("idle");
     setError(null);
     setAutoplayBlocked(false);
@@ -212,7 +217,11 @@ export const MessageAudioPlayer = forwardRef<
     if (audioRef.current && objectUrlRef.current) {
       return audioRef.current;
     }
+    if (ensurePromiseRef.current) {
+      return ensurePromiseRef.current;
+    }
 
+    const run = async (): Promise<HTMLAudioElement | null> => {
     const settings = loadTtsSettings();
     if (
       settings.provider === "elevenlabs" &&
@@ -327,6 +336,12 @@ export const MessageAudioPlayer = forwardRef<
       setError(e instanceof Error ? e.message : String(e));
       return null;
     }
+    };
+
+    ensurePromiseRef.current = run().finally(() => {
+      ensurePromiseRef.current = null;
+    });
+    return ensurePromiseRef.current;
   };
 
   const finishPlayWait = () => {
@@ -416,8 +431,13 @@ export const MessageAudioPlayer = forwardRef<
 
   const togglePlay = async () => {
     if (status === "loading") return;
+    unlockAudioForAutoplay();
     if (status === "playing") {
       pause();
+      return;
+    }
+    if (autoplayChain && onChainPlay) {
+      onChainPlay();
       return;
     }
     if (status === "paused") {
@@ -425,14 +445,6 @@ export const MessageAudioPlayer = forwardRef<
       return;
     }
     if (status === "ready" && audioRef.current) {
-      await tryResumeOrPlay(audioRef.current);
-      return;
-    }
-    if (autoplayChain && onChainPlay) {
-      onChainPlay();
-      return;
-    }
-    if (status === "ready") {
       await tryResumeOrPlay(audioRef.current);
       return;
     }

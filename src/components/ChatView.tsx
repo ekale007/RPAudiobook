@@ -74,6 +74,7 @@ import { isTtsReady, loadTtsSettings } from "@/lib/storage/ttsSettings";
 import { subscribeServerCapabilities } from "@/lib/server/serverCapabilities";
 import type { MessageAudioPlayerHandle } from "@/lib/tts/messageAudioPlayerHandle";
 import { TtsAutoplayQueue } from "@/lib/tts/ttsAutoplayQueue";
+import { unlockAudioForAutoplay } from "@/lib/tts/audioUnlock";
 import { saveTtsAutoplay } from "@/lib/storage/ttsPlaybackSettings";
 import { ChatScrollPane } from "@/components/ChatScrollPane";
 import Link from "next/link";
@@ -212,6 +213,7 @@ export function ChatView({
   const requestTtsChainPlay = useCallback(
     (turnId: string) => {
       if (!hasTts || !ttsAutoplay) return;
+      unlockAudioForAutoplay();
       ttsQueueRef.current.playFrom(turnId, assistantTurnIds);
     },
     [hasTts, ttsAutoplay, assistantTurnIds],
@@ -821,6 +823,7 @@ export function ChatView({
   const runDriveMode = async (minutes: DriveModeMinutes) => {
     if (streaming || readOnly || autoSession || !turns.length || !hasTts) return;
 
+    unlockAudioForAutoplay();
     setBeatOptions(null);
     setAutoSession(true);
     setAutoTotal(0);
