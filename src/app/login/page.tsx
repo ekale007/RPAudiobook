@@ -13,6 +13,10 @@ import {
   saveRedirectOriginOverride,
   getAuthRedirectOrigin,
 } from "@/lib/auth/redirectUrl";
+import {
+  isInviteOnlyBeta,
+  showAnonymousDevLogin,
+} from "@/lib/auth/betaAuth";
 
 type LoginView = "sign-in" | "forgot-password";
 
@@ -27,6 +31,8 @@ function LoginForm() {
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [originOverride, setOriginOverride] = useState("");
+  const inviteOnly = isInviteOnlyBeta();
+  const showAnonymous = showAnonymousDevLogin();
 
   useEffect(() => {
     setOriginOverride(loadRedirectOriginOverride());
@@ -145,9 +151,18 @@ function LoginForm() {
     <div className="flex flex-1 flex-col gap-4 p-6">
       {view === "sign-in" ? (
         <form onSubmit={signInPassword} className="flex flex-col gap-3">
-          <p className="text-xs text-zinc-500">
-            Sign in with email and password. Works on phone and PC.
-          </p>
+          {inviteOnly ? (
+            <p className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-xs leading-relaxed text-violet-200">
+              Beta — Zugang nur mit Einladung. Hast du eine E-Mail von uns
+              bekommen, nutze den Link darin oder melde dich mit deinem
+              Passwort an.
+            </p>
+          ) : (
+            <p className="text-xs text-zinc-500">
+              Mit E-Mail und Passwort anmelden — funktioniert am Handy und am
+              PC.
+            </p>
+          )}
           <label className="text-sm text-zinc-400">Email</label>
           <input
             type="email"
@@ -185,14 +200,16 @@ function LoginForm() {
           >
             Sign in
           </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={signUpPassword}
-            className="rounded-xl border border-surface-border py-3 text-sm text-zinc-300 disabled:opacity-50"
-          >
-            Create account
-          </button>
+          {!inviteOnly ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={signUpPassword}
+              className="rounded-xl border border-surface-border py-3 text-sm text-zinc-300 disabled:opacity-50"
+            >
+              Create account
+            </button>
+          ) : null}
         </form>
       ) : (
         <form onSubmit={sendPasswordReset} className="flex flex-col gap-3">
@@ -250,19 +267,21 @@ function LoginForm() {
         </form>
       )}
 
-      <div className="border-t border-surface-border pt-4">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={signInAnonymous}
-          className="w-full rounded-xl border border-dashed border-zinc-600 py-2 text-xs text-zinc-500"
-        >
-          Dev: continue without email (anonymous)
-        </button>
-        <p className="mt-2 text-center text-xs text-zinc-600">
-          Enable in Supabase → Authentication → Providers → Anonymous
-        </p>
-      </div>
+      {showAnonymous ? (
+        <div className="border-t border-surface-border pt-4">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={signInAnonymous}
+            className="w-full rounded-xl border border-dashed border-zinc-600 py-2 text-xs text-zinc-500"
+          >
+            Dev: continue without email (anonymous)
+          </button>
+          <p className="mt-2 text-center text-xs text-zinc-600">
+            Enable in Supabase → Authentication → Providers → Anonymous
+          </p>
+        </div>
+      ) : null}
 
       {info ? <p className="text-sm text-green-400">{info}</p> : null}
       {error ? <p className="text-sm text-red-400">{error}</p> : null}

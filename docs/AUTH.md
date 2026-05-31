@@ -1,5 +1,11 @@
 # Authentication (Supabase)
 
+## Beta (nur eingeladene Gäste)
+
+Siehe **[BETA-AUTH.md](./BETA-AUTH.md)** — Supabase Sign-up aus, Anonymous aus, Gäste per **Invite user**.
+
+In Vercel: `NEXT_PUBLIC_BETA_INVITE_ONLY=1`
+
 ## Password login (default)
 
 1. Supabase → **Authentication** → **Providers** → **Email** → enabled.

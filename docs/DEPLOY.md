@@ -9,8 +9,10 @@ Checkliste für Beta-Deploy mit Server-LLM/TTS (ElevenLabs + OpenRouter).
 3. **Auth → URL configuration**
    - Site URL: `https://<deine-domain>`
    - Redirect URLs: `https://<deine-domain>/auth/callback`, `http://localhost:3000/auth/callback` (Dev)
-4. **Storage**: Bucket für Story-Covers / Turn-Audio wie in Migrationen (falls genutzt)
-5. RLS prüfen: User sieht nur eigene Stories, Characters, Usage
+4. **Auth Beta (Invite-only)**: siehe [BETA-AUTH.md](./BETA-AUTH.md)
+   - Sign-up **aus**, Anonymous **aus**, Gäste per **Invite user**
+5. **Storage**: Bucket für Story-Covers / Turn-Audio wie in Migrationen (falls genutzt)
+6. RLS prüfen: User sieht nur eigene Stories, Characters, Usage
 
 ## 2. Vercel
 
@@ -22,6 +24,7 @@ Checkliste für Beta-Deploy mit Server-LLM/TTS (ElevenLabs + OpenRouter).
 | `NEXT_PUBLIC_SUPABASE_URL` | ja | Supabase Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ja | Anon key (öffentlich OK) |
 | `NEXT_PUBLIC_SITE_URL` | ja | `https://<deine-domain>` für Magic Links |
+| `NEXT_PUBLIC_BETA_INVITE_ONLY` | ja (Beta) | `1` — kein öffentliches Registrieren |
 | `NEXT_PUBLIC_SERVER_TTS` | ja | `1` |
 | `NEXT_PUBLIC_SERVER_LLM` | ja | `1` |
 | `ELEVENLABS_API_KEY` | ja | **Nur Server** — nie `NEXT_PUBLIC_` |
