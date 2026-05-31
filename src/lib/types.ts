@@ -50,7 +50,8 @@ export interface OpenRouterSettings {
 }
 
 export const DEFAULT_OPENROUTER: Omit<OpenRouterSettings, "apiKey"> = {
-  model: "anthropic/claude-sonnet-4",
+  model: "google/gemini-2.5-flash-lite",
+  narratorModel: "aion-labs/aion-2.0",
   maxTokens: 2048,
   temperature: 0.85,
 };

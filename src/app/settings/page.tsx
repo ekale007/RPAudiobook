@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { DecimalStepInput } from "@/components/DecimalStepInput";
 import {
@@ -33,12 +33,21 @@ import {
   syncUserPreferences,
 } from "@/lib/storage/userPreferencesSync";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import {
+  pickAllowedModel,
+  useLlmModelCatalog,
+} from "@/lib/llm/useLlmModelCatalog";
+
+const MAX_TOKENS_MIN = 256;
+const MAX_TOKENS_MAX = 8192;
 
 export default function SettingsPage() {
   const serverCaps = useServerCapabilities();
   const serverLlm = serverCaps.serverLlm;
   const serverTts = serverCaps.serverTts;
   const capsReady = serverCaps.ready;
+  const betaMode = capsReady && serverLlm;
+  const { models: llmModels, loading: modelsLoading } = useLlmModelCatalog();
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState(DEFAULT_OPENROUTER.model);
   const [narratorModel, setNarratorModel] = useState("");
@@ -57,6 +66,19 @@ export default function SettingsPage() {
   const [pronunciationText, setPronunciationText] = useState("");
   const [ttsSaved, setTtsSaved] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
+
+  const selectedModelMeta = useMemo(
+    () => llmModels.find((m) => m.id === model),
+    [llmModels, model],
+  );
+
+  const selectedNarratorMeta = useMemo(
+    () =>
+      narratorModel.trim()
+        ? llmModels.find((m) => m.id === narratorModel)
+        : null,
+    [llmModels, narratorModel],
+  );
 
   const reloadFromStorage = useCallback(() => {
     const s = loadOpenRouterSettings();
@@ -92,14 +114,42 @@ export default function SettingsPage() {
     return () => window.removeEventListener(PREFS_UPDATED_EVENT, onPrefsUpdated);
   }, [reloadFromStorage]);
 
-  const save = () => {
+  useEffect(() => {
+    if (!betaMode || !llmModels.length) return;
+    setModel((current) => pickAllowedModel(current, llmModels));
+    setNarratorModel((current) =>
+      current.trim() ? pickAllowedModel(current, llmModels) : "",
+    );
+  }, [betaMode, llmModels]);
+
+  const saveLlm = () => {
+    const allowedModel = betaMode
+      ? pickAllowedModel(model, llmModels)
+      : model.trim();
+    const allowedNarrator = betaMode
+      ? narratorModel.trim()
+        ? pickAllowedModel(narratorModel, llmModels)
+        : undefined
+      : narratorModel.trim() || undefined;
     saveOpenRouterSettings({
       apiKey: apiKey.trim(),
-      model,
-      narratorModel: narratorModel.trim() || undefined,
-      maxTokens,
+      model: allowedModel,
+      narratorModel:
+        allowedNarrator && allowedNarrator !== allowedModel
+          ? allowedNarrator
+          : undefined,
+      maxTokens: Math.min(
+        MAX_TOKENS_MAX,
+        Math.max(MAX_TOKENS_MIN, maxTokens),
+      ),
       temperature,
     });
+    setModel(allowedModel);
+    setNarratorModel(
+      allowedNarrator && allowedNarrator !== allowedModel
+        ? allowedNarrator
+        : "",
+    );
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -132,37 +182,180 @@ export default function SettingsPage() {
     setTimeout(() => setTtsSaved(false), 2000);
   };
 
+  const saveBetaVoice = () => {
+    const tts = loadTtsSettings();
+    saveTtsSettings({
+      ...tts,
+      provider: "elevenlabs",
+      elevenLabsVoiceId: elVoiceId.trim(),
+    });
+    setTtsSaved(true);
+    setTimeout(() => setTtsSaved(false), 2000);
+  };
+
   return (
     <main className="flex min-h-dvh flex-col">
       <AppHeader title="Settings" backHref="/" />
       <div className="flex flex-col gap-5 p-4">
         {loggedIn ? (
           <p className="rounded-lg border border-surface-border bg-surface-raised px-3 py-2 text-xs text-zinc-400">
-            Modell, Temperatur und TTS-Stimme werden mit deinem Account
-            synchronisiert (Handy ↔ Desktop). API-Keys bleiben optional nur
-            auf diesem Gerät.
+            Modell, Temperatur und Erzähler-Stimme werden mit deinem Account
+            synchronisiert (Handy ↔ Desktop). Hintergrund- und Erzähler-Modell
+            getrennt — spart Budget bei Memory-Sync.
           </p>
         ) : null}
-        <LlmUsagePanel />
-        <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
-          <h2 className="mb-1 font-medium text-accent">OpenRouter</h2>
-          {!capsReady ? (
-            <p className="mb-3 text-xs text-zinc-500">Server-Konfiguration wird geprüft…</p>
-          ) : null}
-          {capsReady && serverLlm ? (
-            <p className="mb-3 text-xs text-green-400/90">
-              Server-Modus: LLM läuft über <code>/api/llm/chat</code> mit
-              Server-Key (<code className="text-zinc-400">OPENROUTER_API_KEY</code>
-              ). Modell &amp; Temperatur unten gelten weiterhin.
-            </p>
-          ) : capsReady ? (
-            <p className="mb-3 text-xs text-zinc-500">
-              Ohne Server-Key: API-Key nur in diesem Browser. Modell &amp;
-              Temperatur syncen mit dem Account, wenn du eingeloggt bist.
-            </p>
-          ) : null}
-          {capsReady && !serverLlm ? (
-            <>
+
+        {betaMode ? (
+          <>
+            <LlmUsagePanel />
+
+            <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
+              <h2 className="mb-1 font-medium text-accent">LLM — Modelle</h2>
+              <p className="mb-3 text-xs text-zinc-500">
+                <strong>Hintergrund</strong> für Memory, Zusammenfassungen und
+                JSON — <strong>Erzähler</strong> für Story-Chat und
+                Beat-Vorschläge. Kosten pro Modell auf dein Monatsbudget.
+              </p>
+
+              <label className="mb-1 block text-xs text-zinc-400">
+                Hintergrund-Modell
+              </label>
+              {modelsLoading && !llmModels.length ? (
+                <p className="mb-3 text-sm text-zinc-500">Modelle laden…</p>
+              ) : (
+                <select
+                  value={pickAllowedModel(model, llmModels)}
+                  onChange={(e) => setModel(e.target.value)}
+                  className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm text-zinc-100"
+                >
+                  {llmModels.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {selectedModelMeta ? (
+                <p className="mb-3 text-[11px] text-zinc-500">
+                  {selectedModelMeta.priceHint}
+                </p>
+              ) : null}
+
+              <label className="mb-1 block text-xs text-zinc-400">
+                Erzähler-Modell (Story-Chat)
+              </label>
+              {modelsLoading && !llmModels.length ? (
+                <p className="mb-3 text-sm text-zinc-500">Modelle laden…</p>
+              ) : (
+                <select
+                  value={narratorModel}
+                  onChange={(e) => setNarratorModel(e.target.value)}
+                  className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm text-zinc-100"
+                >
+                  <option value="">— gleich wie Hintergrund —</option>
+                  {llmModels.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {selectedNarratorMeta ? (
+                <p className="mb-3 text-[11px] text-zinc-500">
+                  {selectedNarratorMeta.priceHint}
+                </p>
+              ) : (
+                <p className="mb-3 text-[11px] text-zinc-600">
+                  Ohne Auswahl nutzt der Chat das Hintergrund-Modell.
+                </p>
+              )}
+
+              <div className="mb-3 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    Max. Tokens
+                  </label>
+                  <input
+                    type="number"
+                    min={MAX_TOKENS_MIN}
+                    max={MAX_TOKENS_MAX}
+                    value={maxTokens}
+                    onChange={(e) => setMaxTokens(Number(e.target.value))}
+                    className="w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    Temperatur
+                  </label>
+                  <DecimalStepInput
+                    ariaLabel="Temperatur"
+                    value={temperature}
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    decimals={2}
+                    onChange={setTemperature}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={saveLlm}
+                className="w-full rounded-lg bg-accent py-2 text-sm font-medium text-black"
+              >
+                LLM-Einstellungen speichern
+              </button>
+              {saved ? (
+                <p className="mt-2 text-center text-xs text-green-400">
+                  Gespeichert
+                </p>
+              ) : null}
+            </section>
+
+            {serverTts ? (
+              <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
+                <h2 className="mb-1 font-medium text-accent">
+                  Erzähler-Stimme
+                </h2>
+                <p className="mb-3 text-xs text-zinc-500">
+                  Standard-Stimme für Erzähler/Protagonist. Cast-Stimmen pro
+                  Story unter Voices.
+                </p>
+                <ElevenLabsVoiceSelect
+                  value={elVoiceId}
+                  onChange={setElVoiceId}
+                  label="Erzähler-Stimme"
+                />
+                <button
+                  type="button"
+                  onClick={saveBetaVoice}
+                  className="mt-3 w-full rounded-lg bg-accent py-2 text-sm font-medium text-black"
+                >
+                  Stimme speichern
+                </button>
+                {ttsSaved ? (
+                  <p className="mt-2 text-center text-xs text-green-400">
+                    Gespeichert
+                  </p>
+                ) : null}
+              </section>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
+              <h2 className="mb-1 font-medium text-accent">OpenRouter</h2>
+              {!capsReady ? (
+                <p className="mb-3 text-xs text-zinc-500">
+                  Server-Konfiguration wird geprüft…
+                </p>
+              ) : (
+                <p className="mb-3 text-xs text-zinc-500">
+                  Lokaler Dev-Modus ohne Server-LLM — API-Key im Browser.
+                </p>
+              )}
               <label className="mb-1 block text-xs text-zinc-400">API key</label>
               <input
                 type="password"
@@ -172,89 +365,77 @@ export default function SettingsPage() {
                 placeholder="sk-or-…"
                 autoComplete="off"
               />
-            </>
-          ) : null}
-          <label className="mb-1 block text-xs text-zinc-400">Model</label>
-          <input
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="mb-3 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
-          />
-          <label className="mb-1 block text-xs text-zinc-400">
-            Storyteller model (optional override)
-          </label>
-          <input
-            value={narratorModel}
-            onChange={(e) => setNarratorModel(e.target.value)}
-            className="mb-3 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
-            placeholder="e.g. anthropic/claude-sonnet-4"
-          />
-          <div className="mb-3 grid grid-cols-2 gap-3">
-            <div>
               <label className="mb-1 block text-xs text-zinc-400">
-                Max tokens
+                Hintergrund-Modell (Memory, Sync, JSON)
               </label>
               <input
-                type="number"
-                value={maxTokens}
-                onChange={(e) => setMaxTokens(Number(e.target.value))}
-                className="w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="mb-3 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
               />
-            </div>
-            <div>
               <label className="mb-1 block text-xs text-zinc-400">
-                Temperature
+                Erzähler-Modell (Story-Chat, optional)
               </label>
-              <DecimalStepInput
-                ariaLabel="Temperatur"
-                value={temperature}
-                min={0}
-                max={2}
-                step={0.05}
-                decimals={2}
-                onChange={setTemperature}
+              <input
+                value={narratorModel}
+                onChange={(e) => setNarratorModel(e.target.value)}
+                className="mb-3 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
+                placeholder="e.g. aion-labs/aion-2.0"
               />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={save}
-              className="flex-1 rounded-lg bg-accent py-2 text-sm font-medium text-black"
-            >
-              Save
-            </button>
-            {capsReady && !serverLlm ? (
-              <button
-                type="button"
-                onClick={clearKey}
-                className="rounded-lg border border-surface-border px-3 py-2 text-sm text-zinc-400"
-              >
-                Clear key
-              </button>
-            ) : null}
-          </div>
-          {saved ? (
-            <p className="mt-2 text-center text-xs text-green-400">Saved</p>
-          ) : null}
-        </section>
+              <div className="mb-3 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    Max tokens
+                  </label>
+                  <input
+                    type="number"
+                    value={maxTokens}
+                    onChange={(e) => setMaxTokens(Number(e.target.value))}
+                    className="w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    Temperature
+                  </label>
+                  <DecimalStepInput
+                    ariaLabel="Temperatur"
+                    value={temperature}
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    decimals={2}
+                    onChange={setTemperature}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={saveLlm}
+                  className="flex-1 rounded-lg bg-accent py-2 text-sm font-medium text-black"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={clearKey}
+                  className="rounded-lg border border-surface-border px-3 py-2 text-sm text-zinc-400"
+                >
+                  Clear key
+                </button>
+              </div>
+              {saved ? (
+                <p className="mt-2 text-center text-xs text-green-400">Saved</p>
+              ) : null}
+            </section>
 
-        <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
-          <h2 className="mb-1 font-medium text-accent">Narrator TTS</h2>
-          {capsReady && serverTts ? (
-            <p className="mb-3 text-xs text-green-400/90">
-              Server-Modus: ElevenLabs über <code>/api/tts</code> (
-              <code className="text-zinc-400">ELEVENLABS_API_KEY</code> in{" "}
-              <code className="text-zinc-400">.env.local</code>). Kein Key im
-              Browser nötig.
-            </p>
-          ) : capsReady ? (
-            <p className="mb-3 text-xs text-zinc-500">
-              <strong>Local (free)</strong> uses a small server on your PC — no
-              ElevenLabs account. See{" "}
-              <code className="text-zinc-400">docs/LOCAL-TTS.md</code>.
-            </p>
-          ) : null}
+            <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
+              <h2 className="mb-1 font-medium text-accent">Narrator TTS</h2>
+              <p className="mb-3 text-xs text-zinc-500">
+                <strong>Local (free)</strong> uses a small server on your PC.
+                See <code className="text-zinc-400">docs/LOCAL-TTS.md</code>.
+              </p>
           <div className="mb-3 flex gap-2">
             {(["local", "elevenlabs"] as const).map((p) => (
               <button
@@ -371,21 +552,17 @@ export default function SettingsPage() {
             </>
           ) : (
             <>
-              {capsReady && !serverTts ? (
-                <>
-                  <label className="mb-1 block text-xs text-zinc-400">
-                    API key
-                  </label>
-                  <input
-                    type="password"
-                    value={elApiKey}
-                    onChange={(e) => setElApiKey(e.target.value)}
-                    className="mb-3 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
-                    placeholder="xi-…"
-                    autoComplete="off"
-                  />
-                </>
-              ) : null}
+              <label className="mb-1 block text-xs text-zinc-400">
+                API key
+              </label>
+              <input
+                type="password"
+                value={elApiKey}
+                onChange={(e) => setElApiKey(e.target.value)}
+                className="mb-3 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
+                placeholder="xi-…"
+                autoComplete="off"
+              />
               <ElevenLabsVoiceSelect
                 value={elVoiceId}
                 onChange={setElVoiceId}
@@ -433,26 +610,29 @@ export default function SettingsPage() {
           {ttsSaved ? (
             <p className="mt-2 text-center text-xs text-green-400">Saved</p>
           ) : null}
-        </section>
+            </section>
 
-        <section className="rounded-xl border border-surface-border p-4 text-xs text-zinc-500">
-          <p className="mb-2">
-            Get a key at{" "}
-            <a
-              href="https://openrouter.ai"
-              className="text-accent underline"
-              target="_blank"
-              rel="noreferrer"
-            >
-              openrouter.ai
-            </a>
-            . Recommended:{" "}
-            <code className="text-zinc-400">anthropic/claude-sonnet-4</code>
-          </p>
-          <p>
-            Local TTS guide: <code className="text-zinc-400">docs/LOCAL-TTS.md</code>
-          </p>
-        </section>
+            <section className="rounded-xl border border-surface-border p-4 text-xs text-zinc-500">
+              <p className="mb-2">
+                Get a key at{" "}
+                <a
+                  href="https://openrouter.ai"
+                  className="text-accent underline"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  openrouter.ai
+                </a>
+                . Recommended:{" "}
+                <code className="text-zinc-400">anthropic/claude-sonnet-4</code>
+              </p>
+              <p>
+                Local TTS guide:{" "}
+                <code className="text-zinc-400">docs/LOCAL-TTS.md</code>
+              </p>
+            </section>
+          </>
+        )}
       </div>
     </main>
   );

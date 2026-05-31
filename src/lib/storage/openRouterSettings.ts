@@ -61,7 +61,7 @@ export function clearOpenRouterApiKey(): void {
   }
 }
 
-/** Storyteller chat — optional narratorModel override. */
+/** Storyteller chat — uses narratorModel when set, otherwise base model. */
 export function resolveChatModelSettings(
   settings: OpenRouterSettings,
 ): OpenRouterSettings {

@@ -12,7 +12,7 @@ export function getOpenRouterApiKey(): string | null {
 
 export function getOpenRouterModel(): string {
   return (
-    process.env.OPENROUTER_MODEL?.trim() || "anthropic/claude-sonnet-4"
+    process.env.OPENROUTER_MODEL?.trim() || "google/gemini-2.5-flash-lite"
   );
 }
 

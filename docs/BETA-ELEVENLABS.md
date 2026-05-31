@@ -25,8 +25,9 @@ Browser → Next.js API Routes → ElevenLabs / OpenRouter
 | `RATE_LIMIT_LLM_PER_HOUR` | nein | Default 80 (Anfragen/Stunde/User) |
 | `RATE_LIMIT_TTS_PER_HOUR` | nein | Default 200 |
 | `BETA_LLM_BUDGET_CENTS` | nein | Monatsbudget pro User in Cent (Default 10000 = 100,00 €) |
-| `BETA_LLM_PROMPT_CENTS_PER_1K` | nein | Schätzung Prompt-Kosten / 1k Tokens |
-| `BETA_LLM_COMPLETION_CENTS_PER_1K` | nein | Schätzung Antwort-Kosten / 1k Tokens |
+| `BETA_LLM_MODELS` | nein | JSON-Array: erlaubte Modelle + ¢/1k Prompt/Antwort (User-Picker) |
+| `BETA_LLM_PROMPT_CENTS_PER_1K` | nein | Fallback-Schätzung wenn Modell unbekannt |
+| `BETA_LLM_COMPLETION_CENTS_PER_1K` | nein | Fallback-Schätzung wenn Modell unbekannt |
 
 ## LLM-Verbrauch (Beta)
 

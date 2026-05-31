@@ -26,8 +26,10 @@ Checkliste für Beta-Deploy mit Server-LLM/TTS (ElevenLabs + OpenRouter).
 | `NEXT_PUBLIC_SERVER_LLM` | ja | `1` |
 | `ELEVENLABS_API_KEY` | ja | **Nur Server** — nie `NEXT_PUBLIC_` |
 | `OPENROUTER_API_KEY` | ja | **Nur Server** |
-| `OPENROUTER_MODEL` | nein | z. B. `anthropic/claude-sonnet-4` |
-| `OPENROUTER_NARRATOR_MODEL` | nein | optional |
+| `OPENROUTER_MODEL` | nein | Admin-Default, muss in `BETA_LLM_MODELS` stehen |
+| `BETA_LLM_MODELS` | nein | JSON — erlaubte User-Modelle + ¢/1k (siehe `.env.example`) |
+| `BETA_LLM_PROMPT_CENTS_PER_1K` | nein | Fallback-Schätzung wenn Modell unbekannt |
+| `BETA_LLM_COMPLETION_CENTS_PER_1K` | nein | Fallback-Schätzung wenn Modell unbekannt |
 | `RATE_LIMIT_LLM_PER_HOUR` | nein | Beta: `200`–`500` |
 | `RATE_LIMIT_TTS_PER_HOUR` | nein | Beta: `200`–`400` |
 | `BETA_LLM_BUDGET_CENTS` | nein | Default `10000` (= 100 €) |
@@ -51,7 +53,7 @@ Checkliste für Beta-Deploy mit Server-LLM/TTS (ElevenLabs + OpenRouter).
 - [ ] `GET /api/auth/me` eingeloggt → `{ ok: true }`
 - [ ] DE-Story: Chat + TTS
 - [ ] EN-Story: Chat + TTS
-- [ ] Settings → Beta LLM Verbrauch lädt
+- [ ] Settings → Modell-Picker (nur erlaubte Modelle) + Beta LLM Verbrauch
 - [ ] Story-Gedächtnis → Von KI (Plot-State)
 - [ ] Mobile: gleiche Domain wie Login (kein localhost/127.0.0.1-Mix)
 

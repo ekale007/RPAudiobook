@@ -1,4 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  getLlmModelById,
+  resolveAllowedLlmModel,
+} from "@/lib/server/llmModels";
 
 export type LlmUsageSnapshot = {
   periodMonth: string;
@@ -35,7 +39,7 @@ export function getLlmCompletionCentsPer1k(): number {
 }
 
 /** Fallback when OpenRouter omits usage (stream edge cases). */
-export function fallbackUsageEstimate(): {
+export function fallbackUsageEstimate(modelId?: string): {
   promptTokens: number;
   completionTokens: number;
   costCents: number;
@@ -45,19 +49,22 @@ export function fallbackUsageEstimate(): {
   return {
     promptTokens,
     completionTokens,
-    costCents: estimateLlmCostCents(promptTokens, completionTokens),
+    costCents: estimateLlmCostCents(promptTokens, completionTokens, modelId),
   };
 }
 
 export function estimateLlmCostCents(
   promptTokens: number,
   completionTokens: number,
+  modelId?: string,
 ): number {
   const prompt = Math.max(0, promptTokens);
   const completion = Math.max(0, completionTokens);
+  const pricing =
+    getLlmModelById(modelId) ?? resolveAllowedLlmModel(modelId);
   const cost =
-    (prompt / 1000) * getLlmPromptCentsPer1k() +
-    (completion / 1000) * getLlmCompletionCentsPer1k();
+    (prompt / 1000) * pricing.promptCentsPer1k +
+    (completion / 1000) * pricing.completionCentsPer1k;
   return Math.max(1, Math.ceil(cost));
 }
 
@@ -109,8 +116,13 @@ export async function recordLlmUsage(
   supabase: SupabaseClient,
   promptTokens: number,
   completionTokens: number,
+  modelId?: string,
 ): Promise<void> {
-  const costCents = estimateLlmCostCents(promptTokens, completionTokens);
+  const costCents = estimateLlmCostCents(
+    promptTokens,
+    completionTokens,
+    modelId,
+  );
   const { error } = await supabase.rpc("increment_llm_usage", {
     p_prompt_tokens: promptTokens,
     p_completion_tokens: completionTokens,

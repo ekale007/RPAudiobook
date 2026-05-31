@@ -10,6 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export function createUsageTrackingStream(
   upstream: ReadableStream<Uint8Array>,
   supabase: SupabaseClient,
+  modelId: string,
 ): ReadableStream<Uint8Array> {
   const reader = upstream.getReader();
   const decoder = new TextDecoder();
@@ -21,12 +22,13 @@ export function createUsageTrackingStream(
   const persist = async () => {
     if (recorded) return;
     recorded = true;
-    const usage = lastUsage ?? fallbackUsageEstimate();
+    const usage = lastUsage ?? fallbackUsageEstimate(modelId);
     try {
       await recordLlmUsage(
         supabase,
         usage.promptTokens,
         usage.completionTokens,
+        modelId,
       );
     } catch (e) {
       console.warn("LLM usage record failed:", e);
@@ -76,6 +78,7 @@ export function createUsageTrackingStream(
 export async function recordUsageFromJsonResponse(
   supabase: SupabaseClient,
   json: unknown,
+  modelId: string,
 ): Promise<void> {
   const root = json as { usage?: unknown };
   const parsed = parseOpenRouterUsage(root.usage);
@@ -84,13 +87,15 @@ export async function recordUsageFromJsonResponse(
       supabase,
       parsed.promptTokens,
       parsed.completionTokens,
+      modelId,
     );
     return;
   }
-  const fallback = fallbackUsageEstimate();
+  const fallback = fallbackUsageEstimate(modelId);
   await recordLlmUsage(
     supabase,
     fallback.promptTokens,
     fallback.completionTokens,
+    modelId,
   );
 }

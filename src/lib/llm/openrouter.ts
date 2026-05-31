@@ -54,61 +54,35 @@ async function parseErrorResponse(res: Response): Promise<string> {
 
 
 export async function streamOpenRouterChat(
-
   settings: OpenRouterSettings,
-
   messages: Array<{ role: string; content: string }>,
-
   callbacks: StreamCallbacks,
-
   signal?: AbortSignal,
-
 ): Promise<void> {
+  const chatSettings = resolveChatModelSettings(settings);
 
   if (isServerLlmAvailable()) {
-
-    await streamViaServer(settings, messages, callbacks, signal);
-
+    await streamViaServer(chatSettings, messages, callbacks, signal);
     return;
-
   }
 
-
-
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-
     method: "POST",
-
     headers: {
-
       Authorization: `Bearer ${settings.apiKey}`,
-
       "Content-Type": "application/json",
-
       "HTTP-Referer":
-
         typeof window !== "undefined" ? window.location.origin : "",
-
       "X-Title": "HörbuchKI",
-
     },
-
     body: JSON.stringify({
-
-      model: settings.model,
-
+      model: chatSettings.model,
       messages,
-
-      max_tokens: settings.maxTokens,
-
-      temperature: settings.temperature,
-
+      max_tokens: chatSettings.maxTokens,
+      temperature: chatSettings.temperature,
       stream: true,
-
     }),
-
     signal,
-
   });
 
 
@@ -158,13 +132,8 @@ async function streamViaServer(
       temperature: settings.temperature,
 
       model: settings.model,
-
-      useNarratorModel: false,
-
     }),
-
     signal,
-
   });
 
 
@@ -321,42 +290,22 @@ export async function completeOpenRouter(
 
         };
 
-    useNarratorModel?: boolean;
-
   },
 
 ): Promise<string> {
-
-  const resolved = resolveChatModelSettings(settings);
-
   if (isServerLlmAvailable()) {
-
     const res = await authFetch("/api/llm/chat", {
-
       method: "POST",
-
       headers: { "Content-Type": "application/json" },
-
       body: JSON.stringify({
-
         messages,
-
         stream: false,
-
         maxTokens: opts?.maxTokens ?? 1024,
-
         temperature: opts?.temperature ?? 0.5,
-
-        model: resolved.model,
-
-        useNarratorModel: opts?.useNarratorModel,
-
+        model: settings.model,
         responseFormat: opts?.responseFormat,
-
       }),
-
       signal: opts?.signal,
-
     });
 
 
@@ -400,9 +349,7 @@ export async function completeOpenRouter(
     },
 
     body: JSON.stringify({
-
-      model: resolved.model,
-
+      model: settings.model,
       messages,
 
       max_tokens: opts?.maxTokens ?? 1024,

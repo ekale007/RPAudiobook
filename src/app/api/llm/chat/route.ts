@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
+import { resolveAllowedLlmModel } from "@/lib/server/llmModels";
 import {
   getOpenRouterApiKey,
   getOpenRouterModel,
-  getOpenRouterNarratorModel,
   getRateLimitLlmPerHour,
 } from "@/lib/server/env";
 import {
@@ -84,7 +84,6 @@ export async function POST(req: Request) {
     maxTokens?: number;
     temperature?: number;
     model?: string;
-    useNarratorModel?: boolean;
     responseFormat?: unknown;
   };
   try {
@@ -98,10 +97,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing messages" }, { status: 400 });
   }
 
-  const model =
-    body.model?.trim() ||
-    (body.useNarratorModel ? getOpenRouterNarratorModel() : undefined) ||
-    getOpenRouterModel();
+  const resolved = resolveAllowedLlmModel(body.model);
+  const model = resolved.id;
 
   const payload: Record<string, unknown> = {
     model,
@@ -121,11 +118,10 @@ export async function POST(req: Request) {
     const message = extractOpenRouterErrorMessage(errText);
     const formatted = formatOpenRouterErrorMessage(message, upstream.status);
 
-    const fallbackModel = getOpenRouterModel();
+    const fallbackModel = resolveAllowedLlmModel(getOpenRouterModel()).id;
     if (
       upstream.status === 404 &&
       isOpenRouterPrivacyError(message) &&
-      fallbackModel &&
       fallbackModel !== model
     ) {
       const retry = await postOpenRouter(apiKey, {
@@ -133,7 +129,12 @@ export async function POST(req: Request) {
         model: fallbackModel,
       });
       if (retry.ok) {
-        return forwardOpenRouterResponse(retry, body.stream, supabase);
+        return forwardOpenRouterResponse(
+          retry,
+          body.stream,
+          supabase,
+          fallbackModel,
+        );
       }
     }
 
@@ -143,7 +144,7 @@ export async function POST(req: Request) {
     );
   }
 
-  return forwardOpenRouterResponse(upstream, body.stream, supabase);
+  return forwardOpenRouterResponse(upstream, body.stream, supabase, model);
 }
 
 async function postOpenRouter(
@@ -161,9 +162,10 @@ async function forwardOpenRouterResponse(
   upstream: Response,
   stream: boolean | undefined,
   supabase: Awaited<ReturnType<typeof createServerSupabaseFromRequest>>,
+  modelId: string,
 ): Promise<Response> {
   if (stream && upstream.body) {
-    const tracked = createUsageTrackingStream(upstream.body, supabase);
+    const tracked = createUsageTrackingStream(upstream.body, supabase, modelId);
     return new Response(tracked, {
       status: 200,
       headers: {
@@ -176,7 +178,7 @@ async function forwardOpenRouterResponse(
 
   const json = await upstream.json();
   try {
-    await recordUsageFromJsonResponse(supabase, json);
+    await recordUsageFromJsonResponse(supabase, json, modelId);
   } catch (e) {
     console.warn("LLM usage record failed:", e);
   }
