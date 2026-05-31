@@ -792,7 +792,7 @@ export const PUBLIC_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     coverImageSrc: "/library-covers/when-dawn-breaks.webp",
     spineTitle: "When Dawn Breaks",
     coverImagePrompt:
-      "Audiobook cover illustration, vertical portrait 2:3, science fiction drama. Suburban front door at dawn, warm golden light breaking through violet storm clouds. Silhouette of a young man in the doorway; faint massive invasion ships in the distant sky. Mood: epic but intimate, dry tension, not horror. Cinematic painterly digital art, rich amber and deep indigo palette. No text, no title, no logos, no watermark.",
+      "Audiobook cover illustration, vertical portrait 2:3, cinematic science fiction drama at dawn. View from a Berlin rooftop: silhouette of a young man with dark hair at the railing, Berlin TV Tower visible in misty distance. Above, faint golden celestial barriers shimmer like aurora borealis through storm clouds; first rays of dawn break through. Far sky: dark angular invasion warships emerging from clouds, not peaceful vessels. At opposite edges of the frame, two towering Celestial figures barely visible — one radiating golden light, one silver. Dark moody atmosphere, epic scale, anime-inspired painterly digital art, dramatic composition, rich amber gold and deep indigo violet palette. No text, no title, no logos, no watermark.",
     loadPack: loadWhenDawnBreaksSeed,
   },
   {

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { CastHubPanel } from "@/components/story-hub/CastHubPanel";
 import { StoryCoverEditor } from "@/components/StoryCoverEditor";
 import type { ChapterRow, CharacterRow } from "@/lib/db/stories";
 import type { StorySettings } from "@/lib/types";
@@ -54,113 +55,6 @@ function HubCard({
   );
 }
 
-function CastCharacterCard({
-  character,
-  expanded,
-  onToggle,
-}: {
-  character: CharacterRow;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  const archived = character.status === "archived";
-  const card = character.card_json;
-  const teaser =
-    character.character_memory?.trim() ||
-    card.personality?.trim() ||
-    card.description?.trim() ||
-    null;
-  const teaserShort =
-    teaser && teaser.length > 100 ? `${teaser.slice(0, 100)}…` : teaser;
-
-  return (
-    <li
-      className={`overflow-hidden rounded-lg border ${
-        archived
-          ? "border-zinc-700/80 bg-zinc-900/40"
-          : "border-surface-border bg-surface-raised"
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={expanded}
-        className="flex w-full touch-manipulation flex-col gap-1 px-2.5 py-2 text-left"
-      >
-        <div className="flex items-start justify-between gap-2">
-          <span
-            className={`text-sm font-medium ${
-              archived ? "text-zinc-500" : "text-zinc-100"
-            }`}
-          >
-            {character.name}
-          </span>
-          <span
-            className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] ${
-              archived
-                ? "bg-zinc-800 text-zinc-500"
-                : "bg-accent/15 text-accent"
-            }`}
-          >
-            {archived
-              ? `Archiv${character.archived_reason ? ` · ${character.archived_reason}` : ""}`
-              : "Aktiv"}
-          </span>
-        </div>
-        {card.personality && !expanded ? (
-          <p className="line-clamp-1 text-[11px] text-zinc-500">
-            {card.personality}
-          </p>
-        ) : null}
-        {teaserShort && !expanded ? (
-          <p className="line-clamp-2 text-[11px] leading-snug text-zinc-400">
-            {teaserShort}
-          </p>
-        ) : null}
-        <span className="text-[10px] text-accent/80">
-          {expanded ? "Weniger" : "Details"}
-        </span>
-      </button>
-
-      {expanded ? (
-        <div className="space-y-2 border-t border-surface-border/60 px-2.5 py-2 text-[11px] leading-relaxed text-zinc-400">
-          {card.description ? (
-            <div>
-              <p className="mb-0.5 text-[10px] font-medium text-zinc-500">
-                Beschreibung
-              </p>
-              <p>{card.description}</p>
-            </div>
-          ) : null}
-          {card.personality ? (
-            <div>
-              <p className="mb-0.5 text-[10px] font-medium text-zinc-500">
-                Persönlichkeit
-              </p>
-              <p>{card.personality}</p>
-            </div>
-          ) : null}
-          {character.character_memory ? (
-            <div>
-              <p className="mb-0.5 text-[10px] font-medium text-zinc-500">
-                Erinnerungen
-              </p>
-              <p className="whitespace-pre-wrap">{character.character_memory}</p>
-            </div>
-          ) : (
-            <p className="italic text-zinc-600">Noch keine Figur-Memory</p>
-          )}
-          {card.tags?.length ? (
-            <p className="text-[10px] text-zinc-600">
-              {card.tags.join(" · ")}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-    </li>
-  );
-}
-
 function SettingsLink({
   href,
   title,
@@ -200,6 +94,7 @@ export function StoryHubView({
   bandSummary,
   chapters,
   cast,
+  storyLocale,
   activeChapterId,
   error,
   editingTitle,
@@ -215,6 +110,7 @@ export function StoryHubView({
   onCancelRename,
   onDeleteChapter,
   onToggleSummary,
+  onCastUpdated,
 }: {
   storyId: string;
   userId: string | null;
@@ -227,6 +123,7 @@ export function StoryHubView({
   bandSummary: string | null;
   chapters: ChapterRow[];
   cast: CharacterRow[];
+  storyLocale: "de" | "en";
   activeChapterId?: string;
   error: string | null;
   editingTitle: boolean;
@@ -242,16 +139,15 @@ export function StoryHubView({
   onCancelRename: () => void;
   onDeleteChapter: (ch: ChapterRow) => void;
   onToggleSummary: (id: string | null) => void;
+  onCastUpdated?: () => void;
 }) {
   const [tab, setTab] = useState<HubTab>("story");
-  const [expandedCastId, setExpandedCastId] = useState<string | null>(null);
 
   const chaptersNewestFirst = useMemo(
     () => [...chapters].sort((a, b) => b.index_in_band - a.index_in_band),
     [chapters],
   );
 
-  const castMembers = cast.filter((c) => c.role === "cast");
   const plotState = storySettings.plotState;
 
   return (
@@ -479,39 +375,16 @@ export function StoryHubView({
         ) : null}
 
         {tab === "cast" ? (
-          <>
-            <SettingsLink
-              href={`/story/${storyId}/cards`}
-              title="Charakterkarten"
-              description="Erzähler- und Cast-Karten (Prompts, Eröffnung) bearbeiten"
-            />
-            <SettingsLink
-              href={`/story/${storyId}/cast`}
-              title="Figuren & Erinnerungen"
-              description="Memory, Archiv-Status und Details pro Figur"
-            />
-            <SettingsLink
-              href={`/story/${storyId}/voices`}
-              title="Figuren-Stimmen"
-              description="TTS-Stimmen pro Figur zuweisen"
-            />
-            {castMembers.length ? (
-              <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                {castMembers.map((c) => (
-                  <CastCharacterCard
-                    key={c.id}
-                    character={c}
-                    expanded={expandedCastId === c.id}
-                    onToggle={() =>
-                      setExpandedCastId((id) => (id === c.id ? null : c.id))
-                    }
-                  />
-                ))}
-              </ul>
-            ) : (
-              <p className="text-[11px] text-zinc-500">Noch kein Cast.</p>
-            )}
-          </>
+          <CastHubPanel
+            storyId={storyId}
+            storyTitle={title}
+            storyConcept={storyConcept}
+            userId={userId}
+            cast={cast}
+            storyLocale={storyLocale}
+            storySettings={storySettings}
+            onSaved={onCastUpdated}
+          />
         ) : null}
 
         {tab === "settings" ? (

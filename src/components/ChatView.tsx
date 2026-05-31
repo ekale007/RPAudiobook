@@ -75,7 +75,7 @@ import { isTtsReady, loadTtsSettings } from "@/lib/storage/ttsSettings";
 import { subscribeServerCapabilities } from "@/lib/server/serverCapabilities";
 import type { MessageAudioPlayerHandle } from "@/lib/tts/messageAudioPlayerHandle";
 import { TtsAutoplayQueue } from "@/lib/tts/ttsAutoplayQueue";
-import { unlockAudioForAutoplay } from "@/lib/tts/audioUnlock";
+import { unlockAudioForAutoplay, startAudioSession, stopAudioSession } from "@/lib/tts/audioUnlock";
 import { saveTtsAutoplay } from "@/lib/storage/ttsPlaybackSettings";
 import { ChatScrollPane } from "@/components/ChatScrollPane";
 import Link from "next/link";
@@ -151,9 +151,14 @@ export function ChatView({
   const beatsAbortRef = useRef<AbortController | null>(null);
   const autoPlayRemainingRef = useRef(0);
   const autoChapterBusyRef = useRef(false);
+  const autoSessionRef = useRef(false);
   const [autoLeft, setAutoLeft] = useState(0);
   const [autoTotal, setAutoTotal] = useState(0);
   const [autoSession, setAutoSession] = useState(false);
+
+  useEffect(() => {
+    autoSessionRef.current = autoSession;
+  }, [autoSession]);
   const memorySyncRef = useRef(false);
   const initialPlotSyncDone = useRef(false);
   const knownTurnIdsRef = useRef<Set<string>>(new Set());
@@ -231,6 +236,7 @@ export function ChatView({
 
   const enqueueNewAssistantTts = useCallback(
     (rows: TurnRow[], force = false) => {
+      if (autoSessionRef.current && !force) return;
       if ((!ttsAutoplay && !force) || !hasTts || !ttsBaselineReadyRef.current) {
         return;
       }
@@ -257,7 +263,41 @@ export function ChatView({
     ttsQueueRef.current.stop();
     setTtsQueueActive(false);
     setTtsQueuedTurnIds([]);
+    stopAudioSession();
   }, []);
+
+  const ensureTtsAutoplayForSession = useCallback(() => {
+    startAudioSession();
+    unlockAudioForAutoplay();
+    if (!ttsAutoplay) {
+      setTtsAutoplay(true);
+      saveTtsAutoplay(true);
+    }
+  }, [ttsAutoplay]);
+
+  const waitForLatestAssistantTts = useCallback(
+    async (history: TurnRow[], options?: { forDrive?: boolean }) => {
+      const assistants = history.filter(
+        (t) => t.role === "assistant" && !t.id.startsWith("tmp-"),
+      );
+      const latest = assistants[assistants.length - 1];
+      if (!latest) return "ok" as const;
+
+      unlockAudioForAutoplay();
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+
+      ttsQueueRef.current.setAssistantTurnOrder(assistants.map((t) => t.id));
+      if (!options?.forDrive) {
+        ttsQueueRef.current.stop();
+      }
+      return options?.forDrive
+        ? ttsQueueRef.current.playTurnForDrive(latest.id)
+        : ttsQueueRef.current.playTurnAndWaitForDrive(latest.id);
+    },
+    [],
+  );
 
   const load = useCallback(async () => {
     if (chatBusyRef.current) return;
@@ -582,7 +622,6 @@ export function ChatView({
     );
 
     loadSeqRef.current++;
-    syncKnownTurns(merged);
     setTurns(merged);
 
     const orSettings = loadOpenRouterSettings();
@@ -600,15 +639,25 @@ export function ChatView({
         if (chatBusyRef.current) return;
         if (fresh.length < merged.length) return;
         loadSeqRef.current++;
-        syncKnownTurns(fresh);
         setTurns(fresh);
+        syncKnownTurns(fresh);
       })
       .catch(() => undefined);
 
     enqueueNewAssistantTts(merged, forceTtsEnqueue);
+    syncKnownTurns(merged);
 
-    await maybeSummarize(merged);
-    await maybeAutoCreateChapter(merged);
+    if (autoSessionRef.current) {
+      void maybeSummarize(merged).catch((e) =>
+        console.warn("Rolling summary (background) failed:", e),
+      );
+      void maybeAutoCreateChapter(merged).catch((e) =>
+        console.warn("Auto chapter (background) failed:", e),
+      );
+    } else {
+      await maybeSummarize(merged);
+      await maybeAutoCreateChapter(merged);
+    }
   };
 
   const runGeneration = async (
@@ -620,6 +669,8 @@ export function ChatView({
       rollingSummary?: string | null;
       allCast?: CharacterRow[];
       forceTts?: boolean;
+      /** Prefetch during drive/autoplay — no full-screen generating indicator. */
+      background?: boolean;
     } = {},
   ): Promise<boolean> => {
     const settings = loadOpenRouterSettings();
@@ -631,7 +682,7 @@ export function ChatView({
 
     setError(null);
     chatBusyRef.current = true;
-    setGenerating(true);
+    if (!opts.background) setGenerating(true);
     abortRef.current = new AbortController();
 
     let full = "";
@@ -663,7 +714,7 @@ export function ChatView({
       }
       abortRef.current = null;
       chatBusyRef.current = false;
-      setGenerating(false);
+      if (!opts.background) setGenerating(false);
       return false;
     }
 
@@ -672,12 +723,12 @@ export function ChatView({
 
     if (aborted) {
       chatBusyRef.current = false;
-      setGenerating(false);
+      if (!opts.background) setGenerating(false);
       return false;
     }
     if (!full.trim()) {
       chatBusyRef.current = false;
-      setGenerating(false);
+      if (!opts.background) setGenerating(false);
       setError("Leere Antwort vom Modell — bitte erneut versuchen.");
       return false;
     }
@@ -694,12 +745,12 @@ export function ChatView({
       setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
       await load();
       chatBusyRef.current = false;
-      setGenerating(false);
+      if (!opts.background) setGenerating(false);
       return false;
     }
 
     chatBusyRef.current = false;
-    setGenerating(false);
+    if (!opts.background) setGenerating(false);
     return true;
   };
 
@@ -813,14 +864,76 @@ export function ChatView({
     });
   };
 
+  type DrivePrefetchResult = { ok: boolean; history: TurnRow[] };
+
+  const prewarmDriveTtsAwait = async (history: TurnRow[]) => {
+    const assistants = history.filter(
+      (t) => t.role === "assistant" && !t.id.startsWith("tmp-"),
+    );
+    const latest = assistants[assistants.length - 1];
+    if (!latest) return;
+
+    ttsQueueRef.current.setAssistantTurnOrder(assistants.map((t) => t.id));
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+    await ttsQueueRef.current.prepareTurn(latest.id, {
+      playerWaitMs: 20_000,
+    });
+  };
+
+  /** LLM + TTS buffer for the next scene (runs during current playback). */
+  const prefetchDriveTurn = async (
+    base: TurnRow[],
+  ): Promise<DrivePrefetchResult> => {
+    const llm = await prefetchDriveLlm(base);
+    if (!llm.ok) return llm;
+    await prewarmDriveTtsAwait(llm.history);
+    return llm;
+  };
+
+  /** LLM only — used internally by prefetchDriveTurn. */
+  const prefetchDriveLlm = async (
+    base: TurnRow[],
+  ): Promise<DrivePrefetchResult> => {
+    const ok = await runGeneration(base, {
+      continuation: true,
+      continuationPrompt: autoContinuePrompt(),
+      background: true,
+    });
+    if (!ok) return { ok: false, history: base };
+
+    const history = await getTurns(chapterId);
+    setTurns(history);
+    return { ok: true, history };
+  };
+
+  const handleDriveTtsResult = (
+    ttsResult: "ok" | "no-player" | "blocked" | "error",
+  ): boolean => {
+    if (ttsResult === "blocked") {
+      setError(
+        "Vorlesen blockiert (Browser). Tippe einmal auf ▶ bei der letzten Nachricht, dann starte Fahrmodus erneut.",
+      );
+      return false;
+    }
+    if (ttsResult === "no-player") {
+      setError(
+        "Audio-Player nicht bereit — Seite kurz warten oder ▶ antippen, dann Fahrmodus erneut.",
+      );
+      return false;
+    }
+    if (ttsResult === "error") {
+      setError("TTS-Wiedergabe fehlgeschlagen — bitte erneut versuchen.");
+      return false;
+    }
+    return true;
+  };
+
   const runDriveMode = async (minutes: DriveModeMinutes) => {
     if (generating || readOnly || autoSession || !turns.length || !hasTts) return;
 
-    unlockAudioForAutoplay();
-    if (!ttsAutoplay) {
-      setTtsAutoplay(true);
-      saveTtsAutoplay(true);
-    }
+    ensureTtsAutoplayForSession();
     setBeatOptions(null);
     setAutoSession(true);
     setAutoTotal(0);
@@ -830,54 +943,45 @@ export function ChatView({
 
     const endAt = Date.now() + minutes * 60 * 1000;
     let history = turns;
+    let prefetched: Promise<DrivePrefetchResult> | null = null;
 
-    while (Date.now() < endAt) {
-      const ok = await runGeneration(history, {
-        continuation: true,
-        continuationPrompt: autoContinuePrompt(),
-      });
-      if (!ok) break;
+    try {
+      while (Date.now() < endAt) {
+        if (prefetched) {
+          const result = await prefetched;
+          prefetched = null;
+          if (!result.ok) break;
+          history = result.history;
+        } else {
+          const ok = await runGeneration(history, {
+            continuation: true,
+            continuationPrompt: autoContinuePrompt(),
+          });
+          if (!ok) break;
+          history = await getTurns(chapterId);
+          setTurns(history);
+          await prewarmDriveTtsAwait(history);
+        }
 
-      history = await getTurns(chapterId);
-      setTurns(history);
+        if (Date.now() < endAt) {
+          prefetched = prefetchDriveTurn(history);
+        }
 
-      const assistants = history.filter(
-        (t) => t.role === "assistant" && !t.id.startsWith("tmp-"),
-      );
-      const latest = assistants[assistants.length - 1];
-      if (!latest) continue;
-
-      unlockAudioForAutoplay();
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-      });
-
-      ttsQueueRef.current.setAssistantTurnOrder(assistants.map((t) => t.id));
-      ttsQueueRef.current.stop();
-      const ttsResult = await ttsQueueRef.current.playTurnAndWaitForDrive(
-        latest.id,
-      );
-
-      if (ttsResult === "blocked") {
-        setError(
-          "Vorlesen blockiert (Browser). Tippe einmal auf ▶ bei der letzten Nachricht, dann starte Fahrmodus erneut.",
-        );
-        break;
+        const ttsResult = await waitForLatestAssistantTts(history, {
+          forDrive: true,
+        });
+        if (!handleDriveTtsResult(ttsResult)) break;
       }
-      if (ttsResult === "no-player") {
-        setError(
-          "Audio-Player nicht bereit — Seite kurz warten oder ▶ antippen, dann Fahrmodus erneut.",
-        );
-        break;
-      }
+    } finally {
+      setAutoSession(false);
+      stopAudioSession();
     }
-
-    setAutoSession(false);
   };
 
   const runAutoPlay = async (total: AutoPlayTurnCount) => {
     if (generating || readOnly || autoSession || !turns.length) return;
 
+    if (hasTts) ensureTtsAutoplayForSession();
     setBeatOptions(null);
     setAutoSession(true);
     setAutoTotal(total);
@@ -885,25 +989,58 @@ export function ChatView({
     setAutoLeft(total);
 
     let history = turns;
+    let prefetched: Promise<DrivePrefetchResult> | null = null;
 
-    while (autoPlayRemainingRef.current > 0) {
-      const ok = await runGeneration(history, {
-        continuation: true,
-        continuationPrompt: autoContinuePrompt(),
-      });
-      if (!ok || autoPlayRemainingRef.current === 0) break;
+    try {
+      while (autoPlayRemainingRef.current > 0) {
+        if (prefetched) {
+          const result = await prefetched;
+          prefetched = null;
+          if (!result.ok) break;
+          history = result.history;
+        } else {
+          const ok = await runGeneration(history, {
+            continuation: true,
+            continuationPrompt: autoContinuePrompt(),
+          });
+          if (!ok) break;
+          history = await getTurns(chapterId);
+          setTurns(history);
+          if (hasTts) await prewarmDriveTtsAwait(history);
+        }
 
-      history = await getTurns(chapterId);
-      setTurns(history);
+        if (autoPlayRemainingRef.current > 1) {
+          prefetched = hasTts
+            ? prefetchDriveTurn(history)
+            : prefetchDriveLlm(history);
+        }
 
-      autoPlayRemainingRef.current -= 1;
-      setAutoLeft(autoPlayRemainingRef.current);
+        if (hasTts) {
+          const ttsResult = await waitForLatestAssistantTts(history, {
+            forDrive: true,
+          });
+          if (ttsResult === "blocked") {
+            setError(
+              "Vorlesen blockiert — ▶ bei der letzten Nachricht tippen, dann Autoplay fortsetzen.",
+            );
+            break;
+          }
+          if (ttsResult === "no-player") {
+            setError("Audio-Player nicht bereit — kurz warten oder ▶ antippen.");
+            break;
+          }
+        }
+
+        autoPlayRemainingRef.current -= 1;
+        setAutoLeft(autoPlayRemainingRef.current);
+      }
+    } finally {
+      autoPlayRemainingRef.current = 0;
+      setAutoLeft(0);
+      setAutoTotal(0);
+      setAutoSession(false);
+      stopAudioSession();
     }
-
-    autoPlayRemainingRef.current = 0;
-    setAutoLeft(0);
-    setAutoTotal(0);
-    setAutoSession(false);
   };
 
   const handleEdit = async (turnId: string, content: string) => {

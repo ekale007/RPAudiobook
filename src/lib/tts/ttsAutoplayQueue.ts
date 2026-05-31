@@ -105,6 +105,7 @@ export class TtsAutoplayQueue {
     );
     if (!player) return "no-player";
     try {
+      await player.prepare().catch(() => undefined);
       await player.play();
       return "ok";
     } catch (error) {
@@ -116,6 +117,34 @@ export class TtsAutoplayQueue {
   /** Drive mode: longer wait for React mount + TTS fetch after each new turn. */
   async playTurnAndWaitForDrive(turnId: string) {
     return this.playTurnAndWait(turnId, { playerWaitMs: DRIVE_PLAYER_WAIT_MS });
+  }
+
+  /** Play one turn without stopping other players (preserves prefetched audio). */
+  async playTurnForDrive(turnId: string) {
+    this.stopped = false;
+    for (const [id, player] of this.players) {
+      if (id !== turnId) player.pause();
+    }
+    return this.playTurnAndWait(turnId, { playerWaitMs: DRIVE_PLAYER_WAIT_MS });
+  }
+
+  /** Fetch TTS audio ahead of playback (e.g. while previous clip plays). */
+  async prepareTurn(
+    turnId: string,
+    options?: { playerWaitMs?: number },
+  ): Promise<boolean> {
+    this.stopped = false;
+    const player = await this.waitForPlayer(
+      turnId,
+      options?.playerWaitMs ?? PLAYER_WAIT_MS,
+    );
+    if (!player) return false;
+    try {
+      await player.prepare();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   subscribe(listener: (active: boolean) => void): () => void {

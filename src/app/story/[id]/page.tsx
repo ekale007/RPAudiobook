@@ -13,6 +13,7 @@ import {
   updateStoryTitle,
   type ChapterRow,
 } from "@/lib/db/stories";
+import { normalizeStoryLocale } from "@/lib/tts/ttsLocaleRouting";
 
 export default function StoryHubPage() {
   const params = useParams();
@@ -136,7 +137,9 @@ export default function StoryHubPage() {
         bandSummary={(data.band.band_summary as string | null) ?? null}
         chapters={chapters}
         cast={data.cast}
+        storyLocale={normalizeStoryLocale(data.story.locale as string)}
         activeChapterId={activeChapter?.id}
+        onCastUpdated={load}
         error={error}
         editingTitle={editingTitle}
         titleDraft={titleDraft}

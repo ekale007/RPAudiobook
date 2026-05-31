@@ -43,3 +43,6 @@ next-env.d.ts
 
 # vercel
 .vercel
+
+# local assets (not for repo)
+/Bilder/

@@ -4,7 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
+import { CharacterAvatar } from "@/components/CharacterAvatar";
+import { CharacterAvatarUpload } from "@/components/CharacterAvatarUpload";
 import { createClient } from "@/lib/supabase/client";
+import { getHoerbuchkiExtensions } from "@/lib/images/characterAvatar";
 import {
   getStoryOverview,
   listCharacters,
@@ -51,6 +54,7 @@ export default function StoryCharacterCardsPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [storyTitle, setStoryTitle] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
   const [characters, setCharacters] = useState<CharacterRow[]>([]);
   const [drafts, setDrafts] = useState<Record<string, WryTourCharacter>>({});
   const [openId, setOpenId] = useState<string | null>(null);
@@ -79,6 +83,7 @@ export default function StoryCharacterCardsPage() {
           router.replace("/login");
           return;
         }
+        setUserId(data.user.id);
         load()
           .catch((e) => setError(String(e)))
           .finally(() => setLoading(false));
@@ -138,17 +143,39 @@ export default function StoryCharacterCardsPage() {
                 <button
                   type="button"
                   onClick={() => setOpenId(open ? null : c.id)}
-                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left"
                 >
-                  <span className="text-sm font-medium text-zinc-100">
+                  <CharacterAvatar
+                    name={draft.name || c.name}
+                    avatarStoragePath={
+                      getHoerbuchkiExtensions(draft).avatarStoragePath
+                    }
+                    className="h-10 w-10"
+                  />
+                  <span className="min-w-0 flex-1 text-sm font-medium text-zinc-100">
                     {draft.name || c.name}
                   </span>
-                  <span className="text-[10px] text-zinc-500">
+                  <span className="shrink-0 text-[10px] text-zinc-500">
                     {roleLabel(c.role)} · {open ? "▲" : "▼"}
                   </span>
                 </button>
                 {open ? (
                   <div className="space-y-2 border-t border-surface-border/60 px-3 py-3">
+                    {userId ? (
+                      <CharacterAvatarUpload
+                        userId={userId}
+                        storyId={storyId}
+                        characterId={c.id}
+                        name={draft.name || c.name}
+                        card={draft}
+                        onUpdated={(nextCard) =>
+                          setDrafts((prev) => ({
+                            ...prev,
+                            [c.id]: nextCard,
+                          }))
+                        }
+                      />
+                    ) : null}
                     {FIELDS.map(({ key, label, rows }) => (
                       <label
                         key={key}

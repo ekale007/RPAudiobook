@@ -53,7 +53,7 @@ export function AutoPlayControls({
             ))}
           </div>
           <p className="text-[10px] leading-snug text-zinc-600">
-            Schaltet Autoplay ein und liest jede neue Szene vor (ideal unterwegs).
+            Schaltet Autoplay ein — nächste Szene wird während dem Vorlesen vorbereitet.
           </p>
         </div>
       ) : null}

@@ -61,4 +61,22 @@ Ausgabe: `public/library-covers/{id}.webp` (768×1152, 2:3)
 
 Prompts kommen automatisch aus `libraryTemplates.ts` / `libraryTemplatesExtra.ts` (`coverImagePrompt`).
 
+## Dev-Bildgenerator (Cover + Porträts in der App)
+
+Gleiches Modell, HTTP-Server für die Test-UI:
+
+```powershell
+npm run images:server
+npm run dev
+```
+
+Öffne `http://localhost:3000/dev/image-generator` — oder über Story-Hub → Settings → **Bildgenerator (lokal)**.
+
+| Modus | Größe | Speichern |
+|-------|-------|-----------|
+| Buchcover | 768×1152 | Story-Cover (Supabase `story-covers`) |
+| Char-Porträt | 768×768 | Avatar in Char-Karte (`extensions.hoerbuchki`) |
+
+Erstes Bild lädt das Modell (~6–7 GB, einmalig). Danach ~30–90 s pro Bild auf der 1080 Ti.
+
 Siehe auch: [COVER-PROMPTS.md](./COVER-PROMPTS.md)

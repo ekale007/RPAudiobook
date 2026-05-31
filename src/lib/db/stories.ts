@@ -475,6 +475,42 @@ export async function applyCharacterMemoryUpdates(
   return listCharacters(storyId);
 }
 
+export async function createCastCharacter(
+  storyId: string,
+  userId: string,
+  payload: {
+    slug: string;
+    name: string;
+    card_json?: WryTourCharacter;
+    character_memory?: string | null;
+    first_seen_chapter_id?: string | null;
+  },
+): Promise<CharacterRow> {
+  const supabase = createClient();
+  const slug = payload.slug.trim().toLowerCase().replace(/_/g, "-");
+  const name = payload.name.trim() || "Figur";
+  const { data, error } = await supabase
+    .from("characters")
+    .insert({
+      user_id: userId,
+      story_id: storyId,
+      slug,
+      role: "cast",
+      name,
+      card_json: payload.card_json ?? minimalCharacterCard(name),
+      character_memory: payload.character_memory?.trim() || null,
+      status: "active",
+      first_seen_chapter_id: payload.first_seen_chapter_id ?? null,
+    })
+    .select(
+      "id, slug, role, name, card_json, status, character_memory, archived_at, archived_reason, first_seen_chapter_id",
+    )
+    .single();
+  if (error) throw error;
+  await touchStoryUpdated(storyId);
+  return mapCharacterRow(data as Record<string, unknown>);
+}
+
 export async function updateCharacterManual(
   characterId: string,
   storyId: string,

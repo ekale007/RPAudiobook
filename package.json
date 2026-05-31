@@ -24,7 +24,8 @@
     "covers:install:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-covers.ps1 -CpuOnly",
     "covers:list-missing": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-covers.ps1 --list-missing",
     "covers:missing": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-covers.ps1 --missing",
-    "covers:generate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-covers.ps1"
+    "covers:generate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-covers.ps1",
+    "images:server": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-image-server.ps1"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

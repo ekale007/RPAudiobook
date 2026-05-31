@@ -4,6 +4,10 @@ import {
   loadTtsAutoplay,
   saveTtsAutoplay,
 } from "@/lib/storage/ttsPlaybackSettings";
+import {
+  startAudioSession,
+  unlockAudioForAutoplay,
+} from "@/lib/tts/audioUnlock";
 
 export function TtsAutoplayToggle({
   enabled,
@@ -19,6 +23,10 @@ export function TtsAutoplayToggle({
   const toggle = () => {
     const next = !enabled;
     saveTtsAutoplay(next);
+    if (next) {
+      startAudioSession();
+      unlockAudioForAutoplay();
+    }
     onChange(next);
   };
 
