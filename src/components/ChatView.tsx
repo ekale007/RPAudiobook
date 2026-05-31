@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { GeneratingIndicator } from "@/components/GeneratingIndicator";
 import { BubbleNavArrows } from "@/components/BubbleNavArrows";
 import { ChatTurnBubble } from "@/components/ChatTurnBubble";
 import { AutoPlayControls } from "@/components/AutoPlayControls";
@@ -130,8 +131,7 @@ export function ChatView({
 
   const [turns, setTurns] = useState<TurnRow[]>([]);
   const [input, setInput] = useState("");
-  const [streaming, setStreaming] = useState(false);
-  const [streamDraft, setStreamDraft] = useState("");
+  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loreCount, setLoreCount] = useState(0);
   const [rollingSummary, setRollingSummary] = useState(
@@ -481,7 +481,7 @@ export function ChatView({
       const settings = loadOpenRouterSettings();
       if (!settings) return false;
       autoChapterBusyRef.current = true;
-      setStreaming(true);
+      setGenerating(true);
       setError(null);
 
       try {
@@ -553,7 +553,7 @@ export function ChatView({
         return false;
       } finally {
         autoChapterBusyRef.current = false;
-        setStreaming(false);
+        setGenerating(false);
       }
     },
     [readOnly, storyId, chapterId, chapterTitle, chapter.title, phaseHint, plotState],
@@ -630,9 +630,8 @@ export function ChatView({
     const chatSettings = resolveChatModelSettings(settings);
 
     setError(null);
-    setStreamDraft("");
     chatBusyRef.current = true;
-    setStreaming(true);
+    setGenerating(true);
     abortRef.current = new AbortController();
 
     let full = "";
@@ -656,7 +655,6 @@ export function ChatView({
         continuation: opts.continuation,
         continuationPrompt: opts.continuationPrompt,
         onLoreCount: setLoreCount,
-        onToken: (chunk) => setStreamDraft((prev) => prev + chunk),
         signal: abortRef.current.signal,
       });
     } catch (e) {
@@ -665,8 +663,7 @@ export function ChatView({
       }
       abortRef.current = null;
       chatBusyRef.current = false;
-      setStreaming(false);
-      setStreamDraft("");
+      setGenerating(false);
       return false;
     }
 
@@ -675,14 +672,12 @@ export function ChatView({
 
     if (aborted) {
       chatBusyRef.current = false;
-      setStreaming(false);
-      setStreamDraft("");
+      setGenerating(false);
       return false;
     }
     if (!full.trim()) {
       chatBusyRef.current = false;
-      setStreaming(false);
-      setStreamDraft("");
+      setGenerating(false);
       setError("Leere Antwort vom Modell — bitte erneut versuchen.");
       return false;
     }
@@ -699,14 +694,12 @@ export function ChatView({
       setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
       await load();
       chatBusyRef.current = false;
-      setStreaming(false);
-      setStreamDraft("");
+      setGenerating(false);
       return false;
     }
 
     chatBusyRef.current = false;
-    setStreaming(false);
-    setStreamDraft("");
+    setGenerating(false);
     return true;
   };
 
@@ -720,14 +713,13 @@ export function ChatView({
     beatsAbortRef.current?.abort();
     abortRef.current = null;
     beatsAbortRef.current = null;
-    setStreaming(false);
-    setStreamDraft("");
+    setGenerating(false);
     setBeatsLoading(false);
   };
 
   const sendMessage = async () => {
     const text = input.trim();
-    if (!text || streaming || autoSession || readOnly) return;
+    if (!text || generating || autoSession || readOnly) return;
 
     setInput("");
     setError(null);
@@ -771,7 +763,7 @@ export function ChatView({
   });
 
   const requestBeatSuggestions = async () => {
-    if (streaming || autoSession || readOnly || !turns.length || beatsLoading)
+    if (generating || autoSession || readOnly || !turns.length || beatsLoading)
       return;
 
     const settings = loadOpenRouterSettings();
@@ -804,7 +796,7 @@ export function ChatView({
   };
 
   const playChosenBeat = async (beat: StoryBeatOption) => {
-    if (streaming || autoSession || readOnly) return;
+    if (generating || autoSession || readOnly) return;
     setBeatOptions(null);
     await runGeneration(turns, {
       continuation: true,
@@ -813,7 +805,7 @@ export function ChatView({
   };
 
   const quickContinue = async () => {
-    if (streaming || readOnly || autoSession || !turns.length) return;
+    if (generating || readOnly || autoSession || !turns.length) return;
     setBeatOptions(null);
     await runGeneration(turns, {
       continuation: true,
@@ -822,14 +814,19 @@ export function ChatView({
   };
 
   const runDriveMode = async (minutes: DriveModeMinutes) => {
-    if (streaming || readOnly || autoSession || !turns.length || !hasTts) return;
+    if (generating || readOnly || autoSession || !turns.length || !hasTts) return;
 
     unlockAudioForAutoplay();
+    if (!ttsAutoplay) {
+      setTtsAutoplay(true);
+      saveTtsAutoplay(true);
+    }
     setBeatOptions(null);
     setAutoSession(true);
     setAutoTotal(0);
     autoPlayRemainingRef.current = 0;
     setAutoLeft(0);
+    setError(null);
 
     const endAt = Date.now() + minutes * 60 * 1000;
     let history = turns;
@@ -838,21 +835,48 @@ export function ChatView({
       const ok = await runGeneration(history, {
         continuation: true,
         continuationPrompt: autoContinuePrompt(),
-        forceTts: true,
       });
       if (!ok) break;
 
-      await ttsQueueRef.current.waitUntilIdle();
-
       history = await getTurns(chapterId);
       setTurns(history);
+
+      const assistants = history.filter(
+        (t) => t.role === "assistant" && !t.id.startsWith("tmp-"),
+      );
+      const latest = assistants[assistants.length - 1];
+      if (!latest) continue;
+
+      unlockAudioForAutoplay();
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+
+      ttsQueueRef.current.setAssistantTurnOrder(assistants.map((t) => t.id));
+      ttsQueueRef.current.stop();
+      const ttsResult = await ttsQueueRef.current.playTurnAndWaitForDrive(
+        latest.id,
+      );
+
+      if (ttsResult === "blocked") {
+        setError(
+          "Vorlesen blockiert (Browser). Tippe einmal auf ▶ bei der letzten Nachricht, dann starte Fahrmodus erneut.",
+        );
+        break;
+      }
+      if (ttsResult === "no-player") {
+        setError(
+          "Audio-Player nicht bereit — Seite kurz warten oder ▶ antippen, dann Fahrmodus erneut.",
+        );
+        break;
+      }
     }
 
     setAutoSession(false);
   };
 
   const runAutoPlay = async (total: AutoPlayTurnCount) => {
-    if (streaming || readOnly || autoSession || !turns.length) return;
+    if (generating || readOnly || autoSession || !turns.length) return;
 
     setBeatOptions(null);
     setAutoSession(true);
@@ -900,7 +924,7 @@ export function ChatView({
     stopTtsAutoplay();
     syncKnownTurns(rows);
     setTurns(rows);
-    if (streaming) abortRef.current?.abort();
+    if (generating) abortRef.current?.abort();
     await syncStoryMemory(rows);
   };
 
@@ -995,7 +1019,7 @@ export function ChatView({
   };
 
   const toolsActivity = useMemo(() => {
-    if (streaming) {
+    if (generating) {
       return {
         label:
           autoTotal > 0
@@ -1020,7 +1044,7 @@ export function ChatView({
     }
     return null;
   }, [
-    streaming,
+    generating,
     autoTotal,
     autoLeft,
     ttsQueueActive,
@@ -1040,7 +1064,7 @@ export function ChatView({
         />
         <ChatScrollPane
           scrollRef={chatScrollRef}
-          contentKey={`${turns.length}:${streaming}:${streamDraft.length}`}
+          contentKey={`${turns.length}:${generating}`}
         >
           {loreCount > 0 ? (
             <p className="mb-2 text-center text-xs text-zinc-500">
@@ -1088,33 +1112,11 @@ export function ChatView({
             </div>
           ))}
 
-          {streaming ? (
-            <div
-              ref={(el) => {
-                if (el) bubbleRefs.current.set("__streaming__", el);
-                else bubbleRefs.current.delete("__streaming__");
-              }}
-              className="scroll-mt-3 scroll-mb-3 opacity-90"
-            >
-              <ChatTurnBubble
-                turn={{
-                  id: "__streaming__",
-                  chapter_id: chapterId,
-                  index_in_chapter: turns.length,
-                  role: "assistant",
-                  content: streamDraft || "Erzähler schreibt …",
-                  created_at: new Date().toISOString(),
-                  speaker_slug: "narrator",
-                }}
-                cast={allCast}
-                voiceMap={voiceMap}
-                voiceEnabledSlugs={voiceEnabledSlugs}
-                readOnly
-                onEdit={async () => {}}
-                onRewind={async () => {}}
-                navFocused={false}
-                storyLocale={storyLocale}
-                showDialogueMarkup={false}
+          {generating ? (
+            <div className="scroll-mt-3 scroll-mb-3 px-1">
+              <GeneratingIndicator
+                label="Erzähler schreibt …"
+                onCancel={cancelWork}
               />
             </div>
           ) : null}
@@ -1144,7 +1146,7 @@ export function ChatView({
             {hasTts ? (
               <TtsAutoplayToggle
                 enabled={ttsAutoplay}
-                disabled={streaming || autoSession}
+                disabled={generating || autoSession}
                 queueActive={ttsQueueActive}
                 onChange={(next) => {
                   setTtsAutoplay(next);
@@ -1185,7 +1187,7 @@ export function ChatView({
           </div>
           {!readOnly ? (
             <AutoPlayControls
-              disabled={streaming || autoSession || turns.length === 0}
+              disabled={generating || autoSession || turns.length === 0}
               onStart={runAutoPlay}
               onDriveStart={hasTts ? runDriveMode : undefined}
             />
@@ -1195,7 +1197,7 @@ export function ChatView({
         {!readOnly ? (
           <>
             <StoryBeatPicker
-              disabled={streaming || autoSession || turns.length === 0}
+              disabled={generating || autoSession || turns.length === 0}
               loading={beatsLoading}
               options={beatOptions}
               onRequestBeats={requestBeatSuggestions}
@@ -1213,22 +1215,32 @@ export function ChatView({
             rows={2}
             placeholder={readOnly ? "Read-only chapter" : "What do you do?"}
             className="flex-1 resize-none rounded-xl border border-surface-border bg-surface-raised px-3 py-2 text-base outline-none focus:border-accent"
-            disabled={streaming || autoSession || readOnly}
+            disabled={generating || autoSession || readOnly}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                sendMessage();
+                if (!generating) sendMessage();
               }
             }}
           />
-          <button
-            type="button"
-            onClick={sendMessage}
-            disabled={streaming || autoSession || readOnly || !input.trim()}
-            className="shrink-0 rounded-xl bg-accent px-4 py-2 text-sm font-medium text-black disabled:opacity-40"
-          >
-            Send
-          </button>
+          {generating ? (
+            <button
+              type="button"
+              onClick={cancelWork}
+              className="shrink-0 rounded-xl border border-red-500/50 bg-red-500/15 px-4 py-2 text-sm font-medium text-red-300"
+            >
+              Stop
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={sendMessage}
+              disabled={autoSession || readOnly || !input.trim()}
+              className="shrink-0 rounded-xl bg-accent px-4 py-2 text-sm font-medium text-black disabled:opacity-40"
+            >
+              Send
+            </button>
+          )}
         </div>
       </div>
     </div>

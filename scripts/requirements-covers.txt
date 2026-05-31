@@ -1,0 +1,10 @@
+# Local library cover generation (SDXL-Turbo, GPU optional)
+# Separate venv from Kokoro — see scripts/install-covers.ps1
+
+torch>=2.2.0
+diffusers>=0.32.0
+transformers>=4.44.0
+accelerate>=0.33.0
+safetensors>=0.4.0
+pillow>=10.4.0
+huggingface-hub>=0.24.0

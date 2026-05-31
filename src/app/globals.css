@@ -83,6 +83,35 @@ body {
   }
 }
 
+.generating-indicator__bar {
+  height: 0.2rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: rgb(212 175 55 / 0.12);
+}
+
+.generating-indicator__bar-fill {
+  height: 100%;
+  width: 35%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    rgb(212 175 55 / 0.35),
+    rgb(212 175 55 / 0.95),
+    rgb(212 175 55 / 0.35)
+  );
+  animation: generating-bar-slide 1.4s ease-in-out infinite;
+}
+
+@keyframes generating-bar-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
 .library-shelf-board {
   background: linear-gradient(
     180deg,

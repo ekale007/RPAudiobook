@@ -1,6 +1,6 @@
 # Bibliotheks-Cover
 
-Lege deine generierten Cover hier ab (WebP oder JPG):
+WebP/JPEG Hochformat **2:3**, ca. 600×900 px, ohne Titel im Bild.
 
 | Dateiname | Vorlage |
 |-----------|---------|
@@ -8,11 +8,6 @@ Lege deine generierten Cover hier ab (WebP oder JPG):
 | `station-echo.webp` | Station Echo |
 | `last-letter.webp` | Der letzte Brief |
 | `when-dawn-breaks.jpeg` | When Dawn Breaks |
-
-Weitere Vorlagen nutzen vorerst nur `coverGradient` (Farben am Regal). Optional Cover hinzufügen:
-
-| Dateiname | Vorlage |
-|-----------|---------|
 | `haunted-lake.webp` | Das Haus am Schwarzen See |
 | `midnight-bakery.webp` | Mitternacht in der Bäckerei |
 | `iron-republic.webp` | The Iron Republic |
@@ -30,6 +25,6 @@ Weitere Vorlagen nutzen vorerst nur `coverGradient` (Farben am Regal). Optional 
 | `hexbound-academy.webp` | Hexbound Academy |
 | `ghost-signal.webp` | Ghost Signal |
 
-Empfohlen: Hochformat **2:3**, ca. 600×900 px, ohne Titel im Bild.
+Pfade in `src/lib/story/libraryTemplates.ts` als `coverImageSrc`.
 
-Pfade sind in `src/lib/story/libraryTemplates.ts` als `coverImageSrc` hinterlegt.
+**Lokal nachgenerieren:** [docs/LOCAL-COVERS.md](../docs/LOCAL-COVERS.md) — `npm run covers:missing`

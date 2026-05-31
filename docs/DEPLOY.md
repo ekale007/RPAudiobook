@@ -48,7 +48,11 @@ Checkliste für Beta-Deploy mit Server-LLM/TTS (ElevenLabs + OpenRouter).
 
 ## 4. Smoke-Test nach Deploy
 
-- [ ] Login / Magic Link funktioniert
+Siehe **[SMOKE-TEST.md](./SMOKE-TEST.md)** — kurze manuelle Checkliste (Login, Chat, TTS, Bibliothek, …).
+
+Kurz:
+
+- [ ] Login / Passwort-Reset funktioniert
 - [ ] `GET /api/health` → `{ serverTts: true, serverLlm: true }`
 - [ ] `GET /api/auth/me` eingeloggt → `{ ok: true }`
 - [ ] DE-Story: Chat + TTS

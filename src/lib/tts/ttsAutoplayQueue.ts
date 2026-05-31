@@ -2,6 +2,7 @@ import type { MessageAudioPlayerHandle } from "@/lib/tts/messageAudioPlayerHandl
 import { isAutoplayBlockedError } from "@/lib/tts/autoplayPolicy";
 
 const PLAYER_WAIT_MS = 4000;
+const DRIVE_PLAYER_WAIT_MS = 20000;
 const PLAYER_POLL_MS = 50;
 const PREWARM_AHEAD = 4;
 
@@ -87,6 +88,34 @@ export class TtsAutoplayQueue {
         }
       });
     });
+  }
+
+  /**
+   * Wait for player mount, then play one turn through to the end.
+   * Used by drive mode where LLM latency breaks mobile autoplay unlock.
+   */
+  async playTurnAndWait(
+    turnId: string,
+    options?: { playerWaitMs?: number },
+  ): Promise<"ok" | "no-player" | "blocked" | "error"> {
+    this.stopped = false;
+    const player = await this.waitForPlayer(
+      turnId,
+      options?.playerWaitMs ?? PLAYER_WAIT_MS,
+    );
+    if (!player) return "no-player";
+    try {
+      await player.play();
+      return "ok";
+    } catch (error) {
+      if (isAutoplayBlockedError(error)) return "blocked";
+      return "error";
+    }
+  }
+
+  /** Drive mode: longer wait for React mount + TTS fetch after each new turn. */
+  async playTurnAndWaitForDrive(turnId: string) {
+    return this.playTurnAndWait(turnId, { playerWaitMs: DRIVE_PLAYER_WAIT_MS });
   }
 
   subscribe(listener: (active: boolean) => void): () => void {

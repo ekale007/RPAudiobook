@@ -15,6 +15,7 @@ import {
   getLibraryTemplate,
   type LibraryTemplateId,
 } from "@/lib/story/libraryTemplates";
+import { getLibraryTemplateId } from "@/lib/story/storyOrigin";
 import { defaultElevenVoiceMap } from "@/lib/tts/elevenLabsVoices";
 import { normalizeStoryLocale } from "@/lib/tts/ttsLocaleRouting";
 
@@ -255,12 +256,47 @@ export async function createStoryFromSeedPack(
   return { storyId, chapterId: chapter.id as string };
 }
 
+export async function findStoryByLibraryTemplate(
+  templateId: LibraryTemplateId,
+): Promise<{ id: string; title: string } | null> {
+  const rows = await listStories(true);
+  for (const row of rows) {
+    if (getLibraryTemplateId(row.settings) === templateId) {
+      return { id: row.id, title: row.title };
+    }
+  }
+  return null;
+}
+
+export class DuplicateLibraryImportError extends Error {
+  readonly code = "DUPLICATE_LIBRARY_IMPORT" as const;
+
+  constructor(
+    readonly existingStoryId: string,
+    readonly existingTitle: string,
+    readonly templateId: LibraryTemplateId,
+  ) {
+    super(`Library template "${templateId}" already imported as "${existingTitle}".`);
+    this.name = "DuplicateLibraryImportError";
+  }
+}
+
 export async function importFromLibraryTemplate(
   userId: string,
   templateId: LibraryTemplateId,
 ): Promise<{ storyId: string; chapterId: string }> {
   const template = getLibraryTemplate(templateId);
   if (!template) throw new Error("Unknown library template");
+
+  const existing = await findStoryByLibraryTemplate(templateId);
+  if (existing) {
+    throw new DuplicateLibraryImportError(
+      existing.id,
+      existing.title,
+      templateId,
+    );
+  }
+
   const pack = template.loadPack();
   return createStoryFromSeedPack({
     userId,
@@ -468,6 +504,39 @@ export async function updateCharacterManual(
   const { error } = await supabase
     .from("characters")
     .update(row)
+    .eq("id", characterId)
+    .eq("story_id", storyId);
+  if (error) throw error;
+  await touchStoryUpdated(storyId);
+}
+
+export async function updateStoryLorebook(
+  lorebookId: string,
+  storyId: string,
+  book: WryTourLorebook,
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("lorebooks")
+    .update({
+      name: book.name.trim() || "World",
+      book_json: book,
+    })
+    .eq("id", lorebookId);
+  if (error) throw error;
+  await touchStoryUpdated(storyId);
+}
+
+export async function updateCharacterCard(
+  characterId: string,
+  storyId: string,
+  card: WryTourCharacter,
+): Promise<void> {
+  const supabase = createClient();
+  const name = card.name?.trim() || "Character";
+  const { error } = await supabase
+    .from("characters")
+    .update({ card_json: card, name })
     .eq("id", characterId)
     .eq("story_id", storyId);
   if (error) throw error;

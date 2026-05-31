@@ -789,7 +789,7 @@ export const PUBLIC_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     chapterTitle: "Chapter 1 — When Dawn Breaks",
     phaseHint: "Hours 0-4 (Shock)",
     lorebookName: "When Dawn Breaks — World Info",
-    coverImageSrc: "/library-covers/when-dawn-breaks.jpeg",
+    coverImageSrc: "/library-covers/when-dawn-breaks.webp",
     spineTitle: "When Dawn Breaks",
     coverImagePrompt:
       "Audiobook cover illustration, vertical portrait 2:3, science fiction drama. Suburban front door at dawn, warm golden light breaking through violet storm clouds. Silhouette of a young man in the doorway; faint massive invasion ships in the distant sky. Mood: epic but intimate, dry tension, not horror. Cinematic painterly digital art, rich amber and deep indigo palette. No text, no title, no logos, no watermark.",
@@ -812,6 +812,7 @@ export const PUBLIC_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     phaseHint: "Erste Nacht im Seehaus",
     lorebookName: "Das Haus am Schwarzen See",
     spineTitle: "Schwarzer See",
+    coverImageSrc: "/library-covers/haunted-lake.webp",
     coverImagePrompt:
       "Book cover illustration, horror audiobook, isolated lake house in pine forest during storm, single warm window light, wooden dock stretching into black water, rain and mist, subtle silhouette under dock, moody teal and charcoal palette, no text, vertical portrait 2:3",
     loadPack: loadHauntedLakePack,
@@ -833,6 +834,7 @@ export const PUBLIC_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     phaseHint: "Kurz nach Mitternacht",
     lorebookName: "Bäckerei Sonnenaufgang",
     spineTitle: "Mitternachtsbäckerei",
+    coverImageSrc: "/library-covers/midnight-bakery.webp",
     coverImagePrompt:
       "Book cover illustration, cozy mystery audiobook, warm bakery interior at night, glowing oven, flour dust in air, cat sitting before cellar door, small town mood, soft amber and lavender tones, no text, vertical portrait 2:3",
     loadPack: loadMidnightBakeryPack,
@@ -854,6 +856,7 @@ export const PUBLIC_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     phaseHint: "Morning dock shift",
     lorebookName: "The Iron Republic",
     spineTitle: "Iron Republic",
+    coverImageSrc: "/library-covers/iron-republic.webp",
     coverImagePrompt:
       "Book cover illustration, steampunk audiobook, brass airship sky-dock, steam fog, giant gears and gantries, sealed crate with mysterious crest, Victorian-industrial aesthetic, copper and teal palette, no text, vertical portrait 2:3",
     loadPack: loadIronRepublicPack,
@@ -875,6 +878,7 @@ export const PUBLIC_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     phaseHint: "05:00 deadline",
     lorebookName: "Neon District 9",
     spineTitle: "Neon Witness",
+    coverImageSrc: "/library-covers/neon-witness.webp",
     coverImagePrompt:
       "Book cover illustration, cyberpunk noir audiobook, rainy rooftop at night, neon hologram ads, black corporate tower in distance, glowing data chip in hand, drone searchlight, magenta and cyan palette, no text, vertical portrait 2:3",
     loadPack: loadNeonWitnessPack,
@@ -896,6 +900,7 @@ export const PUBLIC_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     phaseHint: "Nacht vor dem Sturm",
     lorebookName: "Die Oase von Kharim",
     spineTitle: "Eid der Oase",
+    coverImageSrc: "/library-covers/desert-oath.webp",
     coverImagePrompt:
       "Book cover illustration, desert fantasy audiobook, oasis camp at night, caravan fires, ancient artifact glow, sandstorm wall on horizon, starry sky, warm gold and deep umber palette, no text, vertical portrait 2:3",
     loadPack: loadDesertOathPack,
@@ -917,6 +922,7 @@ export const PUBLIC_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     phaseHint: "Low tide afternoon",
     lorebookName: "The Tide Line",
     spineTitle: "The Tide Line",
+    coverImageSrc: "/library-covers/tide-line.webp",
     coverImagePrompt:
       "Book cover illustration, coastal drama audiobook, weathered seaside cottage, low tide exposing pier pilings, kelp and old phone in wrack line, overcast golden light, emotional mood, slate blue and sand tones, no text, vertical portrait 2:3",
     loadPack: loadTideLinePack,

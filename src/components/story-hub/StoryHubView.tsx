@@ -481,9 +481,14 @@ export function StoryHubView({
         {tab === "cast" ? (
           <>
             <SettingsLink
+              href={`/story/${storyId}/cards`}
+              title="Charakterkarten"
+              description="Erzähler- und Cast-Karten (Prompts, Eröffnung) bearbeiten"
+            />
+            <SettingsLink
               href={`/story/${storyId}/cast`}
               title="Figuren & Erinnerungen"
-              description="Memory, Archiv-Status und Details pro Figur bearbeiten"
+              description="Memory, Archiv-Status und Details pro Figur"
             />
             <SettingsLink
               href={`/story/${storyId}/voices`}
@@ -511,6 +516,11 @@ export function StoryHubView({
 
         {tab === "settings" ? (
           <div className="flex flex-col gap-1.5">
+            <SettingsLink
+              href={`/story/${storyId}/world`}
+              title="Welt & Lorebook"
+              description="Lore-Einträge, Keys und Weltbeschreibung pflegen"
+            />
             <SettingsLink
               href={`/story/${storyId}/memory`}
               title="Story-Gedächtnis"

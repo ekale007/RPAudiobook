@@ -733,6 +733,7 @@ export const EXTENDED_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     phaseHint: "Erste Stunde in Valdris",
     lorebookName: "Das Schattenreich von Valdris",
     spineTitle: "Schattenkaiser",
+    coverImageSrc: "/library-covers/schatten-kaiser.webp",
     coverImagePrompt:
       "Book cover illustration, dark fantasy isekai audiobook, obsidian palace under blood moon, hooded procession in rain-slick alley, glowing black sigil on hand, purple and charcoal palette, no text, vertical portrait 2:3",
     loadPack: loadSchattenKaiserPack,
@@ -754,6 +755,7 @@ export const EXTENDED_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     phaseHint: "Vor der Zeremonie",
     lorebookName: "Akademie Arkanum",
     spineTitle: "Akademie Arkanum",
+    coverImageSrc: "/library-covers/akademie-arkanum.webp",
     coverImagePrompt:
       "Book cover illustration, magic academy audiobook, floating candles in great hall, four house banners, enchanted wand, warm blue and gold palette, no text, vertical portrait 2:3",
     loadPack: loadAkademieArkanumPack,
@@ -775,6 +777,7 @@ export const EXTENDED_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     phaseHint: "Erste Nacht",
     lorebookName: "Welt Null — Systeminterface",
     spineTitle: "System Null",
+    coverImageSrc: "/library-covers/system-null.webp",
     coverImagePrompt:
       "Book cover illustration, isekai RPG audiobook, fantasy village edge, holographic blue status window overlay, moss landing, tutorial quest glow, teal and emerald palette, no text, vertical portrait 2:3",
     loadPack: loadSystemNullPack,
@@ -796,6 +799,7 @@ export const EXTENDED_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     phaseHint: "Erste Nacht im Viertel",
     lorebookName: "Neonstadt — Blutmond-Viertel",
     spineTitle: "Blutmond-Pakt",
+    coverImageSrc: "/library-covers/blutmond-pakt.webp",
     coverImagePrompt:
       "Book cover illustration, urban fantasy vampire audiobook, neon nightclub black glass facade, red rain reflections, blood seal invitation, noir mood, crimson and black palette, no text, vertical portrait 2:3",
     loadPack: loadBlutmondPaktPack,
@@ -817,6 +821,7 @@ export const EXTENDED_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     phaseHint: "Nacht vor dem Rat",
     lorebookName: "Zug 47 — Untergrund",
     spineTitle: "Zug 47",
+    coverImageSrc: "/library-covers/zug-47.webp",
     coverImagePrompt:
       "Book cover illustration, post-apocalyptic audiobook, armored train in dark tunnel, radio glow in cabin, desperate survivors, rust and amber palette, no text, vertical portrait 2:3",
     loadPack: loadZug47Pack,
@@ -838,6 +843,7 @@ export const EXTENDED_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     phaseHint: "Hour six trapped",
     lorebookName: "Second Life Protocol",
     spineTitle: "Second Life",
+    coverImageSrc: "/library-covers/second-life-protocol.webp",
     coverImagePrompt:
       "Book cover illustration, corporate isekai VR audiobook, fantasy meadow with holographic UI overlay, logout button greyed, starter village gate, cyan and violet palette, no text, vertical portrait 2:3",
     loadPack: loadSecondLifeProtocolPack,
@@ -859,6 +865,7 @@ export const EXTENDED_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     phaseHint: "Trial day",
     lorebookName: "Guild of the Last Light",
     spineTitle: "Last Light",
+    coverImageSrc: "/library-covers/guild-last-light.webp",
     coverImagePrompt:
       "Book cover illustration, adventurer guild fantasy audiobook, leaky guild hall, quest board with dungeon pin, rainy cobblestone, torchlight, warm amber palette, no text, vertical portrait 2:3",
     loadPack: loadGuildLastLightPack,
@@ -880,6 +887,7 @@ export const EXTENDED_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     phaseHint: "Before midnight",
     lorebookName: "The Starlit Court",
     spineTitle: "Starlit Court",
+    coverImageSrc: "/library-covers/starlit-court.webp",
     coverImagePrompt:
       "Book cover illustration, space opera audiobook, orbital palace ballroom, starlight chandeliers, masked figures, fleet lights through observation glass, gold and indigo palette, no text, vertical portrait 2:3",
     loadPack: loadStarlitCourtPack,
@@ -901,6 +909,7 @@ export const EXTENDED_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     phaseHint: "Six hours to ceremony",
     lorebookName: "Hexbound Academy",
     spineTitle: "Hexbound",
+    coverImageSrc: "/library-covers/hexbound-academy.webp",
     coverImagePrompt:
       "Book cover illustration, magic academy audiobook, floating island school, cursed dorm door number 13, founder statue with glowing hex runes, crimson and midnight blue palette, no text, vertical portrait 2:3",
     loadPack: loadHexboundAcademyPack,
@@ -922,6 +931,7 @@ export const EXTENDED_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     phaseHint: "First hour awake",
     lorebookName: "Ghost Signal Division",
     spineTitle: "Ghost Signal",
+    coverImageSrc: "/library-covers/ghost-signal.webp",
     coverImagePrompt:
       "Book cover illustration, spy thriller audiobook, safehouse shortwave radio, redacted mission packet, fluorescent noir, clock showing :17, slate and red accent palette, no text, vertical portrait 2:3",
     loadPack: loadGhostSignalPack,

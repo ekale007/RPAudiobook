@@ -19,7 +19,12 @@
     "tts:qwen": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-qwen.ps1 --preload",
     "tts:qwen:large": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-qwen.ps1 --preload --model Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
     "tts:qwen:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-qwen.ps1 --device cpu --preload",
-    "tts:qwen:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-qwen.ps1"
+    "tts:qwen:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-qwen.ps1",
+    "covers:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-covers.ps1",
+    "covers:install:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-covers.ps1 -CpuOnly",
+    "covers:list-missing": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-covers.ps1 --list-missing",
+    "covers:missing": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-covers.ps1 --missing",
+    "covers:generate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-covers.ps1"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

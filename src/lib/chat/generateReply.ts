@@ -1,7 +1,8 @@
 import { buildChatMessages } from "@/lib/prompt/buildPrompt";
 import { ensureSpeakerScript } from "@/lib/chat/dialogueScript";
 import { preprocessAssistantMarkup } from "@/lib/chat/parseSpeakerBlocks";
-import { streamOpenRouterChat } from "@/lib/llm/openrouter";
+import { completeOpenRouter } from "@/lib/llm/openrouter";
+import { resolveChatModelSettings } from "@/lib/storage/openRouterSettings";
 import type { OpenRouterSettings } from "@/lib/types";
 import type { ChatTurn, LoreEntry, StorySettings, WryTourCharacter } from "@/lib/types";
 import type { CharacterRow } from "@/lib/db/stories";
@@ -27,12 +28,11 @@ export type GenerateReplyParams = {
   continuation?: boolean;
   /** Overrides default “continue” prompt (e.g. chosen story beat). */
   continuationPrompt?: string;
-  onToken?: (chunk: string) => void;
-  onStreamError?: (error: Error) => void;
   onLoreCount?: (n: number) => void;
   signal?: AbortSignal;
 };
 
+/** Full reply in one request (no token streaming — simpler on mobile). */
 export async function streamAssistantReply(
   params: GenerateReplyParams,
 ): Promise<string> {
@@ -66,31 +66,12 @@ export async function streamAssistantReply(
   const { messages, activeLoreCount } = buildChatMessages(promptCtx);
   params.onLoreCount?.(activeLoreCount);
 
-  let full = "";
-  let streamError: Error | null = null;
-  await new Promise<void>((resolve) => {
-    streamOpenRouterChat(
-      params.settings,
-      messages,
-      {
-        onToken: (t) => {
-          full += t;
-          params.onToken?.(t);
-        },
-        onDone: () => resolve(),
-        onError: (e) => {
-          streamError = e;
-          params.onStreamError?.(e);
-          resolve();
-        },
-      },
-      params.signal,
-    );
+  const chatSettings = resolveChatModelSettings(params.settings);
+  return completeOpenRouter(chatSettings, messages, {
+    maxTokens: chatSettings.maxTokens,
+    temperature: chatSettings.temperature,
+    signal: params.signal,
   });
-
-  if (streamError) throw streamError;
-
-  return full;
 }
 
 /** Storyteller mode: one narrator turn per reply (content keeps script tags). */

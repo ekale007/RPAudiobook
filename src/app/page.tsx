@@ -10,6 +10,7 @@ import {
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import {
   deleteStory,
+  DuplicateLibraryImportError,
   importFromLibraryTemplate,
   isStoryArchived,
   listStories,
@@ -78,6 +79,14 @@ export default function HomePage() {
       const { storyId } = await importFromLibraryTemplate(user.id, templateId);
       window.location.href = `/story/${storyId}`;
     } catch (e) {
+      if (e instanceof DuplicateLibraryImportError) {
+        const go = window.confirm(
+          `„${e.existingTitle}“ hast du schon aus der Bibliothek importiert.\n\nZur bestehenden Story wechseln?`,
+        );
+        if (go) window.location.href = `/story/${e.existingStoryId}`;
+        setImportingId(null);
+        return;
+      }
       setMessage(String(e));
       setImportingId(null);
     }

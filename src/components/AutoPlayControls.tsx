@@ -37,19 +37,24 @@ export function AutoPlayControls({
         ))}
       </div>
       {onDriveStart ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-zinc-500">Fahren / Hören:</span>
-          {DRIVE_MODE_MINUTES.map((m) => (
-            <button
-              key={m}
-              type="button"
-              disabled={disabled}
-              onClick={() => onDriveStart(m)}
-              className="rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-medium text-accent transition hover:bg-accent/20 disabled:opacity-40"
-            >
-              {m} Min
-            </button>
-          ))}
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-zinc-500">Fahren / Hören:</span>
+            {DRIVE_MODE_MINUTES.map((m) => (
+              <button
+                key={m}
+                type="button"
+                disabled={disabled}
+                onClick={() => onDriveStart(m)}
+                className="rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-medium text-accent transition hover:bg-accent/20 disabled:opacity-40"
+              >
+                {m} Min
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] leading-snug text-zinc-600">
+            Schaltet Autoplay ein und liest jede neue Szene vor (ideal unterwegs).
+          </p>
         </div>
       ) : null}
     </div>

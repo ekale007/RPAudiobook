@@ -24,6 +24,7 @@ Thumbs.db
 .venv-tts/
 .venv-kokoro/
 .venv-qwen/
+.venv-covers/
 __pycache__/
 *.py[cod]
 *.pem
