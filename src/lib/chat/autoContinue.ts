@@ -1,6 +1,6 @@
 import { defaultContinuePrompt } from "@/lib/chat/storyBeatSuggestions";
 
-export const AUTO_PLAY_TURN_OPTIONS = [1, 3, 5] as const;
+export const AUTO_PLAY_TURN_OPTIONS = [2, 3, 5] as const;
 export type AutoPlayTurnCount = (typeof AUTO_PLAY_TURN_OPTIONS)[number];
 export const DEFAULT_AUTO_PLAY_TURNS: AutoPlayTurnCount = 3;
 

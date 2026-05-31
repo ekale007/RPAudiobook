@@ -1325,7 +1325,6 @@ export function ChatView({
           {!readOnly ? (
             <AutoPlayControls
               disabled={generating || autoSession || turns.length === 0}
-              onStart={runAutoPlay}
               onDriveStart={hasTts ? runDriveMode : undefined}
             />
           ) : null}
@@ -1341,6 +1340,7 @@ export function ChatView({
               onSelectBeat={playChosenBeat}
               onDismiss={requestBeatSuggestions}
               onQuickContinue={quickContinue}
+              onAutoPlay={runAutoPlay}
             />
           </>
         ) : null}

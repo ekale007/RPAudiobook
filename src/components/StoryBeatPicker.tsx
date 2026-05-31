@@ -1,6 +1,49 @@
 "use client";
 
+import {
+  AUTO_PLAY_TURN_OPTIONS,
+  type AutoPlayTurnCount,
+} from "@/lib/chat/autoContinue";
 import type { StoryBeatOption } from "@/lib/chat/storyBeatSuggestions";
+
+function NarratorContinueRow({
+  disabled,
+  loading,
+  onQuickContinue,
+  onAutoPlay,
+}: {
+  disabled?: boolean;
+  loading?: boolean;
+  onQuickContinue: () => void;
+  onAutoPlay: (turns: AutoPlayTurnCount) => void;
+}) {
+  return (
+    <div className="flex gap-1.5">
+      <button
+        type="button"
+        disabled={disabled || loading}
+        onClick={onQuickContinue}
+        className="min-w-0 flex-1 rounded-xl border border-violet-400/35 bg-violet-500/10 py-2.5 text-sm font-medium text-violet-200 transition hover:border-violet-400/55 hover:bg-violet-500/15 disabled:opacity-40"
+      >
+        Erzähler macht weiter
+      </button>
+      <div className="flex shrink-0 items-center gap-1 self-stretch">
+        {AUTO_PLAY_TURN_OPTIONS.map((n) => (
+          <button
+            key={n}
+            type="button"
+            disabled={disabled || loading}
+            onClick={() => onAutoPlay(n)}
+            className="flex h-full min-h-[42px] items-center rounded-lg border border-violet-400/25 px-2.5 text-xs font-medium text-violet-300/90 transition hover:border-violet-400/45 hover:bg-violet-500/10 disabled:opacity-40"
+            title={`${n} Szenen automatisch`}
+          >
+            {n}×
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function StoryBeatPicker({
   disabled,
@@ -10,6 +53,7 @@ export function StoryBeatPicker({
   onSelectBeat,
   onDismiss,
   onQuickContinue,
+  onAutoPlay,
 }: {
   disabled?: boolean;
   loading?: boolean;
@@ -18,6 +62,7 @@ export function StoryBeatPicker({
   onSelectBeat: (beat: StoryBeatOption) => void;
   onDismiss: () => void;
   onQuickContinue: () => void;
+  onAutoPlay: (turns: AutoPlayTurnCount) => void;
 }) {
   if (options?.length) {
     return (
@@ -41,29 +86,27 @@ export function StoryBeatPicker({
             </span>
           </button>
         ))}
-        <div className="flex justify-center gap-3 text-xs">
+        <div className="flex justify-center">
           <button
             type="button"
             onClick={onDismiss}
-            className="text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
+            className="text-xs text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
           >
             Andere Vorschläge
           </button>
-          <button
-            type="button"
-            onClick={onQuickContinue}
-            disabled={disabled}
-            className="text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline disabled:opacity-40"
-          >
-            Einfach weiterspielen
-          </button>
         </div>
+        <NarratorContinueRow
+          disabled={disabled}
+          loading={loading}
+          onQuickContinue={onQuickContinue}
+          onAutoPlay={onAutoPlay}
+        />
       </div>
     );
   }
 
   return (
-    <div className="mb-2">
+    <div className="mb-2 space-y-1.5">
       <button
         type="button"
         disabled={disabled || loading}
@@ -72,14 +115,12 @@ export function StoryBeatPicker({
       >
         Schlag was vor
       </button>
-      <button
-        type="button"
-        disabled={disabled || loading}
-        onClick={onQuickContinue}
-        className="mt-1.5 w-full text-center text-xs text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline disabled:opacity-40"
-      >
-        Ohne Vorschläge: Erzähler macht weiter
-      </button>
+      <NarratorContinueRow
+        disabled={disabled}
+        loading={loading}
+        onQuickContinue={onQuickContinue}
+        onAutoPlay={onAutoPlay}
+      />
     </div>
   );
 }
