@@ -2,9 +2,9 @@ import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
 import type { PronunciationMap } from "@/lib/tts/pronunciation";
 
 import {
+  isServerElevenLabsAvailable,
   isServerQwenCloudTtsAvailable,
   isServerQwenTtsAvailable,
-  isServerTtsAvailable,
 } from "@/lib/server/serverCapabilities";
 import {
   coerceQwenPresetVoice,
@@ -129,7 +129,7 @@ export function isTtsReady(settings: TtsSettings): boolean {
     return isServerQwenCloudTtsAvailable();
   }
   if (!settings.elevenLabsVoiceId.trim()) return false;
-  if (isServerTtsAvailable()) return true;
+  if (isServerElevenLabsAvailable()) return true;
   return Boolean(settings.elevenLabsApiKey.trim());
 }
 

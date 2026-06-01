@@ -37,8 +37,8 @@ import {
 } from "@/lib/tts/elevenLabsVoices";
 import { authFetch } from "@/lib/supabase/authFetch";
 import {
+  isServerElevenLabsAvailable,
   isServerQwenTtsAvailable,
-  isServerTtsAvailable,
 } from "@/lib/server/serverCapabilities";
 import { resolveQwenTtsParams } from "@/lib/tts/qwenVoiceProfiles";
 import { coerceQwenPresetVoice } from "@/lib/tts/qwenVoiceSanitize";
@@ -181,7 +181,7 @@ async function synthesizeChunkElevenLabs(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (!isServerTtsAvailable() && settings.elevenLabsApiKey?.trim()) {
+  if (!isServerElevenLabsAvailable() && settings.elevenLabsApiKey?.trim()) {
     headers["xi-api-key"] = settings.elevenLabsApiKey.trim();
   }
 

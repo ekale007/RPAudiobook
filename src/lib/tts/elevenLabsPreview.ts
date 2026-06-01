@@ -1,7 +1,7 @@
 import { authFetch } from "@/lib/supabase/authFetch";
 import { loadTtsSettings } from "@/lib/storage/ttsSettings";
 import { ELEVEN_DEFAULT_MODEL } from "@/lib/tts/elevenLabsVoices";
-import { isServerTtsAvailable } from "@/lib/server/serverCapabilities";
+import { isServerElevenLabsAvailable } from "@/lib/server/serverCapabilities";
 
 const PREVIEW_DE = "Hallo. So klingt diese Stimme in deiner Geschichte.";
 const PREVIEW_EN = "Hello. This is how this voice will sound in your story.";
@@ -15,7 +15,7 @@ export async function fetchElevenLabsPreview(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (!isServerTtsAvailable() && settings.elevenLabsApiKey?.trim()) {
+  if (!isServerElevenLabsAvailable() && settings.elevenLabsApiKey?.trim()) {
     headers["xi-api-key"] = settings.elevenLabsApiKey.trim();
   }
 

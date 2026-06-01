@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  isServerElevenLabsConfigured,
   isServerLlmConfigured,
   isServerQwenCloudTtsConfigured,
   isServerQwenTtsConfigured,
@@ -9,6 +10,7 @@ import {
 export async function GET() {
   return NextResponse.json({
     serverTts: isServerTtsConfigured(),
+    serverElevenLabsTts: isServerElevenLabsConfigured(),
     serverQwenTts: isServerQwenTtsConfigured(),
     serverQwenCloudTts: isServerQwenCloudTtsConfigured(),
     serverLlm: isServerLlmConfigured(),

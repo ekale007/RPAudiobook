@@ -47,9 +47,13 @@ export function isServerQwenTtsConfigured(): boolean {
 
 export { isServerQwenCloudTtsConfigured };
 
+export function isServerElevenLabsConfigured(): boolean {
+  return Boolean(getElevenLabsApiKey());
+}
+
 export function isServerTtsConfigured(): boolean {
   return (
-    Boolean(getElevenLabsApiKey()) ||
+    isServerElevenLabsConfigured() ||
     isServerQwenTtsConfigured() ||
     isServerQwenCloudTtsConfigured()
   );

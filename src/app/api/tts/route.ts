@@ -37,18 +37,13 @@ export async function POST(req: Request) {
   }
 
   const serverKey = getElevenLabsApiKey();
-  const devHeaderKey =
-    process.env.NODE_ENV !== "production"
-      ? req.headers.get("xi-api-key")?.trim()
-      : undefined;
-  const apiKey = serverKey ?? devHeaderKey;
+  const clientKey = req.headers.get("xi-api-key")?.trim();
+  const apiKey = serverKey ?? clientKey;
   if (!apiKey) {
     return NextResponse.json(
       {
         error:
-          process.env.NODE_ENV === "production"
-            ? "TTS not configured. Set ELEVENLABS_API_KEY on the server."
-            : "TTS not configured. Set ELEVENLABS_API_KEY on the server or xi-api-key header (dev only).",
+          "TTS not configured. Set ELEVENLABS_API_KEY on the server or enter your ElevenLabs key in Settings.",
       },
       { status: 503 },
     );

@@ -50,7 +50,7 @@ const MAX_TOKENS_MAX = 8192;
 export default function SettingsPage() {
   const serverCaps = useServerCapabilities();
   const serverLlm = serverCaps.serverLlm;
-  const serverTts = serverCaps.serverTts;
+  const serverElevenLabsTts = serverCaps.serverElevenLabsTts;
   const serverQwenTts = serverCaps.serverQwenTts;
   const serverQwenCloudTts = serverCaps.serverQwenCloudTts;
   const capsReady = serverCaps.ready;
@@ -393,12 +393,32 @@ export default function SettingsPage() {
 
               {ttsProvider === "elevenlabs" ? (
                 <>
-                  {!serverTts ? (
-                    <p className="mb-2 text-xs text-amber-200">
-                      Server-TTS nicht konfiguriert — ElevenLabs-Key in .env
-                      oder unten (nur Dev).
+                  {serverElevenLabsTts ? (
+                    <p className="mb-2 text-xs text-zinc-500">
+                      Server-Key aktiv — TTS läuft über Vercel (kein eigener Key nötig).
                     </p>
-                  ) : null}
+                  ) : (
+                    <>
+                      <p className="mb-2 text-xs text-amber-200">
+                        Kein ElevenLabs-Server-Key — eigenen Key eintragen (nur in
+                        diesem Browser, wird nicht mit dem Account synchronisiert)
+                        oder{" "}
+                        <code className="text-amber-100">ELEVENLABS_API_KEY</code>{" "}
+                        in Vercel setzen.
+                      </p>
+                      <label className="mb-1 block text-xs text-zinc-400">
+                        ElevenLabs API-Key
+                      </label>
+                      <input
+                        type="password"
+                        value={elApiKey}
+                        onChange={(e) => setElApiKey(e.target.value)}
+                        className="mb-3 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
+                        placeholder="xi-…"
+                        autoComplete="off"
+                      />
+                    </>
+                  )}
                   <ElevenLabsVoiceSelect
                     value={elVoiceId}
                     onChange={setElVoiceId}

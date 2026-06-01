@@ -22,7 +22,7 @@ import { loadTtsSettings, ttsCacheVoiceKey } from "@/lib/storage/ttsSettings";
 import { ambienceIdsFromPlot, parseSfxTags } from "@/lib/audio/sfxCatalog";
 import { isStoryDeliveryEnabled } from "@/lib/tts/resolveStoryDelivery";
 import { playSfxForTags, stopAllSfx } from "@/lib/audio/sfxPlayer";
-import { isServerTtsAvailable, refreshServerCapabilities } from "@/lib/server/serverCapabilities";
+import { isServerElevenLabsAvailable, refreshServerCapabilities } from "@/lib/server/serverCapabilities";
 import {
   clampPlaybackRate,
   formatAudioTime,
@@ -234,9 +234,9 @@ export const MessageAudioPlayer = forwardRef<
       !settings.elevenLabsApiKey.trim()
     ) {
       await refreshServerCapabilities();
-      if (!isServerTtsAvailable()) {
+      if (!isServerElevenLabsAvailable()) {
         setError(
-          "ElevenLabs-Key in Settings eintragen oder ELEVENLABS_API_KEY in .env.local setzen.",
+          "ElevenLabs-Key in Settings eintragen oder ELEVENLABS_API_KEY auf dem Server setzen.",
         );
         setStatus("error");
         return null;
