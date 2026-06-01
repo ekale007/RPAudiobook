@@ -7,10 +7,7 @@ import {
   loadElevenLabsVoiceCatalog,
 } from "@/lib/tts/elevenLabsCatalogClient";
 import { fetchElevenLabsPreview } from "@/lib/tts/elevenLabsPreview";
-import {
-  coerceElevenLabsVoiceId,
-  isValidElevenLabsVoiceId,
-} from "@/lib/tts/elevenLabsVoices";
+import { isValidElevenLabsVoiceId } from "@/lib/tts/elevenLabsVoices";
 
 export function ElevenLabsVoiceSelect({
   value,
@@ -42,11 +39,6 @@ export function ElevenLabsVoiceSelect({
       .then(setVoices)
       .finally(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-    if (!value?.trim() || isValidElevenLabsVoiceId(value)) return;
-    onChange(coerceElevenLabsVoiceId(value));
-  }, [value, onChange]);
 
   useEffect(() => {
     if (

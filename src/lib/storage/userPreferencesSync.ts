@@ -9,6 +9,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { DEFAULT_OPENROUTER } from "@/lib/types";
 import {
   DEFAULT_TTS,
+  getTtsSettingsUpdatedAt,
   loadTtsSettings,
   normalizeTtsSettings,
   saveTtsSettings,
@@ -55,6 +56,58 @@ export function toSyncedTts(settings: TtsSettings): SyncedTtsPrefs {
   return rest;
 }
 
+function stripTtsSyncMeta(
+  remote: Partial<SyncedTtsPrefs>,
+): Partial<Omit<TtsSettings, "elevenLabsApiKey">> {
+  const { updatedAt: _at, ...rest } = remote;
+  return rest;
+}
+
+function shouldUseRemoteTts(
+  remote: Partial<SyncedTtsPrefs>,
+  rowUpdatedAt: string | null | undefined,
+  localUpdatedAt: string | null,
+): boolean {
+  const remoteTtsAt = remote.updatedAt?.trim() || null;
+  if (remoteTtsAt) {
+    return !localUpdatedAt || remoteTtsAt > localUpdatedAt;
+  }
+  // Legacy rows without tts.updatedAt — don't let LLM-only row bumps overwrite local TTS.
+  if (localUpdatedAt) return false;
+  return Boolean(rowUpdatedAt?.trim());
+}
+
+function mergeTtsFromRemote(
+  remote: Partial<SyncedTtsPrefs>,
+  local: TtsSettings,
+  useRemote: boolean,
+): TtsSettings {
+  const remoteFields = stripTtsSyncMeta(remote);
+
+  const merged = useRemote
+    ? {
+        ...DEFAULT_TTS,
+        ...remoteFields,
+        elevenLabsApiKey: local.elevenLabsApiKey?.trim() ?? "",
+        pronunciationMap: {
+          ...(local.pronunciationMap ?? {}),
+          ...(remoteFields.pronunciationMap ?? {}),
+        },
+      }
+    : {
+        ...DEFAULT_TTS,
+        ...remoteFields,
+        ...local,
+        elevenLabsApiKey: local.elevenLabsApiKey?.trim() ?? "",
+        pronunciationMap: {
+          ...(remoteFields.pronunciationMap ?? {}),
+          ...(local.pronunciationMap ?? {}),
+        },
+      };
+
+  return normalizeTtsSettings(merged);
+}
+
 function mergeOpenRouterFromRemote(
   remote: Partial<SyncedOpenRouterPrefs>,
   local: OpenRouterSettings | null,
@@ -65,22 +118,6 @@ function mergeOpenRouterFromRemote(
     apiKey: local?.apiKey?.trim() ?? "",
     narratorModel: remote.narratorModel?.trim() || undefined,
   };
-}
-
-function mergeTtsFromRemote(
-  remote: Partial<SyncedTtsPrefs>,
-  local: TtsSettings,
-): TtsSettings {
-  return normalizeTtsSettings({
-    ...DEFAULT_TTS,
-    ...local,
-    ...remote,
-    elevenLabsApiKey: local.elevenLabsApiKey?.trim() ?? "",
-    pronunciationMap: {
-      ...(local.pronunciationMap ?? {}),
-      ...(remote.pronunciationMap ?? {}),
-    },
-  });
 }
 
 function hasRemoteOpenRouter(remote: Partial<SyncedOpenRouterPrefs>): boolean {
@@ -125,7 +162,10 @@ export async function pushUserPreferencesToAccount(): Promise<void> {
     open_router: toSyncedOpenRouter(
       or ?? { ...DEFAULT_OPENROUTER, apiKey: "" },
     ),
-    tts: toSyncedTts(tts),
+    tts: {
+      ...toSyncedTts(tts),
+      updatedAt: getTtsSettingsUpdatedAt() ?? new Date().toISOString(),
+    },
   });
 }
 
@@ -158,9 +198,35 @@ export async function pullUserPreferencesFromAccount(): Promise<boolean> {
   }
 
   if (hasRemoteTts(row.tts)) {
-    const merged = mergeTtsFromRemote(row.tts, localTts);
-    saveTtsSettings(merged, { sync: false });
+    const localUpdatedAt = getTtsSettingsUpdatedAt();
+    const useRemote = shouldUseRemoteTts(
+      row.tts,
+      row.updated_at,
+      localUpdatedAt,
+    );
+    const merged = mergeTtsFromRemote(row.tts, localTts, useRemote);
+    const remoteTtsAt = row.tts.updatedAt?.trim() || null;
+    saveTtsSettings(merged, {
+      sync: false,
+      updatedAt: useRemote
+        ? remoteTtsAt ?? row.updated_at
+        : localUpdatedAt ?? undefined,
+    });
     changed = true;
+    if (!useRemote) {
+      const remoteNorm = normalizeTtsSettings({
+        ...DEFAULT_TTS,
+        ...stripTtsSyncMeta(row.tts),
+      });
+      if (
+        merged.provider !== remoteNorm.provider ||
+        merged.elevenLabsVoiceId !== remoteNorm.elevenLabsVoiceId ||
+        merged.elevenLabsModelId !== remoteNorm.elevenLabsModelId ||
+        merged.localVoice !== remoteNorm.localVoice
+      ) {
+        void pushUserPreferencesToAccount();
+      }
+    }
   }
 
   if (changed) notifyPrefsUpdated();

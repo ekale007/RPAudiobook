@@ -42,7 +42,29 @@ export const DEFAULT_TTS: TtsSettings = {
 };
 
 const STORAGE_KEY = "hoerbuchki.tts";
+const TTS_META_KEY = "hoerbuchki.tts.meta";
 const LEGACY_ELEVEN_KEY = "hoerbuchki.elevenlabs";
+
+function readTtsUpdatedAt(): string | null {
+  try {
+    const raw = localStorage.getItem(TTS_META_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { updatedAt?: string };
+    return parsed.updatedAt?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function touchTtsUpdatedAt(iso = new Date().toISOString()): string {
+  localStorage.setItem(TTS_META_KEY, JSON.stringify({ updatedAt: iso }));
+  return iso;
+}
+
+export function getTtsSettingsUpdatedAt(): string | null {
+  if (typeof window === "undefined") return null;
+  return readTtsUpdatedAt();
+}
 
 function parseStored(raw: string): Partial<TtsSettings> {
   return JSON.parse(raw) as Partial<TtsSettings>;
@@ -104,6 +126,9 @@ export function loadTtsSettings(): TtsSettings {
         ...DEFAULT_TTS,
         ...parseStored(raw),
       });
+      if (!readTtsUpdatedAt()) {
+        touchTtsUpdatedAt();
+      }
       return merged;
     }
 
@@ -121,11 +146,12 @@ export function loadTtsSettings(): TtsSettings {
 
 export function saveTtsSettings(
   settings: TtsSettings,
-  options?: { sync?: boolean },
+  options?: { sync?: boolean; updatedAt?: string },
 ): void {
   const normalized = normalizeTtsSettings(settings);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
   localStorage.removeItem(LEGACY_ELEVEN_KEY);
+  touchTtsUpdatedAt(options?.updatedAt ?? new Date().toISOString());
   if (options?.sync !== false && typeof window !== "undefined") {
     void import("@/lib/storage/userPreferencesSync").then((m) =>
       m.pushUserPreferencesToAccount(),
