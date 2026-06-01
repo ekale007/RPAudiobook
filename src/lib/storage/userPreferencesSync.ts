@@ -10,6 +10,7 @@ import { DEFAULT_OPENROUTER } from "@/lib/types";
 import {
   DEFAULT_TTS,
   loadTtsSettings,
+  normalizeTtsSettings,
   saveTtsSettings,
   type TtsSettings,
 } from "@/lib/storage/ttsSettings";
@@ -70,7 +71,7 @@ function mergeTtsFromRemote(
   remote: Partial<SyncedTtsPrefs>,
   local: TtsSettings,
 ): TtsSettings {
-  return {
+  return normalizeTtsSettings({
     ...DEFAULT_TTS,
     ...local,
     ...remote,
@@ -79,7 +80,7 @@ function mergeTtsFromRemote(
       ...(local.pronunciationMap ?? {}),
       ...(remote.pronunciationMap ?? {}),
     },
-  };
+  });
 }
 
 function hasRemoteOpenRouter(remote: Partial<SyncedOpenRouterPrefs>): boolean {

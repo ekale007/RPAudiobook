@@ -10,6 +10,7 @@ import {
   coerceQwenPresetVoice,
   isValidQwenPresetVoice,
 } from "@/lib/tts/qwenVoiceSanitize";
+import { coerceElevenLabsVoiceId } from "@/lib/tts/elevenLabsVoices";
 import { QWEN_CLOUD_DEFAULT_NARRATOR } from "@/lib/tts/qwenCloudVoices";
 import { QWEN_DEFAULT_NARRATOR } from "@/lib/tts/qwenVoices";
 
@@ -69,6 +70,29 @@ function migrateLegacyIfNeeded(): TtsSettings | null {
   }
 }
 
+export function normalizeTtsSettings(settings: TtsSettings): TtsSettings {
+  const out = { ...settings };
+  if (out.provider === "elevenlabs") {
+    out.elevenLabsVoiceId = coerceElevenLabsVoiceId(out.elevenLabsVoiceId);
+  }
+  if (
+    (out.provider === "qwen" || out.provider === "qwen-cloud") &&
+    !isValidQwenPresetVoice(out.localVoice)
+  ) {
+    out.localVoice =
+      out.provider === "qwen-cloud"
+        ? QWEN_CLOUD_DEFAULT_NARRATOR
+        : QWEN_DEFAULT_NARRATOR;
+  }
+  if (
+    out.provider === "qwen-cloud" &&
+    out.localVoice === QWEN_DEFAULT_NARRATOR
+  ) {
+    out.localVoice = QWEN_CLOUD_DEFAULT_NARRATOR;
+  }
+  return out;
+}
+
 export function loadTtsSettings(): TtsSettings {
   if (typeof window === "undefined") return DEFAULT_TTS;
   try {
@@ -76,22 +100,10 @@ export function loadTtsSettings(): TtsSettings {
     if (raw) {
       // Saved settings win — never let legacy override provider
       localStorage.removeItem(LEGACY_ELEVEN_KEY);
-      const merged = { ...DEFAULT_TTS, ...parseStored(raw) };
-      if (
-        (merged.provider === "qwen" || merged.provider === "qwen-cloud") &&
-        !isValidQwenPresetVoice(merged.localVoice)
-      ) {
-        merged.localVoice =
-          merged.provider === "qwen-cloud"
-            ? QWEN_CLOUD_DEFAULT_NARRATOR
-            : QWEN_DEFAULT_NARRATOR;
-      }
-      if (
-        merged.provider === "qwen-cloud" &&
-        merged.localVoice === QWEN_DEFAULT_NARRATOR
-      ) {
-        merged.localVoice = QWEN_CLOUD_DEFAULT_NARRATOR;
-      }
+      const merged = normalizeTtsSettings({
+        ...DEFAULT_TTS,
+        ...parseStored(raw),
+      });
       return merged;
     }
 
@@ -111,7 +123,8 @@ export function saveTtsSettings(
   settings: TtsSettings,
   options?: { sync?: boolean },
 ): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  const normalized = normalizeTtsSettings(settings);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
   localStorage.removeItem(LEGACY_ELEVEN_KEY);
   if (options?.sync !== false && typeof window !== "undefined") {
     void import("@/lib/storage/userPreferencesSync").then((m) =>

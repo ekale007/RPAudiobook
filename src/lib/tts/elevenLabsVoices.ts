@@ -1,5 +1,7 @@
 /** Curated ElevenLabs premade voices for HörbuchKI (multilingual_v2). */
 
+import { isValidQwenPresetVoice } from "@/lib/tts/qwenVoiceSanitize";
+
 export type ElevenVoiceMeta = {
   id: string;
   label: string;
@@ -187,9 +189,58 @@ export function defaultElevenVoiceMap(
   };
 }
 
+const ELEVEN_VOICE_IDS = new Set(ELEVEN_VOICES.map((v) => v.id));
+
+/** True for curated or typical ElevenLabs voice IDs — not Qwen/Kokoro names. */
+export function isValidElevenLabsVoiceId(
+  voice: string | null | undefined,
+): boolean {
+  const v = voice?.trim();
+  if (!v) return false;
+  if (ELEVEN_VOICE_IDS.has(v)) return true;
+  if (/^[A-Za-z0-9]{18,}$/.test(v)) return true;
+  return false;
+}
+
+export function coerceElevenLabsVoiceId(
+  voice: string | null | undefined,
+  speakerSlug?: string | null,
+  locale: "de" | "en" = "en",
+): string {
+  const v = voice?.trim();
+  if (v && isValidElevenLabsVoiceId(v)) return v;
+
+  const slug = (speakerSlug?.trim() || "narrator").toLowerCase();
+  const defaults = defaultElevenVoiceMap(locale);
+  const fromSlug = defaults[slug] ?? defaults.narrator;
+  if (fromSlug && isValidElevenLabsVoiceId(fromSlug)) return fromSlug;
+
+  return ELEVEN_DEFAULT_NARRATOR;
+}
+
+/** Drop Qwen/Kokoro names when building an ElevenLabs voice map. */
+export function sanitizeVoiceMapForEleven(
+  locale: "de" | "en",
+  map: Record<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = { ...defaultElevenVoiceMap(locale) };
+  for (const [slug, id] of Object.entries(map)) {
+    const trimmed = id?.trim();
+    if (!trimmed) continue;
+    if (isValidElevenLabsVoiceId(trimmed)) {
+      out[slug] = trimmed;
+      continue;
+    }
+    if (isValidQwenPresetVoice(trimmed) && !isValidElevenLabsVoiceId(trimmed)) {
+      continue;
+    }
+  }
+  return out;
+}
+
 export function mergeElevenVoiceMap(
   locale: "de" | "en",
   custom?: Record<string, string> | null,
 ): Record<string, string> {
-  return { ...defaultElevenVoiceMap(locale), ...custom };
+  return sanitizeVoiceMapForEleven(locale, custom ?? {});
 }

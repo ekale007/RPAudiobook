@@ -26,6 +26,7 @@ import {
 } from "@/lib/storage/ttsAudioCache";
 import {
   localTtsRouteCacheSuffix,
+  normalizeStoryLocale,
   resolveLocalTtsRoute,
   type TtsStoryLocale,
 } from "@/lib/tts/ttsLocaleRouting";
@@ -40,6 +41,7 @@ import {
   isServerElevenLabsAvailable,
   isServerQwenTtsAvailable,
 } from "@/lib/server/serverCapabilities";
+import { coerceElevenLabsVoiceId } from "@/lib/tts/elevenLabsVoices";
 import { resolveQwenTtsParams } from "@/lib/tts/qwenVoiceProfiles";
 import { coerceQwenPresetVoice } from "@/lib/tts/qwenVoiceSanitize";
 import type { StorySettings } from "@/lib/types";
@@ -352,7 +354,9 @@ function resolveVoice(
   speakerSlug: string | null | undefined,
   voiceMap?: VoiceMap,
   voiceEnabledSlugs?: VoiceEnabledSlugs,
+  storyLocale?: TtsStoryLocale,
 ): string {
+  const elLocale = normalizeStoryLocale(storyLocale);
   if (voiceMap) {
     const fallback =
       settings.provider === "local" ||
@@ -372,6 +376,9 @@ function resolveVoice(
     ) {
       return coerceQwenPresetVoice(resolved, speakerSlug);
     }
+    if (settings.provider === "elevenlabs") {
+      return coerceElevenLabsVoiceId(resolved, speakerSlug, elLocale);
+    }
     return resolved;
   }
   if (
@@ -384,7 +391,11 @@ function resolveVoice(
       ? coerceQwenPresetVoice(v, speakerSlug)
       : v;
   }
-  return settings.elevenLabsVoiceId;
+  return coerceElevenLabsVoiceId(
+    settings.elevenLabsVoiceId,
+    speakerSlug,
+    elLocale,
+  );
 }
 
 function cacheVoiceKey(
@@ -444,6 +455,7 @@ export async function getNarratorAudio(
     options?.speakerSlug,
     options?.voiceMap,
     options?.voiceEnabledSlugs,
+    storyLocale,
   );
   const voiceKey = hasSegmentOverrides
     ? `${ttsCacheVoiceKey(settings)}:multi:${JSON.stringify(
@@ -510,6 +522,7 @@ export async function getNarratorAudio(
         seg.speakerSlug,
         options?.voiceMap,
         options?.voiceEnabledSlugs,
+        storyLocale,
       );
       const qwen = qwenForSpeaker(seg.speakerSlug, segText);
       const chunks = chunkTextForTts(segText, chunkLimit);
