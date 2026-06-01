@@ -106,7 +106,7 @@ function DevImageGeneratorInner() {
         }),
       );
     }
-  }, [templateId, characterId, character?.id, character?.name]);
+  }, [templateId, characterId, character]);
 
   useEffect(() => {
     return () => {

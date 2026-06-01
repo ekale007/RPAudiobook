@@ -66,12 +66,15 @@ export function ChatTurnBubble({
   const [busy, setBusy] = useState(false);
   const [copiedRaw, setCopiedRaw] = useState(false);
   const displayContent = stripSpeakerTags(turn.content);
-  const markedSnippets =
-    showDialogueMarkup &&
-    turn.role === "assistant" &&
-    (turn.speaker_slug ?? "narrator") === "narrator"
-      ? extractMarkedSnippets(displayContent)
-      : [];
+  const markedSnippets = useMemo(
+    () =>
+      showDialogueMarkup &&
+      turn.role === "assistant" &&
+      (turn.speaker_slug ?? "narrator") === "narrator"
+        ? extractMarkedSnippets(displayContent)
+        : [],
+    [showDialogueMarkup, turn.role, turn.speaker_slug, displayContent],
+  );
   const llmAttribution = useDialogueAttribution(
     turn.id,
     turn.content,

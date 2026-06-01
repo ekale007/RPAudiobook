@@ -44,13 +44,16 @@ export function ChatScrollPane({
     show: false,
   });
 
-  const getScrollEl = () => scrollRef?.current ?? localRef.current;
+  const getScrollEl = useCallback(
+    () => scrollRef?.current ?? localRef.current,
+    [scrollRef],
+  );
 
   const updateThumb = useCallback(() => {
     const el = getScrollEl();
     if (!el) return;
     setThumb(measureThumb(el));
-  }, [scrollRef]);
+  }, [getScrollEl]);
 
   useEffect(() => {
     updateThumb();
@@ -62,7 +65,7 @@ export function ChatScrollPane({
     const ro = new ResizeObserver(updateThumb);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [updateThumb, scrollRef]);
+  }, [updateThumb, getScrollEl, scrollRef]);
 
   const handleScroll = () => {
     updateThumb();

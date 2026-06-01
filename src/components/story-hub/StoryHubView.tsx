@@ -168,12 +168,14 @@ export function StoryHubView({
       <nav
         className="mt-2 shrink-0 border-b border-surface-border px-3 sm:px-4"
         aria-label="Story Hub"
+        role="tablist"
       >
         <div className="flex gap-1">
           {TABS.map(({ id, label }) => (
             <button
               key={id}
               type="button"
+              role="tab"
               onClick={() => setTab(id)}
               aria-selected={tab === id}
               className={`flex-1 touch-manipulation rounded-t-md px-2 py-2 text-xs font-medium transition ${

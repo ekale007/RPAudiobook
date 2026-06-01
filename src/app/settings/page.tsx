@@ -199,37 +199,63 @@ export default function SettingsPage() {
     setTimeout(() => setTtsSaved(false), 2000);
   };
 
+  const persistTtsFromState = useCallback(
+    (overrides?: {
+      ttsProvider?: TtsProvider;
+      elVoiceId?: string;
+      elModelId?: string;
+      localVoice?: string;
+    }) => {
+      const provider = overrides?.ttsProvider ?? ttsProvider;
+      const voiceId = (overrides?.elVoiceId ?? elVoiceId).trim();
+      const modelId = (overrides?.elModelId ?? elModelId).trim();
+      const qwenVoice = (overrides?.localVoice ?? localVoice).trim();
+
+      if (provider === "qwen" || provider === "qwen-cloud") {
+        saveTtsSettings({
+          provider,
+          localEngine: "qwen",
+          localServerUrl:
+            localUrl.trim() || LOCAL_TTS_PRESETS.qwen.serverUrl,
+          localVoice:
+            qwenVoice ||
+            (provider === "qwen-cloud"
+              ? QWEN_CLOUD_DEFAULT_NARRATOR
+              : "Ryan"),
+          elevenLabsApiKey: elApiKey.trim(),
+          elevenLabsVoiceId: voiceId || elVoiceId.trim(),
+          elevenLabsModelId: modelId || elModelId.trim(),
+          pronunciationMap: parsePronunciationLines(pronunciationText),
+        });
+      } else {
+        saveTtsSettings({
+          provider: "elevenlabs",
+          localEngine,
+          localServerUrl: localUrl.trim(),
+          localVoice: qwenVoice || localVoice.trim(),
+          elevenLabsApiKey: elApiKey.trim(),
+          elevenLabsVoiceId: voiceId,
+          elevenLabsModelId: modelId,
+          pronunciationMap: parsePronunciationLines(pronunciationText),
+        });
+      }
+      setTtsSaved(true);
+      setTimeout(() => setTtsSaved(false), 2000);
+    },
+    [
+      ttsProvider,
+      localEngine,
+      localUrl,
+      localVoice,
+      elApiKey,
+      elVoiceId,
+      elModelId,
+      pronunciationText,
+    ],
+  );
+
   const saveBetaTts = () => {
-    if (ttsProvider === "qwen" || ttsProvider === "qwen-cloud") {
-      saveTtsSettings({
-        provider: ttsProvider,
-        localEngine: "qwen",
-        localServerUrl:
-          localUrl.trim() || LOCAL_TTS_PRESETS.qwen.serverUrl,
-        localVoice:
-          localVoice.trim() ||
-          (ttsProvider === "qwen-cloud"
-            ? QWEN_CLOUD_DEFAULT_NARRATOR
-            : "Ryan"),
-        elevenLabsApiKey: elApiKey.trim(),
-        elevenLabsVoiceId: elVoiceId.trim(),
-        elevenLabsModelId: elModelId.trim(),
-        pronunciationMap: parsePronunciationLines(pronunciationText),
-      });
-    } else {
-      saveTtsSettings({
-        provider: "elevenlabs",
-        localEngine,
-        localServerUrl: localUrl.trim(),
-        localVoice: localVoice.trim(),
-        elevenLabsApiKey: elApiKey.trim(),
-        elevenLabsVoiceId: elVoiceId.trim(),
-        elevenLabsModelId: elModelId.trim(),
-        pronunciationMap: parsePronunciationLines(pronunciationText),
-      });
-    }
-    setTtsSaved(true);
-    setTimeout(() => setTtsSaved(false), 2000);
+    persistTtsFromState();
   };
 
   return (
@@ -379,6 +405,7 @@ export default function SettingsPage() {
                       if (id === "qwen" || id === "qwen-cloud") {
                         applyEnginePreset("qwen");
                       }
+                      persistTtsFromState({ ttsProvider: id });
                     }}
                     className={`min-w-[30%] flex-1 rounded-lg py-2 text-xs sm:text-sm ${
                       ttsProvider === id
@@ -421,18 +448,32 @@ export default function SettingsPage() {
                   )}
                   <ElevenLabsVoiceSelect
                     value={elVoiceId}
-                    onChange={setElVoiceId}
+                    onChange={(id) => {
+                      setElVoiceId(id);
+                      persistTtsFromState({
+                        ttsProvider: "elevenlabs",
+                        elVoiceId: id,
+                      });
+                    }}
                     label="Erzähler-Stimme"
                   />
+                  <p className="mb-2 text-[11px] text-zinc-600">
+                    Stimme wird beim Auswählen automatisch gespeichert.
+                  </p>
                   <label className="mt-3 flex cursor-pointer items-start gap-2 text-xs text-zinc-400">
                     <input
                       type="checkbox"
                       checked={elModelId === ELEVEN_V3_MODEL}
-                      onChange={(e) =>
-                        setElModelId(
-                          e.target.checked ? ELEVEN_V3_MODEL : ELEVEN_DEFAULT_MODEL,
-                        )
-                      }
+                      onChange={(e) => {
+                        const nextModel = e.target.checked
+                          ? ELEVEN_V3_MODEL
+                          : ELEVEN_DEFAULT_MODEL;
+                        setElModelId(nextModel);
+                        persistTtsFromState({
+                          ttsProvider: "elevenlabs",
+                          elModelId: nextModel,
+                        });
+                      }}
                       className="mt-0.5"
                     />
                     <span>

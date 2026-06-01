@@ -3,7 +3,10 @@ import type { OpenRouterSettings } from "@/lib/types";
 import type { TtsSettings } from "@/lib/storage/ttsSettings";
 
 export type SyncedOpenRouterPrefs = Omit<OpenRouterSettings, "apiKey">;
-export type SyncedTtsPrefs = Omit<TtsSettings, "elevenLabsApiKey">;
+export type SyncedTtsPrefs = Omit<TtsSettings, "elevenLabsApiKey"> & {
+  /** ISO timestamp of the last TTS save (not the whole prefs row). */
+  updatedAt?: string;
+};
 
 export type UserPreferencesRow = {
   user_id: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { StoryHubView } from "@/components/story-hub/StoryHubView";
@@ -32,10 +32,13 @@ export default function StoryHubPage() {
   const [titleBusy, setTitleBusy] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
-  const load = () =>
-    getStoryOverview(storyId).then((overview) => {
-      setData(overview);
-    });
+  const load = useCallback(
+    () =>
+      getStoryOverview(storyId).then((overview) => {
+        setData(overview);
+      }),
+    [storyId],
+  );
 
   useEffect(() => {
     createClient()
@@ -48,7 +51,7 @@ export default function StoryHubPage() {
         setUserId(auth.user.id);
         load().catch((e) => setError(String(e)));
       });
-  }, [storyId, router]);
+  }, [storyId, router, load]);
 
   const handleDeleteChapter = async (ch: ChapterRow) => {
     if (!data) return;

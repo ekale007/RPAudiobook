@@ -330,7 +330,7 @@ export function ChatView({
 
   useEffect(() => {
     setBubbleFocusIndex(Math.max(0, turns.length - 1));
-  }, [chapterId]);
+  }, [chapterId, turns.length]);
 
   useEffect(() => {
     if (turns.length > prevTurnCountRef.current) {
@@ -606,7 +606,7 @@ export function ChatView({
         setGenerating(false);
       }
     },
-    [readOnly, storyId, chapterId, chapterTitle, chapter.title, phaseHint, plotState],
+    [readOnly, storyId, chapterId, chapterTitle, chapter.title, chapter.phase_hint, phaseHint, plotState],
   );
 
   const persistAssistantReply = async (
@@ -764,7 +764,7 @@ export function ChatView({
     return true;
   };
 
-  const cancelWork = () => {
+  const cancelWork = useCallback(() => {
     autoPlayRemainingRef.current = 0;
     setAutoLeft(0);
     setAutoTotal(0);
@@ -776,7 +776,7 @@ export function ChatView({
     beatsAbortRef.current = null;
     setGenerating(false);
     setBeatsLoading(false);
-  };
+  }, [stopTtsAutoplay]);
 
   const sendMessage = async () => {
     const text = input.trim();
