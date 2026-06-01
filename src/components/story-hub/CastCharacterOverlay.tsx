@@ -31,6 +31,7 @@ import type {
   VoiceMap,
   WryTourCharacter,
 } from "@/lib/types";
+import { voiceMapForStorage } from "@/lib/tts/defaultVoiceMap";
 import { emptyQwenProfile } from "@/lib/tts/qwenVoiceProfiles";
 
 type CharDraft = {
@@ -205,8 +206,14 @@ export function CastCharacterOverlay({
         status: draft.archived ? "archived" : "active",
         archived_reason: draft.archived ? draft.reason || "manual" : null,
       });
-      const speaker = profile.presetSpeaker?.trim() || currentVoice;
-      const nextVoiceMap = { ...voiceMap, [character.slug]: speaker };
+      const speaker = qwenMode
+        ? profile.presetSpeaker?.trim() || currentVoice
+        : (voiceMap[character.slug] ?? currentVoice).trim() || currentVoice;
+      const nextVoiceMap = voiceMapForStorage(
+        ttsProvider,
+        storyLocale,
+        { ...voiceMap, [character.slug]: speaker },
+      );
       onVoiceMapChange(nextVoiceMap);
       const settingsPatch: Parameters<typeof updateStorySettings>[1] = {
         voiceMap: nextVoiceMap,

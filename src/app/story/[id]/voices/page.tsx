@@ -16,6 +16,7 @@ import {
   DEFAULT_QWEN_VOICE_MAP,
   DEFAULT_WRYTOUR_VOICE_MAP,
   mergeVoiceMapForProvider,
+  voiceMapForStorage,
 } from "@/lib/tts/defaultVoiceMap";
 import { ELEVEN_DEFAULT_NARRATOR } from "@/lib/tts/elevenLabsVoices";
 import { KOKORO_VOICES } from "@/lib/tts/kokoroVoices";
@@ -179,7 +180,7 @@ export default function StoryVoicesPage() {
     setError(null);
     try {
       const patch: Parameters<typeof updateStorySettings>[1] = {
-        voiceMap,
+        voiceMap: voiceMapForStorage(ttsProvider, storyLocale, voiceMap),
         voiceEnabledSlugs,
       };
       if (qwen) {

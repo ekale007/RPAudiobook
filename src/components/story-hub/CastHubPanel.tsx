@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { CastCharacterOverlay } from "@/components/story-hub/CastCharacterOverlay";
 import { CastDiscoverOverlay } from "@/components/story-hub/CastDiscoverOverlay";
@@ -10,12 +10,14 @@ import {
   DEFAULT_QWEN_VOICE_MAP,
   DEFAULT_WRYTOUR_VOICE_MAP,
   mergeVoiceMapForProvider,
+  voiceMapForStorage,
 } from "@/lib/tts/defaultVoiceMap";
 import { ELEVEN_DEFAULT_NARRATOR } from "@/lib/tts/elevenLabsVoices";
 import { KOKORO_VOICES } from "@/lib/tts/kokoroVoices";
 import { QWEN_DEFAULT_NARRATOR, QWEN_VOICES } from "@/lib/tts/qwenVoices";
 import { defaultEnabledCastSlugs } from "@/lib/tts/voiceActivation";
 import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
+import { PREFS_UPDATED_EVENT } from "@/lib/storage/userPreferencesSync";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
 import type { QwenVoiceProfile, StorySettings, VoiceMap } from "@/lib/types";
 import {
@@ -92,8 +94,8 @@ export function CastHubPanel({
   );
 
   const tts = loadTtsSettings();
-  const [ttsProvider] = useState<TtsProvider>(tts.provider);
-  const [localEngine] = useState<LocalTtsEngine>(
+  const [ttsProvider, setTtsProvider] = useState<TtsProvider>(tts.provider);
+  const [localEngine, setLocalEngine] = useState<LocalTtsEngine>(
     tts.provider === "qwen" || tts.provider === "qwen-cloud"
       ? "qwen"
       : tts.localEngine === "qwen" || tts.localEngine === "kokoro"
@@ -120,6 +122,7 @@ export function CastHubPanel({
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [discoverOpen, setDiscoverOpen] = useState(false);
+  const voiceEditsDirtyRef = useRef(false);
 
   const engine: LocalTtsEngine =
     ttsProvider === "qwen" || ttsProvider === "qwen-cloud"
@@ -129,7 +132,40 @@ export function CastHubPanel({
         : "kokoro";
   const qwen = isQwenTtsMode(ttsProvider, engine);
 
+  const serverVoiceMapKey = useMemo(
+    () => JSON.stringify(storySettings.voiceMap ?? {}),
+    [storySettings.voiceMap],
+  );
+  const serverVoiceEnabledKey = useMemo(
+    () => JSON.stringify(storySettings.voiceEnabledSlugs ?? []),
+    [storySettings.voiceEnabledSlugs],
+  );
+  const serverQwenProfilesKey = useMemo(
+    () => JSON.stringify(storySettings.qwenVoiceProfiles ?? {}),
+    [storySettings.qwenVoiceProfiles],
+  );
+
   useEffect(() => {
+    const next = loadTtsSettings();
+    setTtsProvider(next.provider);
+    if (next.provider === "qwen" || next.provider === "qwen-cloud") {
+      setLocalEngine("qwen");
+    } else if (next.localEngine === "qwen" || next.localEngine === "kokoro") {
+      setLocalEngine(next.localEngine);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onPrefs = () => {
+      const next = loadTtsSettings();
+      setTtsProvider(next.provider);
+    };
+    window.addEventListener(PREFS_UPDATED_EVENT, onPrefs);
+    return () => window.removeEventListener(PREFS_UPDATED_EVENT, onPrefs);
+  }, []);
+
+  useEffect(() => {
+    if (voiceEditsDirtyRef.current) return;
     setVoiceMap(
       mergeVoiceMapForProvider(ttsProvider, storyLocale, storySettings.voiceMap),
     );
@@ -143,7 +179,25 @@ export function CastHubPanel({
       ),
     );
     setQwenSceneInstruct(storySettings.qwenSceneInstructEnabled !== false);
-  }, [storySettings, storyLocale, ttsProvider, cast]);
+  }, [
+    serverVoiceMapKey,
+    serverVoiceEnabledKey,
+    serverQwenProfilesKey,
+    storyLocale,
+    ttsProvider,
+    cast,
+    storySettings,
+  ]);
+
+  const setVoiceMapTracked = useCallback((map: VoiceMap) => {
+    voiceEditsDirtyRef.current = true;
+    setVoiceMap(map);
+  }, []);
+
+  const handleCastSaved = useCallback(() => {
+    voiceEditsDirtyRef.current = false;
+    onSaved?.();
+  }, [onSaved]);
 
   const voiceOptions = voiceOptionsForEngine(engine);
   const defaults =
@@ -232,7 +286,10 @@ export function CastHubPanel({
               setQwenSceneInstruct(on);
               void updateStorySettings(storyId, {
                 qwenSceneInstructEnabled: on,
-              }).then(() => onSaved?.());
+                voiceMap: voiceMapForStorage(ttsProvider, storyLocale, voiceMap),
+                voiceEnabledSlugs,
+                qwenVoiceProfiles: qwenProfiles,
+              }).then(() => handleCastSaved());
             }}
             className="mt-0.5 size-3.5 rounded border-surface-border"
           />
@@ -294,9 +351,13 @@ export function CastHubPanel({
         qwenProfile={
           selected ? qwenProfiles[selected.slug] : undefined
         }
-        onVoiceMapChange={setVoiceMap}
-        onVoiceEnabledChange={setVoiceEnabledSlugs}
+        onVoiceMapChange={setVoiceMapTracked}
+        onVoiceEnabledChange={(slugs) => {
+          voiceEditsDirtyRef.current = true;
+          setVoiceEnabledSlugs(slugs);
+        }}
         onQwenProfileChange={(slug, profile) => {
+          voiceEditsDirtyRef.current = true;
           setQwenProfiles((prev) => ({ ...prev, [slug]: profile }));
           setVoiceMap((prev) => ({
             ...prev,
@@ -305,7 +366,7 @@ export function CastHubPanel({
         }}
         qwenSceneInstruct={qwenSceneInstruct}
         onClose={() => setSelectedId(null)}
-        onSaved={onSaved}
+        onSaved={handleCastSaved}
       />
 
       <CastDiscoverOverlay

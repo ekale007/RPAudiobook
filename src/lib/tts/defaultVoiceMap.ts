@@ -56,6 +56,15 @@ export function mergeVoiceMapForProvider(
   return mergeVoiceMap(custom);
 }
 
+/** Normalize a voice map before persisting to story settings (provider-safe IDs only). */
+export function voiceMapForStorage(
+  provider: TtsProvider,
+  locale: string | null | undefined,
+  map: VoiceMap,
+): VoiceMap {
+  return mergeVoiceMapForProvider(provider, locale, map);
+}
+
 export function defaultNarratorVoiceForProvider(
   provider: TtsProvider,
   locale?: string | null,
