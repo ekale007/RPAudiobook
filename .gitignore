@@ -23,6 +23,7 @@
 Thumbs.db
 .venv-tts/
 .venv-kokoro/
+test-output/
 .venv-qwen/
 .venv-covers/
 __pycache__/
@@ -46,3 +47,13 @@ next-env.d.ts
 
 # local assets (not for repo)
 /Bilder/
+.qwen.settings
+test-output/
+
+# SFX source packs / secrets (use public/sfx/ only)
+public/library-covers/recovery-codes.txt
+public/library-covers/*.pdf
+public/library-covers/*.7z
+public/library-covers/kenney_rpg-audio/
+public/library-covers/Rain OGG/
+public/library-covers/jute-dh-weather.7z

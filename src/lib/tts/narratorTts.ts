@@ -1,11 +1,12 @@
 import { chunkTextForTts } from "@/lib/tts/chunkText";
+import { QWEN_CLOUD_MAX_TEXT_CHARS } from "@/lib/tts/qwenCloudLimits";
 import { stripSpeakerTags } from "@/lib/chat/parseSpeakerBlocks";
 import {
   isSpeakableForTts,
   sanitizeTextForTtsRetry,
 } from "@/lib/tts/speakableText";
 import { voiceForSpeaker } from "@/lib/tts/defaultVoiceMap";
-import type { TtsSettings } from "@/lib/storage/ttsSettings";
+import type { TtsProvider, TtsSettings } from "@/lib/storage/ttsSettings";
 import type { VoiceMap } from "@/lib/types";
 import { ttsCacheVoiceKey } from "@/lib/storage/ttsSettings";
 import type { CharacterRow } from "@/lib/db/stories";
@@ -28,29 +29,50 @@ import {
   resolveLocalTtsRoute,
   type TtsStoryLocale,
 } from "@/lib/tts/ttsLocaleRouting";
+import { resolveElevenLabsTtsExtras } from "@/lib/tts/elevenLabsDelivery";
 import {
   ELEVEN_DEFAULT_MODEL,
+  getElevenLabsVoiceSettings,
   mergeElevenVoiceMap,
 } from "@/lib/tts/elevenLabsVoices";
 import { authFetch } from "@/lib/supabase/authFetch";
-import { isServerTtsAvailable } from "@/lib/server/serverCapabilities";
+import {
+  isServerQwenTtsAvailable,
+  isServerTtsAvailable,
+} from "@/lib/server/serverCapabilities";
+import { resolveQwenTtsParams } from "@/lib/tts/qwenVoiceProfiles";
+import { coerceQwenPresetVoice } from "@/lib/tts/qwenVoiceSanitize";
+import type { StorySettings } from "@/lib/types";
+import { stripSfxTags } from "@/lib/audio/sfxCatalog";
+
+function ttsChunkCharLimit(provider: TtsProvider): number {
+  if (provider === "qwen-cloud") return QWEN_CLOUD_MAX_TEXT_CHARS;
+  if (provider === "local" || provider === "qwen") return 4000;
+  return 2400;
+}
 
 async function synthesizeChunkLocal(
   settings: TtsSettings,
   text: string,
   voice: string,
   storyLocale?: TtsStoryLocale,
+  qwenExtras?: { language?: string; instruct?: string | null },
 ): Promise<Blob> {
   const route = resolveLocalTtsRoute(settings, storyLocale, voice);
   const attempt = async (payload: string, routedVoice: string) => {
+    const body: Record<string, string | null | undefined> = {
+      text: payload,
+      voice: routedVoice,
+      serverUrl: route.serverUrl,
+    };
+    if (route.engine === "qwen" || settings.provider === "qwen") {
+      body.language = qwenExtras?.language ?? "Auto";
+      body.instruct = qwenExtras?.instruct ?? null;
+    }
     const res = await fetch("/api/tts/local", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text: payload,
-        voice: routedVoice,
-        serverUrl: route.serverUrl,
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const err = await res.text();
@@ -77,11 +99,84 @@ async function synthesizeChunkLocal(
   }
 }
 
+async function synthesizeChunkQwenCloud(
+  text: string,
+  voice: string,
+  storyLocale?: TtsStoryLocale,
+  qwenExtras?: { language?: string; instruct?: string | null },
+): Promise<Blob> {
+  const res = await authFetch("/api/tts/qwen-cloud", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text,
+      voice,
+      language: qwenExtras?.language ?? "Auto",
+      instruct: qwenExtras?.instruct ?? null,
+      storyLocale,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || `Qwen Cloud TTS failed (${res.status})`);
+  }
+  return res.blob();
+}
+
+async function synthesizeChunkQwen(
+  settings: TtsSettings,
+  text: string,
+  voice: string,
+  storyLocale?: TtsStoryLocale,
+  qwenExtras?: { language?: string; instruct?: string | null },
+): Promise<Blob> {
+  if (settings.provider === "qwen-cloud") {
+    return synthesizeChunkQwenCloud(text, voice, storyLocale, qwenExtras);
+  }
+
+  if (isServerQwenTtsAvailable()) {
+    const res = await authFetch("/api/tts/qwen", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        voice,
+        language: qwenExtras?.language ?? "Auto",
+        instruct: qwenExtras?.instruct ?? null,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err || `Qwen TTS failed (${res.status})`);
+    }
+    return res.blob();
+  }
+
+  const qwenSettings: TtsSettings = {
+    ...settings,
+    provider: "local",
+    localEngine: "qwen",
+    localServerUrl: settings.localServerUrl.trim() || "http://127.0.0.1:5125",
+  };
+  return synthesizeChunkLocal(
+    qwenSettings,
+    text,
+    voice,
+    storyLocale,
+    qwenExtras,
+  );
+}
+
 async function synthesizeChunkElevenLabs(
   settings: TtsSettings,
   text: string,
   voiceId: string,
   storyLocale?: TtsStoryLocale,
+  options?: {
+    speakerSlug?: string | null;
+    storySettings?: StorySettings | null;
+    segmentText?: string;
+  },
 ): Promise<Blob> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -90,14 +185,27 @@ async function synthesizeChunkElevenLabs(
     headers["xi-api-key"] = settings.elevenLabsApiKey.trim();
   }
 
+  const locale = storyLocale?.startsWith("de") ? "de" : "en";
+  const baseVoiceSettings = getElevenLabsVoiceSettings(locale);
+  const extras = resolveElevenLabsTtsExtras(
+    text,
+    settings.elevenLabsModelId || ELEVEN_DEFAULT_MODEL,
+    baseVoiceSettings,
+    options?.speakerSlug,
+    options?.storySettings,
+    storyLocale,
+    { segmentText: options?.segmentText ?? text },
+  );
+
   const res = await authFetch("/api/tts", {
     method: "POST",
     headers,
     body: JSON.stringify({
-      text,
+      text: extras.text,
       voiceId,
-      modelId: settings.elevenLabsModelId || ELEVEN_DEFAULT_MODEL,
-      locale: storyLocale?.startsWith("de") ? "de" : "en",
+      modelId: extras.modelId ?? settings.elevenLabsModelId ?? ELEVEN_DEFAULT_MODEL,
+      locale,
+      voiceSettings: extras.voiceSettings,
     }),
   });
 
@@ -109,16 +217,43 @@ async function synthesizeChunkElevenLabs(
   return res.blob();
 }
 
+type TtsChunkContext = {
+  speakerSlug?: string | null;
+  storySettings?: StorySettings | null;
+  segmentText?: string;
+};
+
 async function synthesizeChunk(
   settings: TtsSettings,
   text: string,
   voice: string,
   storyLocale?: TtsStoryLocale,
+  qwenExtras?: { language?: string; instruct?: string | null },
+  deliveryContext?: TtsChunkContext,
 ): Promise<Blob> {
   if (settings.provider === "local") {
-    return synthesizeChunkLocal(settings, text, voice, storyLocale);
+    return synthesizeChunkLocal(
+      settings,
+      text,
+      voice,
+      storyLocale,
+      qwenExtras,
+    );
   }
-  return synthesizeChunkElevenLabs(settings, text, voice, storyLocale);
+  if (settings.provider === "qwen" || settings.provider === "qwen-cloud") {
+    return synthesizeChunkQwen(
+      settings,
+      text,
+      voice,
+      storyLocale,
+      qwenExtras,
+    );
+  }
+  return synthesizeChunkElevenLabs(settings, text, voice, storyLocale, {
+    speakerSlug: deliveryContext?.speakerSlug,
+    storySettings: deliveryContext?.storySettings,
+    segmentText: deliveryContext?.segmentText ?? text,
+  });
 }
 
 async function concatAudioBlobs(blobs: Blob[]): Promise<Blob> {
@@ -220,19 +355,36 @@ function resolveVoice(
 ): string {
   if (voiceMap) {
     const fallback =
-      settings.provider === "local"
+      settings.provider === "local" ||
+      settings.provider === "qwen" ||
+      settings.provider === "qwen-cloud"
         ? settings.localVoice
         : settings.elevenLabsVoiceId;
-    return voiceForSpeaker(
+    const resolved = voiceForSpeaker(
       speakerSlug,
       voiceMap,
       fallback,
       voiceEnabledSlugs,
     );
+    if (
+      settings.provider === "qwen" ||
+      settings.provider === "qwen-cloud"
+    ) {
+      return coerceQwenPresetVoice(resolved, speakerSlug);
+    }
+    return resolved;
   }
-  return settings.provider === "local"
-    ? settings.localVoice
-    : settings.elevenLabsVoiceId;
+  if (
+    settings.provider === "local" ||
+    settings.provider === "qwen" ||
+    settings.provider === "qwen-cloud"
+  ) {
+    const v = settings.localVoice;
+    return settings.provider === "qwen" || settings.provider === "qwen-cloud"
+      ? coerceQwenPresetVoice(v, speakerSlug)
+      : v;
+  }
+  return settings.elevenLabsVoiceId;
 }
 
 function cacheVoiceKey(
@@ -243,6 +395,9 @@ function cacheVoiceKey(
   const localeSuffix = localTtsRouteCacheSuffix(settings, storyLocale);
   if (settings.provider === "local") {
     return `${ttsCacheVoiceKey(settings)}:${voice}${localeSuffix}`;
+  }
+  if (settings.provider === "qwen" || settings.provider === "qwen-cloud") {
+    return `${ttsCacheVoiceKey(settings)}:${voice}:${normalizeStoryLocaleKey(storyLocale)}`;
   }
   return `${ttsCacheVoiceKey(settings)}:${voice}:${normalizeStoryLocaleKey(storyLocale)}`;
 }
@@ -261,9 +416,13 @@ export async function getNarratorAudio(
     rawContent?: string;
     /** Story locale — routes German away from English-only Kokoro. */
     storyLocale?: TtsStoryLocale;
+    /** Qwen instruct + plot-state mood (RunPod / local Qwen). */
+    storySettings?: StorySettings | null;
   },
 ): Promise<Blob> {
-  const splitSource = stripSpeakerTags(options?.rawContent ?? text);
+  const splitSource = stripSpeakerTags(
+    stripSfxTags(options?.rawContent ?? text),
+  );
   const activeOverrides = filterSegmentOverridesForActivation(
     options?.segmentOverrides,
     options?.voiceEnabledSlugs,
@@ -275,7 +434,7 @@ export async function getNarratorAudio(
 
   const storyLocale = options?.storyLocale;
   const normalizedText = normalizeTextForTts(
-    hasSegmentOverrides ? splitSource : text,
+    hasSegmentOverrides ? splitSource : stripSfxTags(text),
     settings,
     options?.cast ?? [],
     storyLocale,
@@ -295,15 +454,45 @@ export async function getNarratorAudio(
   const cached = await getCachedAudio(cacheKey);
   if (cached) return cached;
 
+  const chunkLimit = ttsChunkCharLimit(settings.provider);
+
+  const qwenForSpeaker = (
+    slug: string | null | undefined,
+    segmentText?: string,
+  ) =>
+    settings.provider === "qwen" || settings.provider === "qwen-cloud"
+      ? resolveQwenTtsParams(
+          slug,
+          options?.storySettings ?? null,
+          storyLocale,
+          { segmentText, provider: settings.provider },
+        )
+      : null;
+
+  const deliveryCtx = (slug: string | null | undefined, segmentText: string) =>
+    ({
+      speakerSlug: slug ?? options?.speakerSlug,
+      storySettings: options?.storySettings,
+      segmentText,
+    }) satisfies TtsChunkContext;
+
   const parts: Blob[] = [];
   if (!hasSegmentOverrides) {
-    const chunks = chunkTextForTts(
-      normalizedText,
-      settings.provider === "local" ? 4000 : 2400,
-    );
+    const qwen = qwenForSpeaker(options?.speakerSlug, normalizedText);
+    const chunks = chunkTextForTts(normalizedText, chunkLimit);
     for (const chunk of chunks) {
       if (!isSpeakableForTts(chunk)) continue;
-      parts.push(await synthesizeChunk(settings, chunk, voice, storyLocale));
+      const chunkQwen = qwenForSpeaker(options?.speakerSlug, chunk) ?? qwen;
+      parts.push(
+        await synthesizeChunk(
+          settings,
+          chunk,
+          chunkQwen?.voice ?? voice,
+          storyLocale,
+          chunkQwen ?? undefined,
+          deliveryCtx(options?.speakerSlug ?? null, chunk),
+        ),
+      );
     }
   } else {
     const segments = splitByOverrides(splitSource, activeOverrides);
@@ -322,14 +511,20 @@ export async function getNarratorAudio(
         options?.voiceMap,
         options?.voiceEnabledSlugs,
       );
-      const chunks = chunkTextForTts(
-        segText,
-        settings.provider === "local" ? 4000 : 2400,
-      );
+      const qwen = qwenForSpeaker(seg.speakerSlug, segText);
+      const chunks = chunkTextForTts(segText, chunkLimit);
       for (const chunk of chunks) {
         if (!isSpeakableForTts(chunk)) continue;
+        const chunkQwen = qwenForSpeaker(seg.speakerSlug, chunk) ?? qwen;
         parts.push(
-          await synthesizeChunk(settings, chunk, segVoice, storyLocale),
+          await synthesizeChunk(
+            settings,
+            chunk,
+            chunkQwen?.voice ?? segVoice,
+            storyLocale,
+            chunkQwen ?? undefined,
+            deliveryCtx(seg.speakerSlug, chunk),
+          ),
         );
       }
     }

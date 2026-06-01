@@ -62,10 +62,24 @@ export type VoiceMap = Record<string, string>;
 import type { StoryPlotState } from "@/lib/memory/plotState";
 import type { StoryPin } from "@/lib/memory/storyPins";
 
+/** Qwen3-TTS voice profile per cast slug (see docs/QWEN-MASTERPLAN.md). */
+export type QwenVoiceProfile = {
+  slug: string;
+  mode: "preset" | "design" | "clone";
+  presetSpeaker?: string;
+  designInstruct?: string;
+  language?: string;
+  updatedAt?: string;
+};
+
 export interface StorySettings {
   recentTurnCount: number;
   loreTokenBudget: number;
   voiceMap?: VoiceMap;
+  /** Per-slug Qwen instruct + preset when provider is qwen. */
+  qwenVoiceProfiles?: Record<string, QwenVoiceProfile>;
+  /** Auto mood from plot-state (location, threats). Default on. */
+  qwenSceneInstructEnabled?: boolean;
   /** Cast slugs that use their own voice; others use narrator. Omit = all cast enabled. */
   voiceEnabledSlugs?: string[];
   /** Structured RP memory (threats, time, resolved facts) — overrides stale countdowns */

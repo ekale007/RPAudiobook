@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 
-/** Proxy to your local TTS server (edge-tts / Piper) on the same PC as Next.js. */
+/** Proxy to your local TTS server (edge-tts / Kokoro / Qwen) on the same PC as Next.js. */
 export async function POST(req: Request) {
-  let body: { text?: string; voice?: string; serverUrl?: string };
+  let body: {
+    text?: string;
+    voice?: string;
+    serverUrl?: string;
+    language?: string;
+    instruct?: string | null;
+  };
   try {
     body = await req.json();
   } catch {
@@ -21,12 +27,16 @@ export async function POST(req: Request) {
   }
 
   const base = serverUrl.replace(/\/$/, "");
+  const payload: Record<string, string | null> = { text, voice };
+  if (body.language?.trim()) payload.language = body.language.trim();
+  if (body.instruct?.trim()) payload.instruct = body.instruct.trim();
+
   let upstream: Response;
   try {
     upstream = await fetch(`${base}/speak`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, voice }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(120_000),
     });
   } catch (e) {

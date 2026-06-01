@@ -6,3 +6,13 @@ Bilder
 __pycache__
 *.py[cod]
 .env*
+test-output
+runpod
+scripts/test-qwen*.ps1
+scripts/test-qwen*.py
+public/library-covers/kenney_rpg-audio
+public/library-covers/Rain OGG
+public/library-covers/*.pdf
+public/library-covers/*.7z
+public/library-covers/recovery-codes.txt
+.qwen.settings

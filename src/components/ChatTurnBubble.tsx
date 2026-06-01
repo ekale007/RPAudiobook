@@ -13,7 +13,7 @@ import { useDialogueAttribution } from "@/lib/chat/useDialogueAttribution";
 import { stripSpeakerTags } from "@/lib/chat/parseSpeakerBlocks";
 import { prepareTextForTts } from "@/lib/tts/prepareTtsText";
 import type { CharacterRow, TurnRow } from "@/lib/db/stories";
-import type { VoiceMap } from "@/lib/types";
+import type { VoiceMap, StorySettings } from "@/lib/types";
 import { isCastVoiceActive, type VoiceEnabledSlugs } from "@/lib/tts/voiceActivation";
 
 export function ChatTurnBubble({
@@ -35,6 +35,7 @@ export function ChatTurnBubble({
   navFocused = false,
   showDialogueMarkup = true,
   storyLocale,
+  storySettings,
 }: {
   turn: TurnRow;
   cast: CharacterRow[];
@@ -58,6 +59,7 @@ export function ChatTurnBubble({
   /** Highlight dialogue/thought snippets that use a cast TTS voice. */
   showDialogueMarkup?: boolean;
   storyLocale?: string;
+  storySettings?: StorySettings;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(turn.content);
@@ -268,6 +270,7 @@ export function ChatTurnBubble({
               onTtsPlaybackChange?.(turn.id, active)
             }
             storyLocale={storyLocale}
+            storySettings={storySettings}
           />
         ) : null}
 

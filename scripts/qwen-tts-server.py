@@ -26,9 +26,11 @@ import numpy as np
 import soundfile as sf
 import torch
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
+from typing import Annotated
+import os
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger("qwen-tts")
@@ -175,7 +177,13 @@ async def voices():
 
 
 @app.post("/speak")
-async def speak(body: SpeakBody):
+async def speak(
+    body: SpeakBody,
+    x_api_key: Annotated[str | None, Header()] = None,
+):
+    expected = os.environ.get("QWEN_API_KEY", "").strip()
+    if expected and x_api_key != expected:
+        raise HTTPException(status_code=401, detail="Invalid API key")
     try:
         data = synthesize(body.text, body.voice, body.language, body.instruct)
     except Exception as e:

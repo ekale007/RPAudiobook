@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CharacterAvatarUpload } from "@/components/CharacterAvatarUpload";
 import { ElevenLabsVoiceSelect } from "@/components/ElevenLabsVoiceSelect";
+import { QwenVoiceEditor } from "@/components/QwenVoiceEditor";
 import { OverlayPanel } from "@/components/ui/OverlayPanel";
 import {
   updateCharacterCard,
@@ -24,7 +25,13 @@ import {
 } from "@/lib/storage/openRouterSettings";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
 import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
-import type { StorySettings, VoiceMap, WryTourCharacter } from "@/lib/types";
+import type {
+  QwenVoiceProfile,
+  StorySettings,
+  VoiceMap,
+  WryTourCharacter,
+} from "@/lib/types";
+import { emptyQwenProfile } from "@/lib/tts/qwenVoiceProfiles";
 
 type CharDraft = {
   memory: string;
@@ -49,8 +56,13 @@ export function CastCharacterOverlay({
   fallback,
   voiceMap,
   voiceEnabledSlugs,
+  qwenMode = false,
+  qwenProfiles = {},
+  qwenProfile,
   onVoiceMapChange,
   onVoiceEnabledChange,
+  onQwenProfileChange,
+  qwenSceneInstruct = true,
   onClose,
   onSaved,
 }: {
@@ -69,8 +81,13 @@ export function CastCharacterOverlay({
   fallback: string;
   voiceMap: VoiceMap;
   voiceEnabledSlugs: string[];
+  qwenMode?: boolean;
+  qwenProfiles?: Record<string, QwenVoiceProfile>;
+  qwenProfile?: QwenVoiceProfile;
   onVoiceMapChange: (map: VoiceMap) => void;
   onVoiceEnabledChange: (slugs: string[]) => void;
+  onQwenProfileChange?: (slug: string, profile: QwenVoiceProfile) => void;
+  qwenSceneInstruct?: boolean;
   onClose: () => void;
   onSaved?: () => void;
 }) {
@@ -101,8 +118,13 @@ export function CastCharacterOverlay({
 
   const isNarrator = character.role === "narrator";
   const voiceDisabled = !isNarrator && !voiceEnabledSlugs.includes(character.slug);
+  const profile =
+    qwenProfile ?? emptyQwenProfile(character.slug);
   const currentVoice =
-    voiceMap[character.slug] ?? defaults[character.slug] ?? fallback;
+    (qwenMode ? profile.presetSpeaker : null) ??
+    voiceMap[character.slug] ??
+    defaults[character.slug] ??
+    fallback;
 
   const toggleVoiceActive = (active: boolean) => {
     const has = voiceEnabledSlugs.includes(character.slug);
@@ -183,12 +205,28 @@ export function CastCharacterOverlay({
         status: draft.archived ? "archived" : "active",
         archived_reason: draft.archived ? draft.reason || "manual" : null,
       });
-      const nextVoiceMap = { ...voiceMap, [character.slug]: currentVoice };
+      const speaker = profile.presetSpeaker?.trim() || currentVoice;
+      const nextVoiceMap = { ...voiceMap, [character.slug]: speaker };
       onVoiceMapChange(nextVoiceMap);
-      await updateStorySettings(storyId, {
+      const settingsPatch: Parameters<typeof updateStorySettings>[1] = {
         voiceMap: nextVoiceMap,
         voiceEnabledSlugs,
-      });
+      };
+      if (qwenMode && onQwenProfileChange) {
+        const nextProfile: QwenVoiceProfile = {
+          ...profile,
+          slug: character.slug,
+          presetSpeaker: speaker,
+          updatedAt: new Date().toISOString(),
+        };
+        onQwenProfileChange(character.slug, nextProfile);
+        settingsPatch.qwenVoiceProfiles = {
+          ...qwenProfiles,
+          [character.slug]: nextProfile,
+        };
+        settingsPatch.qwenSceneInstructEnabled = qwenSceneInstruct;
+      }
+      await updateStorySettings(storyId, settingsPatch);
       setMessage(`„${draft.card.name || character.name}“ gespeichert.`);
       onSaved?.();
     } catch (e) {
@@ -258,6 +296,13 @@ export function CastCharacterOverlay({
           ) : null}
           {voiceDisabled ? (
             <p className="text-[11px] text-zinc-600">→ Erzähler-Stimme</p>
+          ) : qwenMode ? (
+            <QwenVoiceEditor
+              profile={profile}
+              onChange={(next) => onQwenProfileChange?.(character.slug, next)}
+              locale={storyLocale}
+              compact={!isNarrator}
+            />
           ) : ttsProvider === "elevenlabs" ? (
             <ElevenLabsVoiceSelect
               value={currentVoice}
@@ -287,6 +332,12 @@ export function CastCharacterOverlay({
               ))}
             </select>
           )}
+          {qwenMode && !voiceDisabled ? (
+            <p className="text-[10px] text-zinc-600">
+              Stil gilt im Chat für diese Figur (+ optional Szenen-Stil aus
+              Plot-State).
+            </p>
+          ) : null}
         </section>
 
         <section className="space-y-2">

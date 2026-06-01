@@ -126,6 +126,9 @@ export const ELEVEN_VOICES: ElevenVoiceMeta[] = [
 export const ELEVEN_DEFAULT_NARRATOR = "JBFqnCBsd6RMkjVDRZzb";
 export const ELEVEN_DEFAULT_MODEL = "eleven_multilingual_v2";
 
+/** Expressive model with inline audio tags — see docs/ELEVENLABS-DELIVERY.md */
+export const ELEVEN_V3_MODEL = "eleven_v3";
+
 export function getDefaultElevenLabsModel(): string {
   return ELEVEN_DEFAULT_MODEL;
 }

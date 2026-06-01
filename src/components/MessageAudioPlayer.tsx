@@ -17,8 +17,11 @@ import {
 } from "@/lib/db/ttsStorage";
 import { getNarratorAudio } from "@/lib/tts/narratorTts";
 import type { CharacterRow } from "@/lib/db/stories";
-import type { VoiceMap } from "@/lib/types";
+import type { VoiceMap, StorySettings } from "@/lib/types";
 import { loadTtsSettings, ttsCacheVoiceKey } from "@/lib/storage/ttsSettings";
+import { ambienceIdsFromPlot, parseSfxTags } from "@/lib/audio/sfxCatalog";
+import { isStoryDeliveryEnabled } from "@/lib/tts/resolveStoryDelivery";
+import { playSfxForTags, stopAllSfx } from "@/lib/audio/sfxPlayer";
 import { isServerTtsAvailable, refreshServerCapabilities } from "@/lib/server/serverCapabilities";
 import {
   clampPlaybackRate,
@@ -72,6 +75,7 @@ export const MessageAudioPlayer = forwardRef<
     onChainPlay?: () => void;
     onPlaybackActiveChange?: (active: boolean) => void;
     storyLocale?: string;
+    storySettings?: StorySettings;
   }
 >(function MessageAudioPlayer(
   {
@@ -89,6 +93,7 @@ export const MessageAudioPlayer = forwardRef<
     onChainPlay,
     onPlaybackActiveChange,
     storyLocale,
+    storySettings,
   },
   ref,
 ) {
@@ -198,6 +203,7 @@ export const MessageAudioPlayer = forwardRef<
       if (Number.isFinite(audio.duration)) setDuration(audio.duration);
     };
     audio.onended = () => {
+      stopAllSfx();
       setStatus("ready");
       setCurrentTime(0);
       if (audioRef.current) audioRef.current.currentTime = 0;
@@ -264,7 +270,10 @@ export const MessageAudioPlayer = forwardRef<
       const baseText = stripSpeakerTags(rawContent ?? text).trim() || text.trim();
 
       const localVoice =
-        settings.provider === "local" && voiceMap
+        (settings.provider === "local" ||
+          settings.provider === "qwen" ||
+          settings.provider === "qwen-cloud") &&
+        voiceMap
           ? voiceForSpeaker(
               speakerSlug,
               voiceMap,
@@ -273,7 +282,9 @@ export const MessageAudioPlayer = forwardRef<
             )
           : settings.localVoice;
       const cacheKey = buildTtsCacheKey(
-        settings.provider === "local"
+        settings.provider === "local" ||
+        settings.provider === "qwen" ||
+        settings.provider === "qwen-cloud"
           ? `${ttsCacheVoiceKey(settings)}:${localVoice}${
               hasSegmentOverrides
                 ? `:multi:${JSON.stringify(activeOverrides)}:${storyLocale?.startsWith("de") ? "de" : "en"}:${JSON.stringify(voiceEnabledSlugs ?? null)}${localTtsRouteCacheSuffix(settings, storyLocale)}`
@@ -299,6 +310,7 @@ export const MessageAudioPlayer = forwardRef<
           voiceEnabledSlugs,
           rawContent: rawContent ?? text,
           storyLocale,
+          storySettings,
         });
 
         const supabase = createClient();
@@ -368,6 +380,16 @@ export const MessageAudioPlayer = forwardRef<
   };
 
   const startPlayback = async (audio: HTMLAudioElement): Promise<void> => {
+    const sfxSource = rawContent ?? text;
+    const sfxIds = [
+      ...parseSfxTags(sfxSource),
+      ...(isStoryDeliveryEnabled(storySettings)
+        ? ambienceIdsFromPlot(storySettings?.plotState)
+        : []),
+    ].filter((id, i, arr) => arr.indexOf(id) === i);
+    if (sfxIds.length) {
+      void playSfxForTags(sfxIds);
+    }
     await audio.play();
     setAutoplayBlocked(false);
     setStatus("playing");

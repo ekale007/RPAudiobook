@@ -25,6 +25,13 @@ Name von „Rauch aus dem Schornstein = Maschine läuft“ — hier: **5–10 Mi
 - [ ] TTS abspielen (EN-Story)
 - [ ] Settings → erlaubte Modelle sichtbar, Verbrauchsanzeige
 
+### TTS & Audio (Beta)
+
+- [ ] Settings → ElevenLabs → optional **Eleven v3 (Test)**
+- [ ] Cast → **Szenen-Stil** an → Chat ▶ (dynamische Stimmung)
+- [ ] SFX: Plot mit „Regen“ / `<<sfx:rain>>` → leiser Loop unter TTS
+- [ ] Optional: Qwen Cloud wenn `DASHSCOPE_API_KEY` auf Vercel gesetzt
+
 ### Bibliothek
 
 - [ ] Drehteller: wischen / Pfeile

@@ -17,7 +17,12 @@ import { QWEN_DEFAULT_NARRATOR, QWEN_VOICES } from "@/lib/tts/qwenVoices";
 import { defaultEnabledCastSlugs } from "@/lib/tts/voiceActivation";
 import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
-import type { StorySettings, VoiceMap } from "@/lib/types";
+import type { QwenVoiceProfile, StorySettings, VoiceMap } from "@/lib/types";
+import {
+  buildQwenProfilesFromSettings,
+} from "@/lib/tts/qwenVoiceProfiles";
+import { isQwenTtsMode } from "@/lib/tts/qwenTtsMode";
+import { updateStorySettings } from "@/lib/db/stories";
 
 function voiceOptionsForEngine(engine: LocalTtsEngine) {
   if (engine === "qwen") {
@@ -38,6 +43,7 @@ function defaultMapForEngine(engine: LocalTtsEngine): VoiceMap {
 
 function fallbackVoice(provider: TtsProvider, engine: LocalTtsEngine): string {
   if (provider === "elevenlabs") return ELEVEN_DEFAULT_NARRATOR;
+  if (provider === "qwen" || provider === "qwen-cloud") return QWEN_DEFAULT_NARRATOR;
   return engine === "qwen" ? QWEN_DEFAULT_NARRATOR : "af_bella";
 }
 
@@ -53,7 +59,11 @@ function shortVoiceLabel(
   if (ttsProvider === "elevenlabs") {
     return id.length > 10 ? `${id.slice(0, 8)}…` : id;
   }
-  const options = voiceOptionsForEngine(localEngine);
+  const engineForOptions =
+    ttsProvider === "qwen" || ttsProvider === "qwen-cloud"
+      ? "qwen"
+      : localEngine;
+  const options = voiceOptionsForEngine(engineForOptions);
   return options.find((v) => v.id === id)?.label.split(" (")[0] ?? id;
 }
 
@@ -84,9 +94,11 @@ export function CastHubPanel({
   const tts = loadTtsSettings();
   const [ttsProvider] = useState<TtsProvider>(tts.provider);
   const [localEngine] = useState<LocalTtsEngine>(
-    tts.localEngine === "qwen" || tts.localEngine === "kokoro"
-      ? tts.localEngine
-      : "kokoro",
+    tts.provider === "qwen" || tts.provider === "qwen-cloud"
+      ? "qwen"
+      : tts.localEngine === "qwen" || tts.localEngine === "kokoro"
+        ? tts.localEngine
+        : "kokoro",
   );
 
   const [voiceMap, setVoiceMap] = useState<VoiceMap>(() =>
@@ -95,8 +107,27 @@ export function CastHubPanel({
   const [voiceEnabledSlugs, setVoiceEnabledSlugs] = useState<string[]>(
     storySettings.voiceEnabledSlugs ?? defaultEnabledCastSlugs(cast),
   );
+  const [qwenProfiles, setQwenProfiles] = useState<
+    Record<string, QwenVoiceProfile>
+  >(() =>
+    buildQwenProfilesFromSettings(
+      storySettings,
+      cast.map((c) => c.slug),
+    ),
+  );
+  const [qwenSceneInstruct, setQwenSceneInstruct] = useState(
+    storySettings.qwenSceneInstructEnabled !== false,
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [discoverOpen, setDiscoverOpen] = useState(false);
+
+  const engine: LocalTtsEngine =
+    ttsProvider === "qwen" || ttsProvider === "qwen-cloud"
+      ? "qwen"
+      : localEngine === "qwen" || localEngine === "kokoro"
+        ? localEngine
+        : "kokoro";
+  const qwen = isQwenTtsMode(ttsProvider, engine);
 
   useEffect(() => {
     setVoiceMap(
@@ -105,15 +136,22 @@ export function CastHubPanel({
     setVoiceEnabledSlugs(
       storySettings.voiceEnabledSlugs ?? defaultEnabledCastSlugs(cast),
     );
+    setQwenProfiles(
+      buildQwenProfilesFromSettings(
+        storySettings,
+        cast.map((c) => c.slug),
+      ),
+    );
+    setQwenSceneInstruct(storySettings.qwenSceneInstructEnabled !== false);
   }, [storySettings, storyLocale, ttsProvider, cast]);
 
-  const engine =
-    localEngine === "qwen" || localEngine === "kokoro" ? localEngine : "kokoro";
   const voiceOptions = voiceOptionsForEngine(engine);
   const defaults =
     ttsProvider === "elevenlabs"
       ? mergeVoiceMapForProvider("elevenlabs", storyLocale, null)
-      : defaultMapForEngine(engine);
+      : ttsProvider === "qwen"
+        ? mergeVoiceMapForProvider("qwen", storyLocale, null)
+        : defaultMapForEngine(engine);
   const fallback = fallbackVoice(ttsProvider, engine);
 
   const selected = characters.find((c) => c.id === selectedId) ?? null;
@@ -158,10 +196,22 @@ export function CastHubPanel({
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-[10px] leading-snug text-zinc-600">
-          Tippe eine Karte —{" "}
+          Tippe eine Karte für Stimme & Stil —{" "}
           <Link href="/settings" className="text-accent underline">
             TTS
           </Link>
+          {qwen ? (
+            <>
+              {" "}
+              ·{" "}
+              <Link
+                href={`/story/${storyId}/voices`}
+                className="text-accent underline"
+              >
+                alle Stimmen
+              </Link>
+            </>
+          ) : null}
         </p>
         <button
           type="button"
@@ -171,6 +221,27 @@ export function CastHubPanel({
           + Aus Story
         </button>
       </div>
+
+      {qwen ? (
+        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-surface-border/80 bg-surface px-2.5 py-2">
+          <input
+            type="checkbox"
+            checked={qwenSceneInstruct}
+            onChange={(e) => {
+              const on = e.target.checked;
+              setQwenSceneInstruct(on);
+              void updateStorySettings(storyId, {
+                qwenSceneInstructEnabled: on,
+              }).then(() => onSaved?.());
+            }}
+            className="mt-0.5 size-3.5 rounded border-surface-border"
+          />
+          <span className="text-[10px] leading-snug text-zinc-500">
+            <strong className="text-zinc-300">Szenen-Stil</strong> im Chat (Plot +
+            Absatz) — Qwen-instruct &amp; Eleven v3 Audio-Tags.
+          </span>
+        </label>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {characters.map((c) => {
@@ -218,8 +289,21 @@ export function CastHubPanel({
         fallback={fallback}
         voiceMap={voiceMap}
         voiceEnabledSlugs={voiceEnabledSlugs}
+        qwenMode={qwen}
+        qwenProfiles={qwenProfiles}
+        qwenProfile={
+          selected ? qwenProfiles[selected.slug] : undefined
+        }
         onVoiceMapChange={setVoiceMap}
         onVoiceEnabledChange={setVoiceEnabledSlugs}
+        onQwenProfileChange={(slug, profile) => {
+          setQwenProfiles((prev) => ({ ...prev, [slug]: profile }));
+          setVoiceMap((prev) => ({
+            ...prev,
+            [slug]: profile.presetSpeaker ?? prev[slug],
+          }));
+        }}
+        qwenSceneInstruct={qwenSceneInstruct}
         onClose={() => setSelectedId(null)}
         onSaved={onSaved}
       />

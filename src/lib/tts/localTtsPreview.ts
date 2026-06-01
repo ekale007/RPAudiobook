@@ -3,6 +3,7 @@ export async function fetchLocalTtsPreview(
   serverUrl: string,
   voice: string,
   text?: string,
+  options?: { language?: string; instruct?: string | null },
 ): Promise<Blob> {
   const base = serverUrl.replace(/\/$/, "");
   const res = await fetch("/api/tts/local", {
@@ -12,6 +13,8 @@ export async function fetchLocalTtsPreview(
       text: text ?? "Hello. I will narrate your story.",
       voice,
       serverUrl: base,
+      language: options?.language,
+      instruct: options?.instruct ?? null,
     }),
   });
 

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { ElevenLabsVoiceSelect } from "@/components/ElevenLabsVoiceSelect";
+import { QwenVoiceEditor } from "@/components/QwenVoiceEditor";
 import { createClient } from "@/lib/supabase/client";
 import {
   listCharacters,
@@ -22,11 +23,15 @@ import {
   QWEN_DEFAULT_NARRATOR,
   QWEN_VOICES,
 } from "@/lib/tts/qwenVoices";
+import {
+  buildQwenProfilesFromSettings,
+  emptyQwenProfile,
+} from "@/lib/tts/qwenVoiceProfiles";
 import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
 import { defaultEnabledCastSlugs } from "@/lib/tts/voiceActivation";
 import { normalizeStoryLocale } from "@/lib/tts/ttsLocaleRouting";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
-import type { VoiceMap } from "@/lib/types";
+import type { QwenVoiceProfile, VoiceMap } from "@/lib/types";
 
 type VoiceOption = { id: string; label: string };
 
@@ -49,7 +54,16 @@ function defaultMapForEngine(engine: LocalTtsEngine): VoiceMap {
 
 function fallbackVoice(provider: TtsProvider, engine: LocalTtsEngine): string {
   if (provider === "elevenlabs") return ELEVEN_DEFAULT_NARRATOR;
+  if (provider === "qwen" || provider === "qwen-cloud") return QWEN_DEFAULT_NARRATOR;
   return engine === "qwen" ? QWEN_DEFAULT_NARRATOR : "af_bella";
+}
+
+function isQwenMode(provider: TtsProvider, engine: LocalTtsEngine): boolean {
+  return (
+    provider === "qwen" ||
+    provider === "qwen-cloud" ||
+    (provider === "local" && engine === "qwen")
+  );
 }
 
 export default function StoryVoicesPage() {
@@ -61,12 +75,17 @@ export default function StoryVoicesPage() {
     Awaited<ReturnType<typeof listCharacters>>
   >([]);
   const [voiceMap, setVoiceMap] = useState<VoiceMap>({});
+  const [qwenProfiles, setQwenProfiles] = useState<
+    Record<string, QwenVoiceProfile>
+  >({});
+  const [qwenSceneInstruct, setQwenSceneInstruct] = useState(true);
   const [voiceEnabledSlugs, setVoiceEnabledSlugs] = useState<string[]>([]);
   const [ttsProvider, setTtsProvider] = useState<TtsProvider>("elevenlabs");
   const [localEngine, setLocalEngine] = useState<LocalTtsEngine>("kokoro");
   const [storyLocale, setStoryLocale] = useState<"de" | "en">("de");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedSlug, setExpandedSlug] = useState<string | null>("narrator");
 
   useEffect(() => {
     createClient()
@@ -100,6 +119,11 @@ export default function StoryVoicesPage() {
             setVoiceMap(
               mergeVoiceMapForProvider(tts.provider, locale, settings.voiceMap),
             );
+            setQwenSceneInstruct(settings.qwenSceneInstructEnabled !== false);
+            const slugs = castRows.map((c) => c.slug);
+            setQwenProfiles(
+              buildQwenProfilesFromSettings(settings, slugs),
+            );
             setVoiceEnabledSlugs(
               settings.voiceEnabledSlugs ??
                 defaultEnabledCastSlugs(castRows),
@@ -111,6 +135,7 @@ export default function StoryVoicesPage() {
 
   const engine =
     localEngine === "qwen" || localEngine === "kokoro" ? localEngine : "kokoro";
+  const qwen = isQwenMode(ttsProvider, localEngine);
   const voiceOptions = voiceOptionsForEngine(engine);
   const defaults =
     ttsProvider === "elevenlabs"
@@ -118,14 +143,20 @@ export default function StoryVoicesPage() {
       : defaultMapForEngine(engine);
   const fallback = fallbackVoice(ttsProvider, engine);
 
-  const narrator = cast.find((c) => c.role === "narrator");
-  const castSpeakers = cast
-    .filter((c) => c.role === "cast" && (c.status ?? "active") === "active")
-    .map((c) => ({ slug: c.slug, name: c.name }));
-  const speakers = [
-    { slug: "narrator", name: narrator?.name ?? "Narrator", isNarrator: true },
-    ...castSpeakers.map((c) => ({ ...c, isNarrator: false })),
-  ];
+  const speakers = useMemo(() => {
+    const narrator = cast.find((c) => c.role === "narrator");
+    const castSpeakers = cast
+      .filter((c) => c.role === "cast" && (c.status ?? "active") === "active")
+      .map((c) => ({ slug: c.slug, name: c.name }));
+    return [
+      {
+        slug: "narrator",
+        name: narrator?.name ?? "Narrator",
+        isNarrator: true,
+      },
+      ...castSpeakers.map((c) => ({ ...c, isNarrator: false })),
+    ];
+  }, [cast]);
 
   const toggleVoiceActive = (slug: string, active: boolean) => {
     setVoiceEnabledSlugs((prev) => {
@@ -136,10 +167,26 @@ export default function StoryVoicesPage() {
     });
   };
 
+  const updateQwenProfile = (slug: string, next: QwenVoiceProfile) => {
+    setQwenProfiles((prev) => ({ ...prev, [slug]: next }));
+    setVoiceMap((prev) => ({
+      ...prev,
+      [slug]: next.presetSpeaker ?? prev[slug],
+    }));
+  };
+
   const save = async () => {
     setError(null);
     try {
-      await updateStorySettings(storyId, { voiceMap, voiceEnabledSlugs });
+      const patch: Parameters<typeof updateStorySettings>[1] = {
+        voiceMap,
+        voiceEnabledSlugs,
+      };
+      if (qwen) {
+        patch.qwenVoiceProfiles = qwenProfiles;
+        patch.qwenSceneInstructEnabled = qwenSceneInstruct;
+      }
+      await updateStorySettings(storyId, patch);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
@@ -147,12 +194,13 @@ export default function StoryVoicesPage() {
     }
   };
 
-  const engineLabel =
-    ttsProvider === "elevenlabs"
+  const engineLabel = qwen
+    ? "Qwen3-TTS"
+    : ttsProvider === "elevenlabs"
       ? "ElevenLabs"
-      : engine === "qwen"
-        ? "Qwen3-TTS"
-        : "Kokoro";
+      : engine === "kokoro"
+        ? "Kokoro"
+        : "Local";
 
   return (
     <main className="flex min-h-dvh flex-col">
@@ -163,11 +211,32 @@ export default function StoryVoicesPage() {
           <Link href="/settings" className="text-accent underline">
             Engine
           </Link>
-          {ttsProvider === "elevenlabs" ? (
-            <> · {storyLocale === "de" ? "DE" : "EN"}</>
+          {qwen ? (
+            <>
+              {" "}
+              ·{" "}
+              <Link href="/dev/qwen-voices" className="text-accent underline">
+                Stimmen-Labor
+              </Link>
+            </>
           ) : null}
-          . ▶ = kostenlose ElevenLabs-Vorschau.
         </p>
+
+        {qwen ? (
+          <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-surface-border bg-surface-raised px-3 py-2">
+            <input
+              type="checkbox"
+              checked={qwenSceneInstruct}
+              onChange={(e) => setQwenSceneInstruct(e.target.checked)}
+              className="mt-0.5 size-3.5 rounded border-surface-border"
+            />
+            <span className="text-xs text-zinc-400">
+              <strong className="text-zinc-200">Szenen-Stil</strong> aus
+              Plot-State (Ort, Bedrohungen, Threads) — kombiniert mit
+              Figuren-instruct.
+            </span>
+          </label>
+        ) : null}
 
         <ul className="flex flex-col gap-2">
           {speakers.map((s) => {
@@ -177,6 +246,9 @@ export default function StoryVoicesPage() {
               !s.isNarrator && !voiceEnabledSlugs.includes(s.slug);
             const currentVoice =
               voiceMap[s.slug] ?? defaults[s.slug] ?? fallback;
+            const expanded = expandedSlug === s.slug;
+            const profile =
+              qwenProfiles[s.slug] ?? emptyQwenProfile(s.slug);
 
             return (
               <li
@@ -187,13 +259,22 @@ export default function StoryVoicesPage() {
                     : "border-surface-border/50 bg-surface-raised/60"
                 }`}
               >
-                <div className="mb-1.5 flex items-center gap-2">
+                <button
+                  type="button"
+                  className="mb-1.5 flex w-full items-center gap-2 text-left"
+                  onClick={() =>
+                    setExpandedSlug(expanded ? null : s.slug)
+                  }
+                >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-medium text-zinc-200">
                       {s.name}
                     </p>
                     <p className="truncate text-[10px] text-zinc-600">
                       {s.slug}
+                      {qwen && profile.designInstruct?.trim()
+                        ? " · instruct"
+                        : ""}
                     </p>
                   </div>
                   {s.isNarrator ? (
@@ -201,7 +282,10 @@ export default function StoryVoicesPage() {
                       Erzähler
                     </span>
                   ) : (
-                    <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[10px] text-zinc-500">
+                    <label
+                      className="flex shrink-0 cursor-pointer items-center gap-1 text-[10px] text-zinc-500"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <input
                         type="checkbox"
                         checked={voiceEnabledSlugs.includes(s.slug)}
@@ -213,7 +297,10 @@ export default function StoryVoicesPage() {
                       Eigene
                     </label>
                   )}
-                </div>
+                  <span className="text-[10px] text-zinc-600">
+                    {expanded ? "▲" : "▼"}
+                  </span>
+                </button>
 
                 {voiceDisabled ? (
                   <p className="mb-1 text-[10px] text-zinc-600">
@@ -221,33 +308,44 @@ export default function StoryVoicesPage() {
                   </p>
                 ) : null}
 
-                {ttsProvider === "elevenlabs" ? (
-                  <ElevenLabsVoiceSelect
-                    value={currentVoice}
-                    onChange={(id) =>
-                      setVoiceMap((prev) => ({ ...prev, [s.slug]: id }))
-                    }
-                    disabled={voiceDisabled}
-                  />
-                ) : (
-                  <select
-                    value={currentVoice}
-                    onChange={(e) =>
-                      setVoiceMap((prev) => ({
-                        ...prev,
-                        [s.slug]: e.target.value,
-                      }))
-                    }
-                    disabled={voiceDisabled}
-                    className="w-full rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-xs disabled:opacity-50"
-                  >
-                    {voiceOptions.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                {expanded && !voiceDisabled ? (
+                  qwen ? (
+                    <QwenVoiceEditor
+                      profile={profile}
+                      onChange={(next) => updateQwenProfile(s.slug, next)}
+                      locale={storyLocale}
+                      compact={!s.isNarrator}
+                    />
+                  ) : ttsProvider === "elevenlabs" ? (
+                    <ElevenLabsVoiceSelect
+                      value={currentVoice}
+                      onChange={(id) =>
+                        setVoiceMap((prev) => ({ ...prev, [s.slug]: id }))
+                      }
+                    />
+                  ) : (
+                    <select
+                      value={currentVoice}
+                      onChange={(e) =>
+                        setVoiceMap((prev) => ({
+                          ...prev,
+                          [s.slug]: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-xs"
+                    >
+                      {voiceOptions.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                  )
+                ) : !voiceDisabled && qwen ? (
+                  <p className="text-[10px] text-zinc-600">
+                    {profile.presetSpeaker} — antippen zum Bearbeiten & ▶
+                  </p>
+                ) : null}
               </li>
             );
           })}

@@ -140,6 +140,16 @@ export function ChatView({
   const [plotState, setPlotState] = useState<StoryPlotState | null>(
     storySettings.plotState ?? null,
   );
+
+  /** Live plot + Qwen profiles for TTS (scene instruct updates during play). */
+  const ttsStorySettings = useMemo<StorySettings>(
+    () => ({
+      ...storySettings,
+      plotState: plotState ?? storySettings.plotState ?? null,
+    }),
+    [storySettings, plotState],
+  );
+
   const [allCast, setAllCast] = useState<CharacterRow[]>(
     cast.filter((c) => c.role === "cast"),
   );
@@ -1244,6 +1254,7 @@ export function ChatView({
                 onTtsPlaybackChange={handleTtsPlaybackChange}
                 navFocused={bubbleFocusIndex === index}
                 storyLocale={storyLocale}
+                storySettings={ttsStorySettings}
                 showDialogueMarkup
               />
             </div>
@@ -1302,7 +1313,7 @@ export function ChatView({
               href={`/story/${storyId}/voices`}
               className="shrink-0 rounded-full border border-surface-border px-3 py-1 text-zinc-400"
             >
-              Voices
+              Stimmen
             </Link>
             {!readOnly ? (
               <Link

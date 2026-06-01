@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { DecimalStepInput } from "@/components/DecimalStepInput";
@@ -17,6 +18,7 @@ import {
 } from "@/lib/storage/ttsSettings";
 import { KokoroVoicePicker } from "@/components/KokoroVoicePicker";
 import { QwenVoicePicker } from "@/components/QwenVoicePicker";
+import { QWEN_CLOUD_DEFAULT_NARRATOR } from "@/lib/tts/qwenCloudVoices";
 import {
   LOCAL_TTS_PRESETS,
   type LocalTtsEngine,
@@ -27,6 +29,10 @@ import {
 } from "@/lib/tts/pronunciation";
 import { useServerCapabilities } from "@/lib/server/useServerCapabilities";
 import { ElevenLabsVoiceSelect } from "@/components/ElevenLabsVoiceSelect";
+import {
+  ELEVEN_DEFAULT_MODEL,
+  ELEVEN_V3_MODEL,
+} from "@/lib/tts/elevenLabsVoices";
 import { LlmUsagePanel } from "@/components/LlmUsagePanel";
 import {
   PREFS_UPDATED_EVENT,
@@ -45,6 +51,8 @@ export default function SettingsPage() {
   const serverCaps = useServerCapabilities();
   const serverLlm = serverCaps.serverLlm;
   const serverTts = serverCaps.serverTts;
+  const serverQwenTts = serverCaps.serverQwenTts;
+  const serverQwenCloudTts = serverCaps.serverQwenCloudTts;
   const capsReady = serverCaps.ready;
   const betaMode = capsReady && serverLlm;
   const { models: llmModels, loading: modelsLoading } = useLlmModelCatalog();
@@ -167,6 +175,15 @@ export default function SettingsPage() {
     setLocalVoice(p.defaultVoice);
   };
 
+  useEffect(() => {
+    if (
+      (ttsProvider === "qwen" || ttsProvider === "qwen-cloud") &&
+      localEngine !== "qwen"
+    ) {
+      applyEnginePreset("qwen");
+    }
+  }, [ttsProvider]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const saveTts = () => {
     saveTtsSettings({
       provider: ttsProvider,
@@ -182,13 +199,35 @@ export default function SettingsPage() {
     setTimeout(() => setTtsSaved(false), 2000);
   };
 
-  const saveBetaVoice = () => {
-    const tts = loadTtsSettings();
-    saveTtsSettings({
-      ...tts,
-      provider: "elevenlabs",
-      elevenLabsVoiceId: elVoiceId.trim(),
-    });
+  const saveBetaTts = () => {
+    if (ttsProvider === "qwen" || ttsProvider === "qwen-cloud") {
+      saveTtsSettings({
+        provider: ttsProvider,
+        localEngine: "qwen",
+        localServerUrl:
+          localUrl.trim() || LOCAL_TTS_PRESETS.qwen.serverUrl,
+        localVoice:
+          localVoice.trim() ||
+          (ttsProvider === "qwen-cloud"
+            ? QWEN_CLOUD_DEFAULT_NARRATOR
+            : "Ryan"),
+        elevenLabsApiKey: elApiKey.trim(),
+        elevenLabsVoiceId: elVoiceId.trim(),
+        elevenLabsModelId: elModelId.trim(),
+        pronunciationMap: parsePronunciationLines(pronunciationText),
+      });
+    } else {
+      saveTtsSettings({
+        provider: "elevenlabs",
+        localEngine,
+        localServerUrl: localUrl.trim(),
+        localVoice: localVoice.trim(),
+        elevenLabsApiKey: elApiKey.trim(),
+        elevenLabsVoiceId: elVoiceId.trim(),
+        elevenLabsModelId: elModelId.trim(),
+        pronunciationMap: parsePronunciationLines(pronunciationText),
+      });
+    }
     setTtsSaved(true);
     setTimeout(() => setTtsSaved(false), 2000);
   };
@@ -314,34 +353,131 @@ export default function SettingsPage() {
               ) : null}
             </section>
 
-            {serverTts ? (
-              <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
-                <h2 className="mb-1 font-medium text-accent">
-                  Erzähler-Stimme
-                </h2>
-                <p className="mb-3 text-xs text-zinc-500">
-                  Standard-Stimme für Erzähler/Protagonist. Cast-Stimmen pro
-                  Story unter Voices.
-                </p>
-                <ElevenLabsVoiceSelect
-                  value={elVoiceId}
-                  onChange={setElVoiceId}
-                  label="Erzähler-Stimme"
-                />
-                <button
-                  type="button"
-                  onClick={saveBetaVoice}
-                  className="mt-3 w-full rounded-lg bg-accent py-2 text-sm font-medium text-black"
-                >
-                  Stimme speichern
-                </button>
-                {ttsSaved ? (
-                  <p className="mt-2 text-center text-xs text-green-400">
-                    Gespeichert
+            <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
+              <h2 className="mb-1 font-medium text-accent">Sprachausgabe (TTS)</h2>
+              <p className="mb-3 text-xs text-zinc-500">
+                <strong>ElevenLabs</strong> = Premium-Cloud.{" "}
+                <strong>Qwen Cloud</strong> = DashScope (~$10/M Zeichen, instruct).{" "}
+                <strong>Qwen lokal</strong> = dein PC (
+                <code className="text-zinc-400">npm run tts:qwen</code>
+                ). Cast-Stimmen pro Story unter Figuren-Stimmen.
+              </p>
+
+              <div className="mb-3 flex flex-wrap gap-2">
+                {(
+                  [
+                    { id: "elevenlabs" as const, label: "ElevenLabs" },
+                    { id: "qwen-cloud" as const, label: "Qwen Cloud" },
+                    { id: "qwen" as const, label: "Qwen lokal" },
+                  ] as const
+                ).map(({ id, label }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => {
+                      setTtsProvider(id);
+                      if (id === "qwen" || id === "qwen-cloud") {
+                        applyEnginePreset("qwen");
+                      }
+                    }}
+                    className={`min-w-[30%] flex-1 rounded-lg py-2 text-xs sm:text-sm ${
+                      ttsProvider === id
+                        ? "bg-accent text-black"
+                        : "border border-surface-border text-zinc-400"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {ttsProvider === "elevenlabs" ? (
+                <>
+                  {!serverTts ? (
+                    <p className="mb-2 text-xs text-amber-200">
+                      Server-TTS nicht konfiguriert — ElevenLabs-Key in .env
+                      oder unten (nur Dev).
+                    </p>
+                  ) : null}
+                  <ElevenLabsVoiceSelect
+                    value={elVoiceId}
+                    onChange={setElVoiceId}
+                    label="Erzähler-Stimme"
+                  />
+                  <label className="mt-3 flex cursor-pointer items-start gap-2 text-xs text-zinc-400">
+                    <input
+                      type="checkbox"
+                      checked={elModelId === ELEVEN_V3_MODEL}
+                      onChange={(e) =>
+                        setElModelId(
+                          e.target.checked ? ELEVEN_V3_MODEL : ELEVEN_DEFAULT_MODEL,
+                        )
+                      }
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <strong className="text-zinc-300">Eleven v3 (Test)</strong>{" "}
+                      — Audio-Tags + Cast/Szenen-Stil (wie Qwen-instruct). Teurer
+                      als multilingual_v2. Cast → „Szenen-Stil“ muss an sein.
+                    </span>
+                  </label>
+                </>
+              ) : ttsProvider === "qwen-cloud" ? (
+                <>
+                  {!serverQwenCloudTts ? (
+                    <p className="mb-2 text-xs text-amber-200">
+                      Qwen Cloud nicht aktiv —{" "}
+                      <code className="text-amber-100">DASHSCOPE_API_KEY</code>{" "}
+                      in Vercel/.env setzen (Singapore-Key für intl.).
+                    </p>
+                  ) : (
+                    <p className="mb-2 text-xs text-zinc-500">
+                      Qwen Cloud aktiv — Stil-instruct aus Cast/Plot. Ca. $0,10
+                      / 10k Zeichen (Flash).
+                    </p>
+                  )}
+                  <QwenVoicePicker
+                    serverUrl={localUrl}
+                    value={localVoice}
+                    onChange={setLocalVoice}
+                    cloudProxy
+                  />
+                </>
+              ) : (
+                <>
+                  <p className="mb-2 text-xs text-zinc-500">
+                    Server:{" "}
+                    <code className="text-accent">{localUrl}</code> — vor ▶{" "}
+                    <code className="text-accent">npm run tts:qwen</code>{" "}
+                    starten.
                   </p>
-                ) : null}
-              </section>
-            ) : null}
+                  <QwenVoicePicker
+                    serverUrl={localUrl}
+                    value={localVoice}
+                    onChange={setLocalVoice}
+                  />
+                  <Link
+                    href="/dev/qwen-voices"
+                    className="mt-2 inline-block text-xs text-accent underline"
+                  >
+                    Qwen Stimmen-Labor (instruct testen)
+                  </Link>
+                </>
+              )}
+
+              <button
+                type="button"
+                onClick={saveBetaTts}
+                className="mt-3 w-full rounded-lg bg-accent py-2 text-sm font-medium text-black"
+              >
+                TTS-Einstellungen speichern
+              </button>
+              {ttsSaved ? (
+                <p className="mt-2 text-center text-xs text-green-400">
+                  Gespeichert
+                </p>
+              ) : null}
+            </section>
           </>
         ) : (
           <>
@@ -437,7 +573,7 @@ export default function SettingsPage() {
                 See <code className="text-zinc-400">docs/LOCAL-TTS.md</code>.
               </p>
           <div className="mb-3 flex gap-2">
-            {(["local", "elevenlabs"] as const).map((p) => (
+            {(["local", "qwen", "elevenlabs"] as const).map((p) => (
               <button
                 key={p}
                 type="button"
@@ -448,52 +584,66 @@ export default function SettingsPage() {
                     : "border border-surface-border text-zinc-400"
                 }`}
               >
-                {p === "local" ? "Local (free)" : "ElevenLabs"}
+                {p === "local"
+                  ? "Local (free)"
+                  : p === "qwen"
+                    ? "Qwen (GPU)"
+                    : "ElevenLabs"}
               </button>
             ))}
           </div>
-          {ttsProvider === "local" ? (
+          {ttsProvider === "local" || ttsProvider === "qwen" ? (
             <>
-              <label className="mb-1 block text-xs text-zinc-400">Engine</label>
-              <div className="mb-3 grid grid-cols-2 gap-2">
-                {(
-                  ["edge", "kokoro", "qwen", "custom"] as LocalTtsEngine[]
-                ).map((e) => (
-                  <button
-                    key={e}
-                    type="button"
-                    onClick={() => applyEnginePreset(e)}
-                    className={`rounded-lg px-2 py-2 text-xs ${
-                      localEngine === e
-                        ? "bg-accent/20 text-accent"
-                        : "border border-surface-border text-zinc-500"
-                    }`}
-                  >
-                    {e === "edge"
-                      ? "edge-tts"
-                      : e === "custom"
-                        ? "Custom"
-                        : e}
-                  </button>
-                ))}
-              </div>
-              {localEngine !== "custom" ? (
-                <p className="mb-2 text-xs text-zinc-600">
-                  {LOCAL_TTS_PRESETS[localEngine].label} —{" "}
-                  {LOCAL_TTS_PRESETS[localEngine].docs}
+              {ttsProvider === "local" ? (
+                <>
+                  <label className="mb-1 block text-xs text-zinc-400">Engine</label>
+                  <div className="mb-3 grid grid-cols-2 gap-2">
+                    {(
+                      ["edge", "kokoro", "qwen", "custom"] as LocalTtsEngine[]
+                    ).map((e) => (
+                      <button
+                        key={e}
+                        type="button"
+                        onClick={() => applyEnginePreset(e)}
+                        className={`rounded-lg px-2 py-2 text-xs ${
+                          localEngine === e
+                            ? "bg-accent/20 text-accent"
+                            : "border border-surface-border text-zinc-500"
+                        }`}
+                      >
+                        {e === "edge"
+                          ? "edge-tts"
+                          : e === "custom"
+                            ? "Custom"
+                            : e}
+                      </button>
+                    ))}
+                  </div>
+                  {localEngine !== "custom" ? (
+                    <p className="mb-2 text-xs text-zinc-600">
+                      {LOCAL_TTS_PRESETS[localEngine].label} —{" "}
+                      {LOCAL_TTS_PRESETS[localEngine].docs}
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+                <p className="mb-2 text-xs text-zinc-500">
+                  Lokal: <code className="text-accent">npm run tts:qwen</code>{" "}
+                  oder RunPod — siehe{" "}
+                  <code className="text-zinc-400">docs/RUNPOD-QWEN.md</code>
                 </p>
-              ) : null}
+              )}
               <p className="mb-2 text-xs text-zinc-500">
                 PC:{" "}
                 <code className="text-accent">
-                  {localEngine === "kokoro"
-                    ? "npm run tts:kokoro"
-                    : localEngine === "qwen"
-                      ? "npm run tts:qwen"
+                  {ttsProvider === "qwen" || localEngine === "qwen"
+                    ? "npm run tts:qwen"
+                    : localEngine === "kokoro"
+                      ? "npm run tts:kokoro"
                       : "npm run tts:server"}
                 </code>{" "}
                 + <code className="text-accent">npm run dev</code>
-                {localEngine === "kokoro" ? (
+                {localEngine === "kokoro" && ttsProvider === "local" ? (
                   <>
                     <br />
                     First time:{" "}
@@ -505,7 +655,7 @@ export default function SettingsPage() {
                     : <code className="text-zinc-400">HF_TOKEN=hf_...</code>
                   </>
                 ) : null}
-                {localEngine === "qwen" ? (
+                {(ttsProvider === "qwen" || localEngine === "qwen") ? (
                   <>
                     <br />
                     First time:{" "}
@@ -513,6 +663,11 @@ export default function SettingsPage() {
                     <br />
                     HF token in <code className="text-zinc-400">.env.local</code>
                     : <code className="text-zinc-400">HF_TOKEN=hf_...</code>
+                    <br />
+                    <Link href="/dev/qwen-voices" className="text-accent underline">
+                      Qwen Stimmen-Labor
+                    </Link>{" "}
+                    — Presets & instruct testen
                   </>
                 ) : null}
               </p>
@@ -524,14 +679,14 @@ export default function SettingsPage() {
                 onChange={(e) => setLocalUrl(e.target.value)}
                 className="mb-3 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
               />
-              {localEngine === "kokoro" ? (
-                <KokoroVoicePicker
+              {(ttsProvider === "qwen" || localEngine === "qwen") ? (
+                <QwenVoicePicker
                   serverUrl={localUrl}
                   value={localVoice}
                   onChange={setLocalVoice}
                 />
-              ) : localEngine === "qwen" ? (
-                <QwenVoicePicker
+              ) : localEngine === "kokoro" ? (
+                <KokoroVoicePicker
                   serverUrl={localUrl}
                   value={localVoice}
                   onChange={setLocalVoice}

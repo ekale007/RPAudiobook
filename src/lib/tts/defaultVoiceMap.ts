@@ -11,6 +11,7 @@ import {
 } from "@/lib/tts/elevenLabsVoices";
 import type { TtsProvider } from "@/lib/storage/ttsSettings";
 import { normalizeStoryLocale } from "@/lib/tts/ttsLocaleRouting";
+import { sanitizeVoiceMapForQwen } from "@/lib/tts/qwenVoiceSanitize";
 
 /** Default Kokoro voices for When Dawn Breaks cast (slug → voice id). */
 export const DEFAULT_WRYTOUR_VOICE_MAP: VoiceMap = {
@@ -32,6 +33,7 @@ export const DEFAULT_QWEN_VOICE_MAP: VoiceMap = {
   michael: "Ryan",
   gabriel: "Vivian",
   "hidden-community": "Uncle_Fu",
+  "tess-roth": "Vivian",
 };
 
 export function mergeVoiceMap(
@@ -48,6 +50,9 @@ export function mergeVoiceMapForProvider(
   if (provider === "elevenlabs") {
     return mergeElevenVoiceMap(normalizeStoryLocale(locale), custom);
   }
+  if (provider === "qwen" || provider === "qwen-cloud") {
+    return sanitizeVoiceMapForQwen({ ...DEFAULT_QWEN_VOICE_MAP, ...custom });
+  }
   return mergeVoiceMap(custom);
 }
 
@@ -60,6 +65,9 @@ export function defaultNarratorVoiceForProvider(
       defaultElevenVoiceMap(normalizeStoryLocale(locale)).narrator ??
       ELEVEN_DEFAULT_NARRATOR
     );
+  }
+  if (provider === "qwen" || provider === "qwen-cloud") {
+    return DEFAULT_QWEN_VOICE_MAP.narrator ?? "Ryan";
   }
   return DEFAULT_WRYTOUR_VOICE_MAP.narrator ?? "af_heart";
 }

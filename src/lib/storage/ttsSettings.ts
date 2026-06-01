@@ -1,9 +1,19 @@
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
 import type { PronunciationMap } from "@/lib/tts/pronunciation";
 
-import { isServerTtsAvailable } from "@/lib/server/serverCapabilities";
+import {
+  isServerQwenCloudTtsAvailable,
+  isServerQwenTtsAvailable,
+  isServerTtsAvailable,
+} from "@/lib/server/serverCapabilities";
+import {
+  coerceQwenPresetVoice,
+  isValidQwenPresetVoice,
+} from "@/lib/tts/qwenVoiceSanitize";
+import { QWEN_CLOUD_DEFAULT_NARRATOR } from "@/lib/tts/qwenCloudVoices";
+import { QWEN_DEFAULT_NARRATOR } from "@/lib/tts/qwenVoices";
 
-export type TtsProvider = "local" | "elevenlabs";
+export type TtsProvider = "local" | "elevenlabs" | "qwen" | "qwen-cloud";
 
 export interface TtsSettings {
   provider: TtsProvider;
@@ -66,7 +76,23 @@ export function loadTtsSettings(): TtsSettings {
     if (raw) {
       // Saved settings win — never let legacy override provider
       localStorage.removeItem(LEGACY_ELEVEN_KEY);
-      return { ...DEFAULT_TTS, ...parseStored(raw) };
+      const merged = { ...DEFAULT_TTS, ...parseStored(raw) };
+      if (
+        (merged.provider === "qwen" || merged.provider === "qwen-cloud") &&
+        !isValidQwenPresetVoice(merged.localVoice)
+      ) {
+        merged.localVoice =
+          merged.provider === "qwen-cloud"
+            ? QWEN_CLOUD_DEFAULT_NARRATOR
+            : QWEN_DEFAULT_NARRATOR;
+      }
+      if (
+        merged.provider === "qwen-cloud" &&
+        merged.localVoice === QWEN_DEFAULT_NARRATOR
+      ) {
+        merged.localVoice = QWEN_CLOUD_DEFAULT_NARRATOR;
+      }
+      return merged;
     }
 
     const migrated = migrateLegacyIfNeeded();
@@ -96,6 +122,12 @@ export function saveTtsSettings(
 
 export function isTtsReady(settings: TtsSettings): boolean {
   if (settings.provider === "local") return true;
+  if (settings.provider === "qwen") {
+    return isServerQwenTtsAvailable() || settings.localServerUrl.trim().length > 0;
+  }
+  if (settings.provider === "qwen-cloud") {
+    return isServerQwenCloudTtsAvailable();
+  }
   if (!settings.elevenLabsVoiceId.trim()) return false;
   if (isServerTtsAvailable()) return true;
   return Boolean(settings.elevenLabsApiKey.trim());
@@ -105,5 +137,13 @@ export function ttsCacheVoiceKey(settings: TtsSettings): string {
   if (settings.provider === "local") {
     return `local:${settings.localEngine}:${settings.localVoice}`;
   }
-  return `el:${settings.elevenLabsVoiceId}:${settings.elevenLabsModelId}:v2`;
+  if (settings.provider === "qwen") {
+    return `qwen:${settings.localVoice}:v1`;
+  }
+  if (settings.provider === "qwen-cloud") {
+    return `qwen-cloud:${settings.localVoice}:v1`;
+  }
+  const elModel = settings.elevenLabsModelId || "eleven_multilingual_v2";
+  const elVer = elModel.includes("v3") ? "v3d" : "v2";
+  return `el:${settings.elevenLabsVoiceId}:${elModel}:${elVer}`;
 }

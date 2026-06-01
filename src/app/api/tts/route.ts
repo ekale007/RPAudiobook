@@ -59,6 +59,12 @@ export async function POST(req: Request) {
     voiceId?: string;
     modelId?: string;
     locale?: string;
+    voiceSettings?: {
+      stability?: number;
+      similarity_boost?: number;
+      style?: number;
+      use_speaker_boost?: boolean;
+    };
   };
   try {
     body = await req.json();
@@ -84,7 +90,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const voiceSettings = getElevenLabsVoiceSettings(locale);
+  const voiceSettings = {
+    ...getElevenLabsVoiceSettings(locale),
+    ...body.voiceSettings,
+  };
 
   const upstream = await fetch(
     `${ELEVEN_BASE}/text-to-speech/${encodeURIComponent(voiceId)}`,
