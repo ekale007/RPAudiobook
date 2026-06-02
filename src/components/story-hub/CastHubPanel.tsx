@@ -5,6 +5,8 @@ import Link from "next/link";
 import { CastCharacterOverlay } from "@/components/story-hub/CastCharacterOverlay";
 import { CastDiscoverOverlay } from "@/components/story-hub/CastDiscoverOverlay";
 import { CastVisitCard } from "@/components/story-hub/CastVisitCard";
+import { ProtagonistCastOverlay } from "@/components/story-hub/ProtagonistCastOverlay";
+import { ProtagonistVisitCard } from "@/components/story-hub/ProtagonistVisitCard";
 import { type CharacterRow } from "@/lib/db/stories";
 import {
   DEFAULT_QWEN_VOICE_MAP,
@@ -25,6 +27,11 @@ import {
 } from "@/lib/tts/qwenVoiceProfiles";
 import { isQwenTtsMode } from "@/lib/tts/qwenTtsMode";
 import { updateStorySettings } from "@/lib/db/stories";
+import {
+  needsProtagonistSetup,
+  PROTAGONIST_SPEAKER_SLUG,
+  protagonistDisplayLabel,
+} from "@/lib/story/protagonist";
 
 function voiceOptionsForEngine(engine: LocalTtsEngine) {
   if (engine === "qwen") {
@@ -112,16 +119,22 @@ export function CastHubPanel({
   const [qwenProfiles, setQwenProfiles] = useState<
     Record<string, QwenVoiceProfile>
   >(() =>
-    buildQwenProfilesFromSettings(
-      storySettings,
-      cast.map((c) => c.slug),
-    ),
+    buildQwenProfilesFromSettings(storySettings, castSlugsForVoices),
   );
   const [qwenSceneInstruct, setQwenSceneInstruct] = useState(
     storySettings.qwenSceneInstructEnabled !== false,
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [protagonistOpen, setProtagonistOpen] = useState(false);
   const [discoverOpen, setDiscoverOpen] = useState(false);
+
+  const castSlugsForVoices = useMemo(
+    () => [
+      PROTAGONIST_SPEAKER_SLUG,
+      ...cast.map((c) => c.slug),
+    ],
+    [cast],
+  );
   const voiceEditsDirtyRef = useRef(false);
 
   const engine: LocalTtsEngine =
@@ -173,10 +186,7 @@ export function CastHubPanel({
       storySettings.voiceEnabledSlugs ?? defaultEnabledCastSlugs(cast),
     );
     setQwenProfiles(
-      buildQwenProfilesFromSettings(
-        storySettings,
-        cast.map((c) => c.slug),
-      ),
+      buildQwenProfilesFromSettings(storySettings, castSlugsForVoices),
     );
     setQwenSceneInstruct(storySettings.qwenSceneInstructEnabled !== false);
   }, [
@@ -185,7 +195,7 @@ export function CastHubPanel({
     serverQwenProfilesKey,
     storyLocale,
     ttsProvider,
-    cast,
+    castSlugsForVoices,
     storySettings,
   ]);
 
@@ -209,9 +219,28 @@ export function CastHubPanel({
   const fallback = fallbackVoice(ttsProvider, engine);
 
   const selected = characters.find((c) => c.id === selectedId) ?? null;
+  const narratorCharacter = characters.find((c) => c.role === "narrator");
+  const castCharacters = characters.filter((c) => c.role === "cast");
+
+  const protagonistLabel = protagonistDisplayLabel(storySettings, storyLocale);
+  const protagonistNeedsSetup = needsProtagonistSetup(storySettings);
+  const protagonistVoiceLabel = shortVoiceLabel(
+    PROTAGONIST_SPEAKER_SLUG,
+    voiceMap,
+    defaults,
+    fallback,
+    ttsProvider,
+    engine,
+  );
 
   const openCharacter = useCallback((id: string) => {
+    setProtagonistOpen(false);
     setSelectedId(id);
+  }, []);
+
+  const openProtagonist = useCallback(() => {
+    setSelectedId(null);
+    setProtagonistOpen(true);
   }, []);
 
   const handleImported = (characterId: string) => {
@@ -220,10 +249,78 @@ export function CastHubPanel({
     setSelectedId(characterId);
   };
 
+  const renderCastCard = (c: (typeof characters)[number]) => {
+    const isNarrator = c.role === "narrator";
+    const archived = c.status === "archived";
+    const voiceDisabled =
+      !isNarrator && !voiceEnabledSlugs.includes(c.slug);
+    const voiceLabel = voiceDisabled
+      ? "Erzähler"
+      : shortVoiceLabel(
+          c.slug,
+          voiceMap,
+          defaults,
+          fallback,
+          ttsProvider,
+          engine,
+        );
+
+    return (
+      <CastVisitCard
+        key={c.id}
+        character={c}
+        archived={archived}
+        isNarrator={isNarrator}
+        voiceLabel={voiceLabel}
+        onClick={() => openCharacter(c.id)}
+      />
+    );
+  };
+
+  const protagonistOverlay = (
+    <ProtagonistCastOverlay
+      open={protagonistOpen}
+      onClose={() => setProtagonistOpen(false)}
+      storyId={storyId}
+      storyLocale={storyLocale}
+      storySettings={storySettings}
+      ttsProvider={ttsProvider}
+      localEngine={engine}
+      voiceOptions={voiceOptions}
+      defaults={defaults}
+      fallback={fallback}
+      voiceMap={voiceMap}
+      qwenMode={qwen}
+      qwenProfile={qwenProfiles[PROTAGONIST_SPEAKER_SLUG]}
+      onVoiceMapChange={setVoiceMapTracked}
+      onQwenProfileChange={(slug, profile) => {
+        voiceEditsDirtyRef.current = true;
+        setQwenProfiles((prev) => ({ ...prev, [slug]: profile }));
+        setVoiceMap((prev) => ({
+          ...prev,
+          [slug]: profile.presetSpeaker ?? prev[slug],
+        }));
+      }}
+      qwenProfiles={qwenProfiles}
+      qwenSceneInstruct={qwenSceneInstruct}
+      voiceEnabledSlugs={voiceEnabledSlugs}
+      onSaved={handleCastSaved}
+    />
+  );
+
   if (!characters.length) {
     return (
       <div className="flex flex-col gap-3">
-        <p className="text-[11px] text-zinc-500">Noch kein Cast.</p>
+        <div className="grid grid-cols-2 gap-2 sm:max-w-xs">
+          <ProtagonistVisitCard
+            displayName={protagonistLabel}
+            needsSetup={protagonistNeedsSetup}
+            locale={storyLocale}
+            voiceLabel={protagonistVoiceLabel}
+            onClick={openProtagonist}
+          />
+        </div>
+        <p className="text-[11px] text-zinc-500">Noch kein NPC-Cast.</p>
         <button
           type="button"
           onClick={() => setDiscoverOpen(true)}
@@ -231,6 +328,7 @@ export function CastHubPanel({
         >
           Aus Story holen
         </button>
+        {protagonistOverlay}
         <CastDiscoverOverlay
           open={discoverOpen}
           onClose={() => setDiscoverOpen(false)}
@@ -254,18 +352,14 @@ export function CastHubPanel({
           <Link href="/settings" className="text-accent underline">
             TTS
           </Link>
-          {qwen ? (
-            <>
-              {" "}
-              ·{" "}
-              <Link
-                href={`/story/${storyId}/voices`}
-                className="text-accent underline"
-              >
-                alle Stimmen
-              </Link>
-            </>
-          ) : null}
+          {" "}
+          ·{" "}
+          <Link
+            href={`/story/${storyId}/voices`}
+            className="text-accent underline"
+          >
+            {storyLocale === "de" ? "alle Stimmen" : "all voices"}
+          </Link>
         </p>
         <button
           type="button"
@@ -301,34 +395,18 @@ export function CastHubPanel({
       ) : null}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {characters.map((c) => {
-          const isNarrator = c.role === "narrator";
-          const archived = c.status === "archived";
-          const voiceDisabled =
-            !isNarrator && !voiceEnabledSlugs.includes(c.slug);
-          const voiceLabel = voiceDisabled
-            ? "Erzähler"
-            : shortVoiceLabel(
-                c.slug,
-                voiceMap,
-                defaults,
-                fallback,
-                ttsProvider,
-                engine,
-              );
-
-          return (
-            <CastVisitCard
-              key={c.id}
-              character={c}
-              archived={archived}
-              isNarrator={isNarrator}
-              voiceLabel={voiceLabel}
-              onClick={() => openCharacter(c.id)}
-            />
-          );
-        })}
+        {narratorCharacter ? renderCastCard(narratorCharacter) : null}
+        <ProtagonistVisitCard
+          displayName={protagonistLabel}
+          needsSetup={protagonistNeedsSetup}
+          locale={storyLocale}
+          voiceLabel={protagonistVoiceLabel}
+          onClick={openProtagonist}
+        />
+        {castCharacters.map((c) => renderCastCard(c))}
       </div>
+
+      {protagonistOverlay}
 
       <CastCharacterOverlay
         open={selectedId !== null}

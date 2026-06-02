@@ -1,4 +1,5 @@
 import type { QwenVoiceProfile, StorySettings } from "@/lib/types";
+import { PROTAGONIST_SPEAKER_SLUG } from "@/lib/story/protagonist";
 import { DEFAULT_QWEN_VOICE_MAP } from "@/lib/tts/defaultVoiceMap";
 import type { TtsProvider } from "@/lib/storage/ttsSettings";
 import { defaultCharacterInstruct } from "@/lib/tts/qwenInstructPresets";
@@ -39,7 +40,13 @@ export function buildQwenProfilesFromSettings(
   castSlugs: string[],
 ): Record<string, QwenVoiceProfile> {
   const out: Record<string, QwenVoiceProfile> = {};
-  const slugs = ["narrator", ...castSlugs.filter((s) => s !== "narrator")];
+  const slugs = [
+    "narrator",
+    PROTAGONIST_SPEAKER_SLUG,
+    ...castSlugs.filter(
+      (s) => s !== "narrator" && s !== PROTAGONIST_SPEAKER_SLUG,
+    ),
+  ];
   for (const slug of slugs) {
     const existing = settings?.qwenVoiceProfiles?.[slug];
     const fromMap = settings?.voiceMap?.[slug];

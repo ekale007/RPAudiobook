@@ -92,8 +92,8 @@ export function ProtagonistSetupModal({
     >
       <p className="mb-4 text-sm text-zinc-400">
         {locale === "de"
-          ? "Name und Anrede für deine Dialogzeilen. Die Erzähler-Stimme bleibt getrennt — du kannst sie unter Cast anpassen."
-          : "Name and address for your spoken lines. Narrator voice stays separate — adjust it under Cast."}
+          ? "Name und Anrede für deine Dialogzeilen. Stimme danach im Story-Hub unter Cast auf der Karte „Protagonist“."
+          : "Name and address for your spoken lines. Set your voice afterward in Story hub → Cast on the Protagonist card."}
       </p>
 
       <label className="mb-3 block text-xs text-zinc-400">

@@ -30,7 +30,10 @@ import {
 } from "@/lib/tts/qwenVoiceProfiles";
 import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
 import { defaultEnabledCastSlugs } from "@/lib/tts/voiceActivation";
-import { PROTAGONIST_SPEAKER_SLUG } from "@/lib/story/protagonist";
+import {
+  PROTAGONIST_SPEAKER_SLUG,
+  protagonistDisplayLabel,
+} from "@/lib/story/protagonist";
 import { normalizeStoryLocale } from "@/lib/tts/ttsLocaleRouting";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
 import type { QwenVoiceProfile, VoiceMap } from "@/lib/types";
@@ -87,7 +90,7 @@ export default function StoryVoicesPage() {
   const [storyLocale, setStoryLocale] = useState<"de" | "en">("de");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [protagonistLabel, setProtagonistLabel] = useState("Protagonist");
+  const [protagonistLabel, setProtagonistLabel] = useState("Protagonist (du)");
   const [expandedSlug, setExpandedSlug] = useState<string | null>("narrator");
 
   useEffect(() => {
@@ -131,10 +134,7 @@ export default function StoryVoicesPage() {
               settings.voiceEnabledSlugs ??
                 defaultEnabledCastSlugs(castRows),
             );
-            setProtagonistLabel(
-              settings.protagonist?.displayName?.trim() ||
-                (locale === "de" ? "Protagonist (du)" : "Protagonist (you)"),
-            );
+            setProtagonistLabel(protagonistDisplayLabel(settings, locale));
           })
           .catch((e) => setError(String(e)));
       });
@@ -225,7 +225,13 @@ export default function StoryVoicesPage() {
       <AppHeader title="Figuren-Stimmen" backHref={`/story/${storyId}`} />
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-3">
         <p className="text-[11px] leading-snug text-zinc-500">
-          {engineLabel} pro Sprecher ·{" "}
+          {engineLabel} pro Sprecher — inkl.{" "}
+          <strong className="text-zinc-400">Protagonist (du)</strong> unter Erzähler.
+          Gleiche Karte auch im{" "}
+          <Link href={`/story/${storyId}`} className="text-accent underline">
+            Story-Hub → Cast
+          </Link>
+          . ·{" "}
           <Link href="/settings" className="text-accent underline">
             Engine
           </Link>

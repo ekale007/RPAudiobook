@@ -19,6 +19,16 @@ export function needsProtagonistSetup(settings: StorySettings): boolean {
   return !settings.protagonist?.displayName?.trim();
 }
 
+export function protagonistDisplayLabel(
+  settings: StorySettings,
+  locale: StoryContentLocale,
+): string {
+  return (
+    settings.protagonist?.displayName?.trim() ||
+    (locale === "de" ? "Protagonist (du)" : "Protagonist (you)")
+  );
+}
+
 export function defaultProtagonistProfile(
   locale: StoryContentLocale,
 ): StoryProtagonistProfile {
