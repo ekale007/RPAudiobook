@@ -23,6 +23,8 @@ export function MobileCollapsibleTools({
   defaultOpen = false,
   activityLabel,
   onActivityCancel,
+  onActivityPause,
+  activityPauseLabel = "Pause",
 }: {
   title: string;
   hint?: string;
@@ -30,6 +32,8 @@ export function MobileCollapsibleTools({
   defaultOpen?: boolean;
   activityLabel?: string | null;
   onActivityCancel?: () => void;
+  onActivityPause?: () => void;
+  activityPauseLabel?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const active = Boolean(activityLabel?.trim());
@@ -62,15 +66,26 @@ export function MobileCollapsibleTools({
               {open ? "▲" : "▼"}
             </span>
           </button>
-          {onActivityCancel ? (
-            <button
-              type="button"
-              onClick={onActivityCancel}
-              className="shrink-0 rounded-lg border border-surface-border px-2.5 py-1 text-xs text-zinc-300 hover:border-red-400/50 hover:text-red-300"
-            >
-              Abbrechen
-            </button>
-          ) : null}
+          <div className="flex shrink-0 items-center gap-1.5">
+            {onActivityPause ? (
+              <button
+                type="button"
+                onClick={onActivityPause}
+                className="rounded-lg border border-surface-border px-2.5 py-1 text-xs text-zinc-300 hover:border-accent/40 hover:text-accent"
+              >
+                {activityPauseLabel}
+              </button>
+            ) : null}
+            {onActivityCancel ? (
+              <button
+                type="button"
+                onClick={onActivityCancel}
+                className="rounded-lg border border-surface-border px-2.5 py-1 text-xs text-zinc-300 hover:border-red-400/50 hover:text-red-300"
+              >
+                Abbrechen
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : (
         <button

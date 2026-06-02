@@ -168,9 +168,13 @@ export function ChatView({
   const autoPlayRemainingRef = useRef(0);
   const autoChapterBusyRef = useRef(false);
   const autoSessionRef = useRef(false);
+  const autoSessionStopRef = useRef(false);
+  const drivePausedRef = useRef(false);
   const [autoLeft, setAutoLeft] = useState(0);
   const [autoTotal, setAutoTotal] = useState(0);
   const [autoSession, setAutoSession] = useState(false);
+  const [drivePaused, setDrivePaused] = useState(false);
+  const [driveEndsAt, setDriveEndsAt] = useState<number | null>(null);
 
   useEffect(() => {
     autoSessionRef.current = autoSession;
@@ -812,6 +816,10 @@ export function ChatView({
   };
 
   const cancelWork = useCallback(() => {
+    autoSessionStopRef.current = true;
+    drivePausedRef.current = false;
+    setDrivePaused(false);
+    setDriveEndsAt(null);
     autoPlayRemainingRef.current = 0;
     setAutoLeft(0);
     setAutoTotal(0);
@@ -824,6 +832,29 @@ export function ChatView({
     setGenerating(false);
     setBeatsLoading(false);
   }, [stopTtsAutoplay]);
+
+  const cancelAutoSession = useCallback(() => {
+    cancelWork();
+  }, [cancelWork]);
+
+  const pauseDriveMode = useCallback(() => {
+    drivePausedRef.current = true;
+    setDrivePaused(true);
+    stopTtsAutoplay();
+  }, [stopTtsAutoplay]);
+
+  const resumeDriveMode = useCallback(() => {
+    drivePausedRef.current = false;
+    setDrivePaused(false);
+  }, []);
+
+  const waitWhileDrivePaused = useCallback(async () => {
+    while (drivePausedRef.current && !autoSessionStopRef.current) {
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 250);
+      });
+    }
+  }, []);
 
   const sendMessage = async () => {
     const text = input.trim();
@@ -994,6 +1025,9 @@ export function ChatView({
 
     ensureTtsAutoplayForSession();
     setBeatOptions(null);
+    autoSessionStopRef.current = false;
+    drivePausedRef.current = false;
+    setDrivePaused(false);
     setAutoSession(true);
     setAutoTotal(0);
     autoPlayRemainingRef.current = 0;
@@ -1001,37 +1035,52 @@ export function ChatView({
     setError(null);
 
     const endAt = Date.now() + minutes * 60 * 1000;
+    setDriveEndsAt(endAt);
     let history = turns;
     let prefetched: Promise<DrivePrefetchResult> | null = null;
 
     try {
-      while (Date.now() < endAt) {
+      while (Date.now() < endAt && !autoSessionStopRef.current) {
+        await waitWhileDrivePaused();
+        if (autoSessionStopRef.current) break;
+
         if (prefetched) {
           const result = await prefetched;
           prefetched = null;
-          if (!result.ok) break;
+          if (!result.ok || autoSessionStopRef.current) break;
           history = result.history;
         } else {
           const ok = await runGeneration(history, {
             continuation: true,
             continuationPrompt: autoContinuePrompt(),
           });
-          if (!ok) break;
+          if (!ok || autoSessionStopRef.current) break;
           history = await getTurns(chapterId);
           setTurns(history);
           await prewarmDriveTtsAwait(history);
         }
 
-        if (Date.now() < endAt) {
+        if (autoSessionStopRef.current) break;
+        await waitWhileDrivePaused();
+        if (autoSessionStopRef.current) break;
+
+        if (Date.now() < endAt && !autoSessionStopRef.current) {
           prefetched = prefetchDriveTurn(history);
         }
 
         const ttsResult = await waitForLatestAssistantTts(history, {
           forDrive: true,
         });
+        if (autoSessionStopRef.current) break;
         if (!handleDriveTtsResult(ttsResult)) break;
+
+        await waitWhileDrivePaused();
       }
     } finally {
+      autoSessionStopRef.current = false;
+      drivePausedRef.current = false;
+      setDrivePaused(false);
+      setDriveEndsAt(null);
       setAutoSession(false);
       stopAudioSession();
     }
@@ -1049,8 +1098,13 @@ export function ChatView({
 
     let history = turns;
 
+    autoSessionStopRef.current = false;
+
     try {
-      while (autoPlayRemainingRef.current > 0) {
+      while (
+        autoPlayRemainingRef.current > 0 &&
+        !autoSessionStopRef.current
+      ) {
         const ok = await runGeneration(history, {
           continuation: true,
           continuationPrompt: defaultContinuePrompt(),
@@ -1064,6 +1118,7 @@ export function ChatView({
         setAutoLeft(autoPlayRemainingRef.current);
       }
     } finally {
+      autoSessionStopRef.current = false;
       autoPlayRemainingRef.current = 0;
       setAutoLeft(0);
       setAutoTotal(0);
@@ -1184,21 +1239,60 @@ export function ChatView({
   };
 
   const toolsActivity = useMemo(() => {
+    const isDriveSession = autoSession && autoTotal === 0;
+    const driveMinutesLeft =
+      driveEndsAt != null
+        ? Math.max(0, Math.ceil((driveEndsAt - Date.now()) / 60_000))
+        : null;
+    const driveTimeSuffix =
+      driveMinutesLeft != null && driveMinutesLeft > 0
+        ? ` · noch ~${driveMinutesLeft} Min`
+        : "";
+    const driveBaseLabel = drivePaused
+      ? `Fahrmodus pausiert${driveTimeSuffix}`
+      : `Fahrmodus${driveTimeSuffix}`;
+    const driveControls = isDriveSession
+      ? {
+          onCancel: cancelAutoSession,
+          onPause: drivePaused ? resumeDriveMode : pauseDriveMode,
+          pauseLabel: drivePaused ? "Weiter" : "Pause",
+        }
+      : {};
+
     if (generating) {
       return {
         label:
           autoTotal > 0
             ? `Erzähler schreibt – noch ${autoLeft} von ${autoTotal} …`
-            : ttsQueueActive
-              ? "Geschichte wird geschrieben · TTS läuft …"
-              : "Geschichte wird geschrieben …",
-        onCancel: cancelWork,
+            : isDriveSession
+              ? `${driveBaseLabel} · schreibt …`
+              : ttsQueueActive
+                ? "Geschichte wird geschrieben · TTS läuft …"
+                : "Geschichte wird geschrieben …",
+        onCancel: isDriveSession ? cancelAutoSession : cancelWork,
+        ...driveControls,
       };
     }
     if (ttsQueueActive && !beatsLoading) {
       return {
-        label: "TTS wird abgespielt …",
-        onCancel: stopTtsAutoplay,
+        label: isDriveSession
+          ? `${driveBaseLabel} · Vorlesen …`
+          : "TTS wird abgespielt …",
+        onCancel: isDriveSession ? cancelAutoSession : stopTtsAutoplay,
+        ...driveControls,
+      };
+    }
+    if (isDriveSession) {
+      return {
+        label: driveBaseLabel,
+        onCancel: cancelAutoSession,
+        ...driveControls,
+      };
+    }
+    if (autoSession && autoTotal > 0) {
+      return {
+        label: `Erzähler-Serie · noch ${autoLeft} von ${autoTotal}`,
+        onCancel: cancelAutoSession,
       };
     }
     if (beatsLoading) {
@@ -1210,11 +1304,17 @@ export function ChatView({
     return null;
   }, [
     generating,
+    autoSession,
     autoTotal,
     autoLeft,
+    driveEndsAt,
+    drivePaused,
     ttsQueueActive,
     beatsLoading,
     cancelWork,
+    cancelAutoSession,
+    pauseDriveMode,
+    resumeDriveMode,
     stopTtsAutoplay,
   ]);
 
@@ -1321,6 +1421,8 @@ export function ChatView({
           }
           activityLabel={toolsActivity?.label}
           onActivityCancel={toolsActivity?.onCancel}
+          onActivityPause={toolsActivity?.onPause}
+          activityPauseLabel={toolsActivity?.pauseLabel}
         >
           <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
             {ttsCloudQuota ? (
