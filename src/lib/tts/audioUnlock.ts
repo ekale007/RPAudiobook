@@ -1,3 +1,8 @@
+import {
+  requestScreenWakeLock,
+  releaseScreenWakeLock,
+} from "@/lib/tts/screenWakeLock";
+
 /** Tiny silent WAV — unlocks mobile autoplay for chained clips in one tap session. */
 const SILENT_WAV =
   "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
@@ -29,6 +34,7 @@ export function unlockAudioForAutoplay(): void {
 export function startAudioSession(): void {
   if (typeof window === "undefined") return;
   unlockAudioForAutoplay();
+  void requestScreenWakeLock();
   try {
     if (!sessionKeepalive) {
       sessionKeepalive = new Audio(SILENT_WAV);
@@ -45,11 +51,15 @@ export function startAudioSession(): void {
 }
 
 export function stopAudioSession(): void {
-  if (!sessionKeepalive) return;
+  if (!sessionKeepalive) {
+    void releaseScreenWakeLock();
+    return;
+  }
   try {
     sessionKeepalive.pause();
     sessionKeepalive.currentTime = 0;
   } catch {
     /* ignore */
   }
+  void releaseScreenWakeLock();
 }

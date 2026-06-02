@@ -1,8 +1,7 @@
 import type { MessageAudioPlayerHandle } from "@/lib/tts/messageAudioPlayerHandle";
 import { isAutoplayBlockedError } from "@/lib/tts/autoplayPolicy";
-
-const PLAYER_WAIT_MS = 4000;
-const DRIVE_PLAYER_WAIT_MS = 20000;
+import { unlockAudioForAutoplay } from "@/lib/tts/audioUnlock";
+import { ttsPlayerWaitMs } from "@/lib/tts/mobilePlayback";
 const PLAYER_POLL_MS = 50;
 const PREWARM_AHEAD = 4;
 
@@ -14,6 +13,16 @@ export class TtsAutoplayQueue {
   private draining = false;
   private stopped = false;
   private preparing = new Set<string>();
+  private onAutoplayBlocked: ((turnId: string) => void) | null = null;
+  private onAutoplayCleared: (() => void) | null = null;
+
+  setAutoplayBlockedHandler(handler: ((turnId: string) => void) | null) {
+    this.onAutoplayBlocked = handler;
+  }
+
+  setAutoplayClearedHandler(handler: (() => void) | null) {
+    this.onAutoplayCleared = handler;
+  }
 
   register(turnId: string, handle: MessageAudioPlayerHandle | null) {
     if (handle) this.players.set(turnId, handle);
@@ -101,12 +110,14 @@ export class TtsAutoplayQueue {
     this.stopped = false;
     const player = await this.waitForPlayer(
       turnId,
-      options?.playerWaitMs ?? PLAYER_WAIT_MS,
+      options?.playerWaitMs ?? ttsPlayerWaitMs(),
     );
     if (!player) return "no-player";
     try {
+      unlockAudioForAutoplay();
       await player.prepare().catch(() => undefined);
       await player.play();
+      this.onAutoplayCleared?.();
       return "ok";
     } catch (error) {
       if (isAutoplayBlockedError(error)) return "blocked";
@@ -116,7 +127,9 @@ export class TtsAutoplayQueue {
 
   /** Drive mode: longer wait for React mount + TTS fetch after each new turn. */
   async playTurnAndWaitForDrive(turnId: string) {
-    return this.playTurnAndWait(turnId, { playerWaitMs: DRIVE_PLAYER_WAIT_MS });
+    return this.playTurnAndWait(turnId, {
+      playerWaitMs: ttsPlayerWaitMs({ forDrive: true }),
+    });
   }
 
   /** Play one turn without stopping other players (preserves prefetched audio). */
@@ -125,7 +138,9 @@ export class TtsAutoplayQueue {
     for (const [id, player] of this.players) {
       if (id !== turnId) player.pause();
     }
-    return this.playTurnAndWait(turnId, { playerWaitMs: DRIVE_PLAYER_WAIT_MS });
+    return this.playTurnAndWait(turnId, {
+      playerWaitMs: ttsPlayerWaitMs({ forDrive: true }),
+    });
   }
 
   /** Fetch TTS audio ahead of playback (e.g. while previous clip plays). */
@@ -136,7 +151,7 @@ export class TtsAutoplayQueue {
     this.stopped = false;
     const player = await this.waitForPlayer(
       turnId,
-      options?.playerWaitMs ?? PLAYER_WAIT_MS,
+      options?.playerWaitMs ?? ttsPlayerWaitMs(),
     );
     if (!player) return false;
     try {
@@ -179,7 +194,7 @@ export class TtsAutoplayQueue {
 
   private async waitForPlayer(
     turnId: string,
-    maxMs = PLAYER_WAIT_MS,
+    maxMs = ttsPlayerWaitMs(),
   ): Promise<MessageAudioPlayerHandle | null> {
     const deadline = Date.now() + maxMs;
     while (Date.now() < deadline && !this.stopped) {
@@ -210,10 +225,14 @@ export class TtsAutoplayQueue {
       this.queue.shift();
       this.notifyQueue();
       try {
+        unlockAudioForAutoplay();
+        await player.prepare().catch(() => undefined);
         await player.play();
+        this.onAutoplayCleared?.();
       } catch (error) {
         if (isAutoplayBlockedError(error)) {
           this.queue.unshift(turnId);
+          this.onAutoplayBlocked?.(turnId);
           break;
         }
         /* skip other failed clips */

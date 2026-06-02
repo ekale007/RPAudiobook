@@ -75,7 +75,9 @@ import { isTtsReady, loadTtsSettings } from "@/lib/storage/ttsSettings";
 import { subscribeServerCapabilities } from "@/lib/server/serverCapabilities";
 import type { MessageAudioPlayerHandle } from "@/lib/tts/messageAudioPlayerHandle";
 import { TtsAutoplayQueue } from "@/lib/tts/ttsAutoplayQueue";
+import { ttsPlayerWaitMs } from "@/lib/tts/mobilePlayback";
 import { unlockAudioForAutoplay, startAudioSession, stopAudioSession } from "@/lib/tts/audioUnlock";
+import { TtsMobileUnlockBar } from "@/components/TtsMobileUnlockBar";
 import { saveTtsAutoplay } from "@/lib/storage/ttsPlaybackSettings";
 import { ChatScrollPane } from "@/components/ChatScrollPane";
 import Link from "next/link";
@@ -179,6 +181,7 @@ export function ChatView({
   const [ttsQueueActive, setTtsQueueActive] = useState(false);
   const [ttsPlayingTurnId, setTtsPlayingTurnId] = useState<string | null>(null);
   const [ttsQueuedTurnIds, setTtsQueuedTurnIds] = useState<string[]>([]);
+  const [ttsBlockedTurnId, setTtsBlockedTurnId] = useState<string | null>(null);
   const [copiedChatDebug, setCopiedChatDebug] = useState(false);
   const bubbleRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const chatScrollRef = useRef<HTMLDivElement>(null);
@@ -197,10 +200,14 @@ export function ChatView({
     const queue = ttsQueueRef.current;
     const unsubActive = queue.subscribe(setTtsQueueActive);
     const unsubQueue = queue.subscribeQueue(setTtsQueuedTurnIds);
+    queue.setAutoplayBlockedHandler((turnId) => setTtsBlockedTurnId(turnId));
+    queue.setAutoplayClearedHandler(() => setTtsBlockedTurnId(null));
     return () => {
       unsubCaps();
       unsubActive();
       unsubQueue();
+      queue.setAutoplayBlockedHandler(null);
+      queue.setAutoplayClearedHandler(null);
     };
   }, []);
 
@@ -224,6 +231,16 @@ export function ChatView({
   useEffect(() => {
     ttsQueueRef.current.setAssistantTurnOrder(assistantTurnIds);
   }, [assistantTurnIds]);
+
+  const resumeBlockedTts = useCallback(() => {
+    unlockAudioForAutoplay();
+    startAudioSession();
+    const blocked = ttsBlockedTurnId;
+    setTtsBlockedTurnId(null);
+    if (blocked) {
+      ttsQueueRef.current.playFrom(blocked, assistantTurnIds);
+    }
+  }, [ttsBlockedTurnId, assistantTurnIds]);
 
   const requestTtsChainPlay = useCallback(
     (turnId: string) => {
@@ -900,7 +917,7 @@ export function ChatView({
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
     });
     await ttsQueueRef.current.prepareTurn(latest.id, {
-      playerWaitMs: 20_000,
+      playerWaitMs: ttsPlayerWaitMs({ forDrive: true }),
     });
   };
 
@@ -1181,8 +1198,15 @@ export function ChatView({
     stopTtsAutoplay,
   ]);
 
+  const chapterLabel = chapterTitle ?? chapter.title;
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div
+      className="flex min-h-0 flex-1 flex-col"
+      onPointerDownCapture={() => {
+        if (hasTts) unlockAudioForAutoplay();
+      }}
+    >
       <div className="relative min-h-0 flex-1">
         <BubbleNavArrows
           count={turns.length}
@@ -1236,6 +1260,7 @@ export function ChatView({
                 navFocused={bubbleFocusIndex === index}
                 storyLocale={storyLocale}
                 storySettings={ttsStorySettings}
+                chapterTitle={chapterLabel}
                 showDialogueMarkup
               />
             </div>
@@ -1254,6 +1279,10 @@ export function ChatView({
 
       {error ? (
         <p className="px-4 pb-2 text-center text-sm text-red-400">{error}</p>
+      ) : null}
+
+      {ttsBlockedTurnId && hasTts ? (
+        <TtsMobileUnlockBar onResume={resumeBlockedTts} />
       ) : null}
 
       <div className="safe-bottom border-t border-surface-border bg-surface px-3 py-3">

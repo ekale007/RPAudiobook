@@ -51,6 +51,11 @@ import {
   isAutoplayBlockedError,
 } from "@/lib/tts/autoplayPolicy";
 import { unlockAudioForAutoplay } from "@/lib/tts/audioUnlock";
+import {
+  audioFilenameForTurn,
+  downloadBlob,
+} from "@/lib/audio/downloadBlob";
+import { saveTurnAudioToDevice } from "@/lib/audio/saveTurnAudio";
 
 type Status = "idle" | "loading" | "ready" | "playing" | "paused" | "error";
 
@@ -76,6 +81,7 @@ export const MessageAudioPlayer = forwardRef<
     onPlaybackActiveChange?: (active: boolean) => void;
     storyLocale?: string;
     storySettings?: StorySettings;
+    chapterTitle?: string | null;
   }
 >(function MessageAudioPlayer(
   {
@@ -94,10 +100,12 @@ export const MessageAudioPlayer = forwardRef<
     onPlaybackActiveChange,
     storyLocale,
     storySettings,
+    chapterTitle,
   },
   ref,
 ) {
   const [status, setStatus] = useState<Status>("idle");
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
@@ -112,6 +120,7 @@ export const MessageAudioPlayer = forwardRef<
   );
   const tickRef = useRef<number | null>(null);
   const playEndRef = useRef<(() => void) | null>(null);
+  const blobRef = useRef<Blob | null>(null);
 
   const cleanupUrl = useCallback(() => {
     if (objectUrlRef.current) {
@@ -192,6 +201,7 @@ export const MessageAudioPlayer = forwardRef<
     setAutoplayBlocked(false);
     setCurrentTime(0);
     setDuration(0);
+    blobRef.current = null;
   }, [turnId, text, rawContent, cleanupUrl]);
 
   const attachAudio = (audio: HTMLAudioElement) => {
@@ -330,6 +340,7 @@ export const MessageAudioPlayer = forwardRef<
         }
       }
 
+      blobRef.current = blob;
       cleanupUrl();
       const url = URL.createObjectURL(blob);
       objectUrlRef.current = url;
@@ -404,6 +415,7 @@ export const MessageAudioPlayer = forwardRef<
   };
 
   const play = async (): Promise<void> => {
+    unlockAudioForAutoplay();
     const audio = await ensureAudio();
     if (!audio) {
       throw new Error("Audio nicht verfügbar");
@@ -484,12 +496,44 @@ export const MessageAudioPlayer = forwardRef<
     }
   };
 
+  const saveToDevice = async () => {
+    if (saving) return;
+    setSaving(true);
+    unlockAudioForAutoplay();
+    try {
+      if (blobRef.current) {
+        downloadBlob(
+          blobRef.current,
+          audioFilenameForTurn(turnId, chapterTitle),
+        );
+        return;
+      }
+      const result = await saveTurnAudioToDevice({
+        turnId,
+        text,
+        rawContent,
+        audioStoragePath,
+        speakerSlug,
+        voiceMap,
+        voiceEnabledSlugs,
+        cast,
+        storyLocale,
+        storySettings,
+        chapterTitle,
+      });
+      if (!result.ok) setError(result.error ?? "Speichern fehlgeschlagen");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const resetPlayback = () => {
     finishPlayWait();
     stopTick();
     audioRef.current?.pause();
     if (audioRef.current) audioRef.current.currentTime = 0;
     cleanupUrl();
+    blobRef.current = null;
     audioRef.current = null;
     setStatus("idle");
     setCurrentTime(0);
@@ -557,7 +601,7 @@ export const MessageAudioPlayer = forwardRef<
           type="button"
           onClick={togglePlay}
           disabled={status === "loading"}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/20 text-xs text-accent disabled:opacity-50"
+          className="touch-target flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent/20 text-sm text-accent disabled:opacity-50"
           aria-label={
             status === "playing" ? "Pause" : "Abspielen"
           }
@@ -577,6 +621,17 @@ export const MessageAudioPlayer = forwardRef<
                     ? "Bereit — Abspielen"
                     : "Anhören"}
         </span>
+        {status !== "loading" ? (
+          <button
+            type="button"
+            onClick={() => void saveToDevice()}
+            disabled={saving}
+            className="shrink-0 rounded px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 disabled:opacity-40"
+            title="MP3 auf Gerät speichern"
+          >
+            {saving ? "…" : "Speichern"}
+          </button>
+        ) : null}
         {showTransport ? (
           <button
             type="button"

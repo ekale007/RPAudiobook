@@ -1,12 +1,15 @@
 {
   "name": "HörbuchKI",
   "short_name": "HörbuchKI",
-  "description": "Interactive story roleplay",
+  "description": "Interaktives Hörspiel mit KI-Erzähler",
+  "lang": "de",
+  "scope": "/",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f0f12",
   "theme_color": "#0f0f12",
   "orientation": "portrait-primary",
+  "categories": ["entertainment", "books"],
   "icons": [
     {
       "src": "/icon.svg",

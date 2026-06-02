@@ -40,6 +40,7 @@ export function ChatTurnBubble({
   showDialogueMarkup = true,
   storyLocale,
   storySettings,
+  chapterTitle,
 }: {
   turn: TurnRow;
   cast: CharacterRow[];
@@ -64,6 +65,7 @@ export function ChatTurnBubble({
   showDialogueMarkup?: boolean;
   storyLocale?: string;
   storySettings?: StorySettings;
+  chapterTitle?: string | null;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(turn.content);
@@ -291,6 +293,7 @@ export function ChatTurnBubble({
             }
             storyLocale={storyLocale}
             storySettings={storySettings}
+            chapterTitle={chapterTitle}
           />
         ) : null}
 

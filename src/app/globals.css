@@ -32,6 +32,12 @@ body {
   padding-top: max(0.5rem, env(safe-area-inset-top));
 }
 
+.touch-target {
+  touch-action: manipulation;
+  min-height: 44px;
+  min-width: 44px;
+}
+
 .prose-chat {
   white-space: pre-wrap;
   word-break: break-word;

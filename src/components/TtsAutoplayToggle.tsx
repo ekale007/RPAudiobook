@@ -34,8 +34,9 @@ export function TtsAutoplayToggle({
     <button
       type="button"
       disabled={disabled}
+      onPointerDown={() => unlockAudioForAutoplay()}
       onClick={toggle}
-      className={`shrink-0 rounded-full border px-3 py-1 text-xs transition disabled:opacity-40 ${
+      className={`min-h-[44px] shrink-0 touch-manipulation rounded-full border px-3 py-1 text-xs transition disabled:opacity-40 ${
         enabled
           ? "border-accent/50 bg-accent/15 text-accent"
           : "border-surface-border text-zinc-400 hover:text-zinc-200"
