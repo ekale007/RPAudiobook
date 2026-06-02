@@ -617,6 +617,7 @@ export function ChatView({
     startIndex: number,
     history: TurnRow[],
     forceTtsEnqueue = false,
+    skipTtsEnqueue = false,
   ) => {
     await truncateTurnsFrom(chapterId, startIndex, storyId);
     const blocks = parseAssistantBlocks(full);
@@ -657,7 +658,9 @@ export function ChatView({
       })
       .catch(() => undefined);
 
-    enqueueNewAssistantTts(merged, forceTtsEnqueue);
+    if (!skipTtsEnqueue) {
+      enqueueNewAssistantTts(merged, forceTtsEnqueue);
+    }
     syncKnownTurns(merged);
 
     if (autoSessionRef.current) {
@@ -684,6 +687,8 @@ export function ChatView({
       forceTts?: boolean;
       /** Prefetch during drive/autoplay — no full-screen generating indicator. */
       background?: boolean;
+      /** Erzähler macht weiter / N× — keine TTS-Warteschlange, Autoplay nicht an. */
+      suppressTts?: boolean;
     } = {},
   ): Promise<boolean> => {
     const settings = loadOpenRouterSettings();
@@ -754,6 +759,7 @@ export function ChatView({
         startIndex,
         history,
         opts.forceTts ?? false,
+        opts.suppressTts ?? false,
       );
     } catch (e) {
       setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
@@ -876,6 +882,7 @@ export function ChatView({
     await runGeneration(turns, {
       continuation: true,
       continuationPrompt: defaultContinuePrompt(),
+      suppressTts: true,
     });
   };
 
@@ -993,10 +1000,10 @@ export function ChatView({
     }
   };
 
-  const runAutoPlay = async (total: AutoPlayTurnCount) => {
+  /** 2× / 3× / 5× — nur weitere Erzähler-Blasen, ohne TTS oder Autoplay-Toggle. */
+  const runMultiContinue = async (total: AutoPlayTurnCount) => {
     if (generating || readOnly || autoSession || !turns.length) return;
 
-    if (hasTts) ensureTtsAutoplayForSession();
     setBeatOptions(null);
     setAutoSession(true);
     setAutoTotal(total);
@@ -1004,48 +1011,18 @@ export function ChatView({
     setAutoLeft(total);
 
     let history = turns;
-    let prefetched: Promise<DrivePrefetchResult> | null = null;
 
     try {
       while (autoPlayRemainingRef.current > 0) {
-        if (prefetched) {
-          const result = await prefetched;
-          prefetched = null;
-          if (!result.ok) break;
-          history = result.history;
-        } else {
-          const ok = await runGeneration(history, {
-            continuation: true,
-            continuationPrompt: autoContinuePrompt(),
-          });
-          if (!ok) break;
-          history = await getTurns(chapterId);
-          setTurns(history);
-          if (hasTts) await prewarmDriveTtsAwait(history);
-        }
-
-        if (autoPlayRemainingRef.current > 1) {
-          prefetched = hasTts
-            ? prefetchDriveTurn(history)
-            : prefetchDriveLlm(history);
-        }
-
-        if (hasTts) {
-          const ttsResult = await waitForLatestAssistantTts(history, {
-            forDrive: true,
-          });
-          if (ttsResult === "blocked") {
-            setError(
-              "Vorlesen blockiert — ▶ bei der letzten Nachricht tippen, dann Autoplay fortsetzen.",
-            );
-            break;
-          }
-          if (ttsResult === "no-player") {
-            setError("Audio-Player nicht bereit — kurz warten oder ▶ antippen.");
-            break;
-          }
-        }
-
+        const ok = await runGeneration(history, {
+          continuation: true,
+          continuationPrompt: defaultContinuePrompt(),
+          suppressTts: true,
+          background: autoPlayRemainingRef.current < total,
+        });
+        if (!ok) break;
+        history = await getTurns(chapterId);
+        setTurns(history);
         autoPlayRemainingRef.current -= 1;
         setAutoLeft(autoPlayRemainingRef.current);
       }
@@ -1054,7 +1031,6 @@ export function ChatView({
       setAutoLeft(0);
       setAutoTotal(0);
       setAutoSession(false);
-      stopAudioSession();
     }
   };
 
@@ -1175,7 +1151,7 @@ export function ChatView({
       return {
         label:
           autoTotal > 0
-            ? `Automatisch – noch ${autoLeft} von ${autoTotal} …`
+            ? `Erzähler schreibt – noch ${autoLeft} von ${autoTotal} …`
             : ttsQueueActive
               ? "Geschichte wird geschrieben · TTS läuft …"
               : "Geschichte wird geschrieben …",
@@ -1356,7 +1332,7 @@ export function ChatView({
               onSelectBeat={playChosenBeat}
               onDismiss={requestBeatSuggestions}
               onQuickContinue={quickContinue}
-              onAutoPlay={runAutoPlay}
+              onAutoPlay={runMultiContinue}
             />
           </>
         ) : null}

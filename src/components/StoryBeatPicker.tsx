@@ -35,7 +35,7 @@ function NarratorContinueRow({
             disabled={disabled || loading}
             onClick={() => onAutoPlay(n)}
             className="flex h-full min-h-[42px] items-center rounded-lg border border-violet-400/25 px-2.5 text-xs font-medium text-violet-300/90 transition hover:border-violet-400/45 hover:bg-violet-500/10 disabled:opacity-40"
-            title={`${n} Szenen automatisch`}
+            title={`${n} Erzähler-Abschnitte schreiben (ohne Vorlesen)`}
           >
             {n}×
           </button>

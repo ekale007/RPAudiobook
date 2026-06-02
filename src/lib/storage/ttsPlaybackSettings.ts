@@ -43,7 +43,7 @@ export function formatAudioTime(seconds: number): string {
 export function loadTtsAutoplay(): boolean {
   if (typeof window === "undefined") return false;
   const raw = localStorage.getItem(AUTOPLAY_KEY);
-  if (raw === null) return true;
+  if (raw === null) return false;
   return raw === "1";
 }
 
