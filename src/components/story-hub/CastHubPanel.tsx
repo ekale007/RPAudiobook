@@ -100,6 +100,11 @@ export function CastHubPanel({
     [cast],
   );
 
+  const castSlugsForVoices = useMemo(
+    () => [PROTAGONIST_SPEAKER_SLUG, ...cast.map((c) => c.slug)],
+    [cast],
+  );
+
   const tts = loadTtsSettings();
   const [ttsProvider, setTtsProvider] = useState<TtsProvider>(tts.provider);
   const [localEngine, setLocalEngine] = useState<LocalTtsEngine>(
@@ -127,14 +132,6 @@ export function CastHubPanel({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [protagonistOpen, setProtagonistOpen] = useState(false);
   const [discoverOpen, setDiscoverOpen] = useState(false);
-
-  const castSlugsForVoices = useMemo(
-    () => [
-      PROTAGONIST_SPEAKER_SLUG,
-      ...cast.map((c) => c.slug),
-    ],
-    [cast],
-  );
   const voiceEditsDirtyRef = useRef(false);
 
   const engine: LocalTtsEngine =
