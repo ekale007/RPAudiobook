@@ -1,4 +1,9 @@
+import {
+  setTurnAudioPath,
+  uploadTurnAudio,
+} from "@/lib/db/ttsStorage";
 import { authFetch } from "@/lib/supabase/authFetch";
+import { createClient } from "@/lib/supabase/client";
 
 export type TtsStorageQuota = {
   used: number;
@@ -20,18 +25,15 @@ export type StoreTurnAudioResult = {
   error?: string;
 };
 
-/** Upload MP3 for a turn via server (quota + ownership enforced). */
+/** Server checks quota; MP3 uploads directly to Supabase (no Vercel body limit). */
 export async function storeTurnAudioToCloud(
   turnId: string,
   blob: Blob,
 ): Promise<StoreTurnAudioResult> {
-  const form = new FormData();
-  form.append("turnId", turnId);
-  form.append("audio", blob, `${turnId}.mp3`);
-
   const res = await authFetch("/api/tts/store", {
     method: "POST",
-    body: form,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ turnId }),
   });
 
   let body: { error?: string; path?: string; used?: number; max?: number } = {};
@@ -48,9 +50,34 @@ export async function storeTurnAudioToCloud(
     };
   }
 
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "Bitte einloggen." };
+  }
+
+  const path = await uploadTurnAudio(user.id, turnId, blob);
+  if (!path) {
+    return {
+      ok: false,
+      error: "Upload zu Supabase fehlgeschlagen — Storage-Bucket prüfen.",
+    };
+  }
+
+  try {
+    await setTurnAudioPath(turnId, path);
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Datenbank-Update fehlgeschlagen",
+    };
+  }
+
   return {
     ok: true,
-    path: body.path,
+    path: body.path ?? path,
     used: body.used,
     max: body.max,
   };
