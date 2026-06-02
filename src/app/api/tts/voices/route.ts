@@ -5,6 +5,7 @@ import {
 } from "@/lib/server/elevenLabsCatalog";
 import { getElevenLabsApiKey } from "@/lib/server/env";
 import { requireUser } from "@/lib/server/requireUser";
+import { ELEVEN_TTS_MODEL_OPTIONS } from "@/lib/tts/elevenLabsModels";
 
 /** Curated ElevenLabs voices with free preview_url (no synthesis credits). */
 export async function GET(req: Request) {
@@ -16,8 +17,8 @@ export async function GET(req: Request) {
       ? await getElevenLabsVoiceCatalog()
       : getElevenLabsVoiceCatalogStatic();
     return NextResponse.json(
-      { voices },
-      { headers: { "Cache-Control": "private, max-age=3600" } },
+      { voices, models: ELEVEN_TTS_MODEL_OPTIONS },
+      { headers: { "Cache-Control": "private, max-age=900" } },
     );
   } catch (e) {
     return NextResponse.json(

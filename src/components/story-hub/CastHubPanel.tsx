@@ -32,6 +32,7 @@ import {
   PROTAGONIST_SPEAKER_SLUG,
   protagonistDisplayLabel,
 } from "@/lib/story/protagonist";
+import { repairStoryElevenVoiceMap } from "@/lib/tts/elevenLabsCatalogClient";
 
 function voiceOptionsForEngine(engine: LocalTtsEngine) {
   if (engine === "qwen") {
@@ -132,7 +133,9 @@ export function CastHubPanel({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [protagonistOpen, setProtagonistOpen] = useState(false);
   const [discoverOpen, setDiscoverOpen] = useState(false);
+  const [voiceRepairNote, setVoiceRepairNote] = useState<string | null>(null);
   const voiceEditsDirtyRef = useRef(false);
+  const voiceRepairRanRef = useRef(false);
 
   const engine: LocalTtsEngine =
     ttsProvider === "qwen" || ttsProvider === "qwen-cloud"
@@ -173,6 +176,46 @@ export function CastHubPanel({
     window.addEventListener(PREFS_UPDATED_EVENT, onPrefs);
     return () => window.removeEventListener(PREFS_UPDATED_EVENT, onPrefs);
   }, []);
+
+  useEffect(() => {
+    if (ttsProvider !== "elevenlabs" || voiceRepairRanRef.current) return;
+    if (voiceEditsDirtyRef.current) return;
+    voiceRepairRanRef.current = true;
+
+    const base = mergeVoiceMapForProvider(
+      ttsProvider,
+      storyLocale,
+      storySettings.voiceMap,
+    );
+    void repairStoryElevenVoiceMap(base, storyLocale).then(({ map, changed }) => {
+      if (!changed.length) return;
+      voiceEditsDirtyRef.current = true;
+      setVoiceMap(map);
+      const label = (slug: string) =>
+        slug === "protagonist"
+          ? "Protagonist"
+          : slug === "narrator"
+            ? "Erzähler"
+            : slug;
+      void updateStorySettings(storyId, {
+        voiceMap: voiceMapForStorage(ttsProvider, storyLocale, map),
+        voiceEnabledSlugs,
+      }).then(() => {
+        voiceEditsDirtyRef.current = false;
+        onSaved?.();
+        setVoiceRepairNote(
+          `Stimmen an dein ElevenLabs-Konto angepasst: ${changed.map(label).join(", ")}`,
+        );
+      });
+    });
+  }, [
+    ttsProvider,
+    storyId,
+    storyLocale,
+    storySettings.voiceMap,
+    voiceEnabledSlugs,
+    onSaved,
+  ]);
 
   useEffect(() => {
     if (voiceEditsDirtyRef.current) return;
@@ -343,6 +386,11 @@ export function CastHubPanel({
 
   return (
     <div className="flex flex-col gap-3">
+      {voiceRepairNote ? (
+        <p className="rounded-lg border border-sky-500/30 bg-sky-950/40 px-2.5 py-2 text-[10px] leading-snug text-sky-200/90">
+          {voiceRepairNote}
+        </p>
+      ) : null}
       <div className="flex items-center justify-between gap-2">
         <p className="text-[10px] leading-snug text-zinc-600">
           Tippe eine Karte für Stimme & Stil —{" "}

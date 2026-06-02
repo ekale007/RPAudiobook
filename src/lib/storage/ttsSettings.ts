@@ -11,6 +11,7 @@ import {
   isValidQwenPresetVoice,
 } from "@/lib/tts/qwenVoiceSanitize";
 import { coerceElevenLabsVoiceId } from "@/lib/tts/elevenLabsVoices";
+import { normalizeElevenLabsModelId } from "@/lib/tts/elevenLabsModels";
 import { QWEN_CLOUD_DEFAULT_NARRATOR } from "@/lib/tts/qwenCloudVoices";
 import { QWEN_DEFAULT_NARRATOR } from "@/lib/tts/qwenVoices";
 
@@ -96,6 +97,7 @@ export function normalizeTtsSettings(settings: TtsSettings): TtsSettings {
   const out = { ...settings };
   if (out.provider === "elevenlabs") {
     out.elevenLabsVoiceId = coerceElevenLabsVoiceId(out.elevenLabsVoiceId);
+    out.elevenLabsModelId = normalizeElevenLabsModelId(out.elevenLabsModelId);
   }
   if (
     (out.provider === "qwen" || out.provider === "qwen-cloud") &&

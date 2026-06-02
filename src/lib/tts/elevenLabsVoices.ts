@@ -163,31 +163,13 @@ export function elevenVoiceOptions(): Array<{ id: string; label: string }> {
   }));
 }
 
-/** Default cast slugs → voice for library templates by locale. */
+/** Minimal defaults — cast slugs get voices from story map or account repair. */
 export function defaultElevenVoiceMap(
-  locale: "de" | "en",
+  _locale: "de" | "en",
 ): Record<string, string> {
-  if (locale === "de") {
-    return {
-      narrator: ELEVEN_DEFAULT_NARRATOR,
-      protagonist: "Xb7hH8MSUJpSbSDYk0k2",
-      marta: "Xb7hH8MSUJpSbSDYk0k2",
-      "hooded-stranger": "ONwK4e9ZLuI852RL2SWn",
-      lena: "EXAVITQu4vr4xnSDxMaL",
-      jonas: "pNInz6obpgDQGcFmaJgB",
-    };
-  }
   return {
     narrator: ELEVEN_DEFAULT_NARRATOR,
-    protagonist: "TX3LPaxmHKxFdv7VOQHJ",
-    "naya-vellen": "EXAVITQu4vr4xnSDxMaL",
-    "kaelen-vellen": "pNInz6obpgDQGcFmaJgB",
-    lucifer: "ONwK4e9ZLuI852RL2SWn",
-    michael: "JBFqnCBsd6RMkjVDRZzb",
-    gabriel: "Xb7hH8MSUJpSbSDYk0k2",
-    "hidden-community": "XB0fDUnXU5powFXDhCwa",
-    "commander-reyes": "pNInz6obpgDQGcFmaJgB",
-    "engineer-park": "EXAVITQu4vr4xnSDxMaL",
+    protagonist: ELEVEN_DEFAULT_NARRATOR,
   };
 }
 
@@ -208,34 +190,97 @@ export function coerceElevenLabsVoiceId(
   voice: string | null | undefined,
   speakerSlug?: string | null,
   locale: "de" | "en" = "en",
+  allowedIds?: ReadonlySet<string> | null,
 ): string {
   const v = voice?.trim();
-  if (v && isValidElevenLabsVoiceId(v)) return v;
+  if (v && allowedIds?.size) {
+    if (allowedIds.has(v)) return v;
+  } else if (v && isValidElevenLabsVoiceId(v)) {
+    return v;
+  }
 
   const slug = (speakerSlug?.trim() || "narrator").toLowerCase();
   const defaults = defaultElevenVoiceMap(locale);
-  const fromSlug = defaults[slug] ?? defaults.narrator;
-  if (fromSlug && isValidElevenLabsVoiceId(fromSlug)) return fromSlug;
+  const candidates = [
+    defaults[slug],
+    defaults.protagonist,
+    defaults.narrator,
+    ELEVEN_DEFAULT_NARRATOR,
+  ];
+  for (const c of candidates) {
+    const id = c?.trim();
+    if (!id) continue;
+    if (!allowedIds?.size || allowedIds.has(id)) return id;
+  }
+
+  if (allowedIds?.size) {
+    const first = [...allowedIds][0];
+    if (first) return first;
+  }
 
   return ELEVEN_DEFAULT_NARRATOR;
+}
+
+/** Map stored voice IDs to voices that exist on the ElevenLabs account. */
+export function repairElevenVoiceMap(
+  map: Record<string, string>,
+  allowedIds: ReadonlySet<string>,
+  locale: "de" | "en",
+): { map: Record<string, string>; changed: string[] } {
+  if (!allowedIds.size) {
+    return { map: { ...map }, changed: [] };
+  }
+
+  const out = { ...map };
+  const changed: string[] = [];
+
+  const fix = (slug: string, raw: string | undefined) => {
+    const id = raw?.trim();
+    if (!id || allowedIds.has(id)) return;
+    const next = coerceElevenLabsVoiceId(id, slug, locale, allowedIds);
+    if (next !== id) {
+      out[slug] = next;
+      changed.push(slug);
+    }
+  };
+
+  for (const [slug, id] of Object.entries(out)) {
+    fix(slug, id);
+  }
+  if (!out.narrator?.trim() || !allowedIds.has(out.narrator)) {
+    fix("narrator", out.narrator);
+  }
+  if (!out.protagonist?.trim() || !allowedIds.has(out.protagonist)) {
+    fix("protagonist", out.protagonist);
+  }
+
+  return { map: out, changed };
 }
 
 /** Drop Qwen/Kokoro names when building an ElevenLabs voice map. */
 export function sanitizeVoiceMapForEleven(
   locale: "de" | "en",
   map: Record<string, string>,
+  allowedIds?: ReadonlySet<string> | null,
 ): Record<string, string> {
-  const out: Record<string, string> = { ...defaultElevenVoiceMap(locale) };
+  const base = defaultElevenVoiceMap(locale);
+  const out: Record<string, string> = { ...base };
   for (const [slug, id] of Object.entries(map)) {
     const trimmed = id?.trim();
     if (!trimmed) continue;
-    if (isValidElevenLabsVoiceId(trimmed)) {
-      out[slug] = trimmed;
-      continue;
-    }
     if (isValidQwenPresetVoice(trimmed) && !isValidElevenLabsVoiceId(trimmed)) {
       continue;
     }
+    if (allowedIds?.size) {
+      if (allowedIds.has(trimmed)) out[slug] = trimmed;
+      continue;
+    }
+    if (isValidElevenLabsVoiceId(trimmed)) {
+      out[slug] = trimmed;
+    }
+  }
+  if (allowedIds?.size) {
+    return repairElevenVoiceMap(out, allowedIds, locale).map;
   }
   return out;
 }
@@ -243,6 +288,7 @@ export function sanitizeVoiceMapForEleven(
 export function mergeElevenVoiceMap(
   locale: "de" | "en",
   custom?: Record<string, string> | null,
+  allowedIds?: ReadonlySet<string> | null,
 ): Record<string, string> {
-  return sanitizeVoiceMapForEleven(locale, custom ?? {});
+  return sanitizeVoiceMapForEleven(locale, custom ?? {}, allowedIds);
 }

@@ -42,6 +42,7 @@ import {
   isServerQwenTtsAvailable,
 } from "@/lib/server/serverCapabilities";
 import { coerceElevenLabsVoiceId } from "@/lib/tts/elevenLabsVoices";
+import { normalizeElevenLabsModelId } from "@/lib/tts/elevenLabsModels";
 import { resolveQwenTtsParams } from "@/lib/tts/qwenVoiceProfiles";
 import { coerceQwenPresetVoice } from "@/lib/tts/qwenVoiceSanitize";
 import type { StorySettings } from "@/lib/types";
@@ -206,7 +207,9 @@ async function synthesizeChunkElevenLabs(
       text: extras.text,
       voiceId,
       speakerSlug: options?.speakerSlug ?? null,
-      modelId: extras.modelId ?? settings.elevenLabsModelId ?? ELEVEN_DEFAULT_MODEL,
+      modelId: normalizeElevenLabsModelId(
+        extras.modelId ?? settings.elevenLabsModelId ?? ELEVEN_DEFAULT_MODEL,
+      ),
       locale,
       voiceSettings: extras.voiceSettings,
     }),

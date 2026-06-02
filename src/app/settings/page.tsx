@@ -29,10 +29,11 @@ import {
 } from "@/lib/tts/pronunciation";
 import { useServerCapabilities } from "@/lib/server/useServerCapabilities";
 import { ElevenLabsVoiceSelect } from "@/components/ElevenLabsVoiceSelect";
+import { ELEVEN_DEFAULT_MODEL } from "@/lib/tts/elevenLabsVoices";
 import {
-  ELEVEN_DEFAULT_MODEL,
-  ELEVEN_V3_MODEL,
-} from "@/lib/tts/elevenLabsVoices";
+  ELEVEN_TTS_MODEL_OPTIONS,
+  normalizeElevenLabsModelId,
+} from "@/lib/tts/elevenLabsModels";
 import { LlmUsagePanel } from "@/components/LlmUsagePanel";
 import {
   PREFS_UPDATED_EVENT,
@@ -460,28 +461,33 @@ export default function SettingsPage() {
                   <p className="mb-2 text-[11px] text-zinc-600">
                     Stimme wird beim Auswählen automatisch gespeichert.
                   </p>
-                  <label className="mt-3 flex cursor-pointer items-start gap-2 text-xs text-zinc-400">
-                    <input
-                      type="checkbox"
-                      checked={elModelId === ELEVEN_V3_MODEL}
+                  <label className="mt-3 block text-xs text-zinc-400">
+                    TTS-Modell
+                    <select
+                      value={normalizeElevenLabsModelId(elModelId)}
                       onChange={(e) => {
-                        const nextModel = e.target.checked
-                          ? ELEVEN_V3_MODEL
-                          : ELEVEN_DEFAULT_MODEL;
+                        const nextModel = normalizeElevenLabsModelId(
+                          e.target.value,
+                        );
                         setElModelId(nextModel);
                         persistTtsFromState({
                           ttsProvider: "elevenlabs",
                           elModelId: nextModel,
                         });
                       }}
-                      className="mt-0.5"
-                    />
-                    <span>
-                      <strong className="text-zinc-300">Eleven v3 (Test)</strong>{" "}
-                      — Audio-Tags + Cast/Szenen-Stil (wie Qwen-instruct). Teurer
-                      als multilingual_v2. Cast → „Szenen-Stil“ muss an sein.
-                    </span>
+                      className="mt-1 w-full rounded-lg border border-surface-border bg-surface px-2 py-2 text-sm"
+                    >
+                      {ELEVEN_TTS_MODEL_OPTIONS.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.label} — {m.hint}
+                        </option>
+                      ))}
+                    </select>
                   </label>
+                  <p className="mt-1 text-[10px] text-zinc-600">
+                    Günstig testen: Flash oder Turbo. Standard: Multilingual v2.
+                    v3 nur mit Szenen-Stil (Cast).
+                  </p>
                 </>
               ) : ttsProvider === "qwen-cloud" ? (
                 <>

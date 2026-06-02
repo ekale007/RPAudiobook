@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getElevenLabsAccountVoices } from "@/lib/server/elevenLabsAccount";
 import {
   getElevenLabsApiKey,
   getRateLimitTtsPerHour,
@@ -12,6 +13,7 @@ import {
   getDefaultElevenLabsModel,
   getElevenLabsVoiceSettings,
 } from "@/lib/tts/elevenLabsVoices";
+import { normalizeElevenLabsModelId } from "@/lib/tts/elevenLabsModels";
 
 const ELEVEN_BASE = "https://api.elevenlabs.io/v1";
 
@@ -73,12 +75,30 @@ export async function POST(req: Request) {
   const text = body.text?.trim();
   const locale = body.locale?.startsWith("de") ? "de" : "en";
   const speakerSlug = body.speakerSlug?.trim() || null;
-  const voiceId = coerceElevenLabsVoiceId(
+
+  let allowedIds: Set<string>;
+  try {
+    ({ ids: allowedIds } = await getElevenLabsAccountVoices(apiKey));
+  } catch (e) {
+    return NextResponse.json(
+      {
+        error:
+          "ElevenLabs-Stimmenliste konnte nicht geladen werden. API-Key prüfen.",
+        detail: e instanceof Error ? e.message : String(e),
+      },
+      { status: 502 },
+    );
+  }
+
+  let voiceId = coerceElevenLabsVoiceId(
     body.voiceId,
     speakerSlug,
     locale,
+    allowedIds,
   );
-  let modelId = body.modelId?.trim() || getDefaultElevenLabsModel();
+  let modelId = normalizeElevenLabsModelId(
+    body.modelId?.trim() || getDefaultElevenLabsModel(),
+  );
 
   if (!text) {
     return NextResponse.json({ error: "Missing text" }, { status: 400 });
@@ -98,8 +118,8 @@ export async function POST(req: Request) {
     ...body.voiceSettings,
   };
 
-  const synthesize = (model: string) =>
-    fetch(`${ELEVEN_BASE}/text-to-speech/${encodeURIComponent(voiceId)}`, {
+  const synthesize = (voice: string, model: string) =>
+    fetch(`${ELEVEN_BASE}/text-to-speech/${encodeURIComponent(voice)}`, {
       method: "POST",
       headers: {
         "xi-api-key": apiKey,
@@ -113,41 +133,70 @@ export async function POST(req: Request) {
       }),
     });
 
-  let upstream = await synthesize(modelId);
+  const tryModels = [modelId];
+  if (isElevenV3Model(modelId)) {
+    tryModels.push("eleven_multilingual_v2", "eleven_turbo_v2_5");
+  }
 
-  if (
-    !upstream.ok &&
-    isElevenV3Model(modelId) &&
-    modelId !== getDefaultElevenLabsModel()
-  ) {
-    const fallbackModel = getDefaultElevenLabsModel();
-    const retry = await synthesize(fallbackModel);
-    if (retry.ok) {
-      upstream = retry;
-      modelId = fallbackModel;
-    } else {
-      await retry.text().catch(() => undefined);
+  let upstream: Response | null = null;
+  let usedModel = modelId;
+  let usedVoice = voiceId;
+  const requestedVoice = body.voiceId?.trim() || null;
+
+  for (const model of tryModels) {
+    usedModel = model;
+    usedVoice = voiceId;
+    upstream = await synthesize(voiceId, model);
+    if (upstream.ok) break;
+
+    if (upstream.status === 404 && allowedIds.size > 0) {
+      const fallbackVoice = coerceElevenLabsVoiceId(
+        null,
+        speakerSlug,
+        locale,
+        allowedIds,
+      );
+      if (fallbackVoice !== voiceId) {
+        voiceId = fallbackVoice;
+        usedVoice = voiceId;
+        upstream = await synthesize(voiceId, model);
+        if (upstream.ok) break;
+      }
     }
   }
 
-  if (!upstream.ok) {
-    const errText = await upstream.text();
-    const detail = errText?.slice(0, 800) || upstream.statusText;
-    if (upstream.status === 404) {
+  if (!upstream?.ok) {
+    const errText = await upstream?.text().catch(() => "") ?? "";
+    const detail = errText?.slice(0, 800) || upstream?.statusText || "TTS failed";
+    const speakerHint = speakerSlug
+      ? ` (Sprecher: ${speakerSlug})`
+      : "";
+    if (upstream?.status === 404) {
       return NextResponse.json(
         {
-          error:
-            "ElevenLabs-Stimme nicht gefunden. Bitte unter Story → Cast die Stimme neu wählen (Erzähler / Protagonist / Figur).",
-          voiceId,
-          modelId,
+          error: `Keine gültige ElevenLabs-Stimme${speakerHint}. Story → Cast: Stimme neu wählen (Liste kommt von deinem Eleven-Konto).`,
+          voiceId: usedVoice,
+          requestedVoiceId: requestedVoice,
+          speakerSlug,
+          modelId: usedModel,
           detail,
         },
         { status: 422 },
       );
     }
     return NextResponse.json(
-      { error: detail || upstream.statusText, voiceId, modelId },
-      { status: upstream.status >= 400 && upstream.status < 600 ? upstream.status : 502 },
+      {
+        error: detail,
+        voiceId: usedVoice,
+        speakerSlug,
+        modelId: usedModel,
+      },
+      {
+        status:
+          upstream && upstream.status >= 400 && upstream.status < 600
+            ? upstream.status
+            : 502,
+      },
     );
   }
 
@@ -157,6 +206,9 @@ export async function POST(req: Request) {
     headers: {
       "Content-Type": "audio/mpeg",
       "Cache-Control": "private, max-age=86400",
+      ...(usedVoice !== requestedVoice
+        ? { "X-TTS-Voice-Coerced": usedVoice }
+        : {}),
     },
   });
 }

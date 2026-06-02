@@ -138,9 +138,9 @@ export function ElevenLabsVoiceSelect({
         <label className="mb-1 block text-[10px] text-zinc-500">{label}</label>
       ) : null}
       {!known && value && !loading ? (
-        <p className="mb-1 text-[10px] text-zinc-600">
-          Gespeichert:{" "}
-          <code className="text-zinc-400">{value.slice(0, 16)}…</code>
+        <p className="mb-1 text-[10px] text-amber-200/90">
+          Diese ID ist nicht in deinem ElevenLabs-Konto — bitte eine Stimme aus
+          der Liste wählen.
         </p>
       ) : null}
       <div className="flex gap-1.5">
