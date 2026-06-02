@@ -25,6 +25,7 @@ export async function fetchElevenLabsPreview(
     body: JSON.stringify({
       text: locale === "de" ? PREVIEW_DE : PREVIEW_EN,
       voiceId,
+      speakerSlug: "narrator",
       modelId: settings.elevenLabsModelId || ELEVEN_DEFAULT_MODEL,
       locale,
     }),

@@ -6,7 +6,9 @@ import {
 } from "@/lib/server/env";
 import { checkRateLimit } from "@/lib/server/rateLimit";
 import { requireUser } from "@/lib/server/requireUser";
+import { isElevenV3Model } from "@/lib/tts/elevenLabsDelivery";
 import {
+  coerceElevenLabsVoiceId,
   getDefaultElevenLabsModel,
   getElevenLabsVoiceSettings,
 } from "@/lib/tts/elevenLabsVoices";
@@ -52,6 +54,7 @@ export async function POST(req: Request) {
   let body: {
     text?: string;
     voiceId?: string;
+    speakerSlug?: string;
     modelId?: string;
     locale?: string;
     voiceSettings?: {
@@ -68,9 +71,14 @@ export async function POST(req: Request) {
   }
 
   const text = body.text?.trim();
-  const voiceId = body.voiceId?.trim();
-  const modelId = body.modelId?.trim() || getDefaultElevenLabsModel();
   const locale = body.locale?.startsWith("de") ? "de" : "en";
+  const speakerSlug = body.speakerSlug?.trim() || null;
+  const voiceId = coerceElevenLabsVoiceId(
+    body.voiceId,
+    speakerSlug,
+    locale,
+  );
+  let modelId = body.modelId?.trim() || getDefaultElevenLabsModel();
 
   if (!text) {
     return NextResponse.json({ error: "Missing text" }, { status: 400 });
@@ -90,9 +98,8 @@ export async function POST(req: Request) {
     ...body.voiceSettings,
   };
 
-  const upstream = await fetch(
-    `${ELEVEN_BASE}/text-to-speech/${encodeURIComponent(voiceId)}`,
-    {
+  const synthesize = (model: string) =>
+    fetch(`${ELEVEN_BASE}/text-to-speech/${encodeURIComponent(voiceId)}`, {
       method: "POST",
       headers: {
         "xi-api-key": apiKey,
@@ -101,17 +108,46 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         text,
-        model_id: modelId,
+        model_id: model,
         voice_settings: voiceSettings,
       }),
-    },
-  );
+    });
+
+  let upstream = await synthesize(modelId);
+
+  if (
+    !upstream.ok &&
+    isElevenV3Model(modelId) &&
+    modelId !== getDefaultElevenLabsModel()
+  ) {
+    const fallbackModel = getDefaultElevenLabsModel();
+    const retry = await synthesize(fallbackModel);
+    if (retry.ok) {
+      upstream = retry;
+      modelId = fallbackModel;
+    } else {
+      await retry.text().catch(() => undefined);
+    }
+  }
 
   if (!upstream.ok) {
     const errText = await upstream.text();
+    const detail = errText?.slice(0, 800) || upstream.statusText;
+    if (upstream.status === 404) {
+      return NextResponse.json(
+        {
+          error:
+            "ElevenLabs-Stimme nicht gefunden. Bitte unter Story → Cast die Stimme neu wählen (Erzähler / Protagonist / Figur).",
+          voiceId,
+          modelId,
+          detail,
+        },
+        { status: 422 },
+      );
+    }
     return NextResponse.json(
-      { error: errText || upstream.statusText },
-      { status: upstream.status },
+      { error: detail || upstream.statusText, voiceId, modelId },
+      { status: upstream.status >= 400 && upstream.status < 600 ? upstream.status : 502 },
     );
   }
 

@@ -170,6 +170,7 @@ export function defaultElevenVoiceMap(
   if (locale === "de") {
     return {
       narrator: ELEVEN_DEFAULT_NARRATOR,
+      protagonist: "Xb7hH8MSUJpSbSDYk0k2",
       marta: "Xb7hH8MSUJpSbSDYk0k2",
       "hooded-stranger": "ONwK4e9ZLuI852RL2SWn",
       lena: "EXAVITQu4vr4xnSDxMaL",
@@ -178,6 +179,7 @@ export function defaultElevenVoiceMap(
   }
   return {
     narrator: ELEVEN_DEFAULT_NARRATOR,
+    protagonist: "TX3LPaxmHKxFdv7VOQHJ",
     "naya-vellen": "EXAVITQu4vr4xnSDxMaL",
     "kaelen-vellen": "pNInz6obpgDQGcFmaJgB",
     lucifer: "ONwK4e9ZLuI852RL2SWn",

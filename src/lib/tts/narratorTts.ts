@@ -205,6 +205,7 @@ async function synthesizeChunkElevenLabs(
     body: JSON.stringify({
       text: extras.text,
       voiceId,
+      speakerSlug: options?.speakerSlug ?? null,
       modelId: extras.modelId ?? settings.elevenLabsModelId ?? ELEVEN_DEFAULT_MODEL,
       locale,
       voiceSettings: extras.voiceSettings,
@@ -212,8 +213,15 @@ async function synthesizeChunkElevenLabs(
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err || `TTS failed (${res.status})`);
+    const raw = await res.text();
+    let message = raw || `TTS failed (${res.status})`;
+    try {
+      const parsed = JSON.parse(raw) as { error?: string };
+      if (parsed.error?.trim()) message = parsed.error.trim();
+    } catch {
+      /* plain text */
+    }
+    throw new Error(message);
   }
 
   return res.blob();
