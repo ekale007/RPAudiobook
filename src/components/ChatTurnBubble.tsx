@@ -15,6 +15,10 @@ import { prepareTextForTts } from "@/lib/tts/prepareTtsText";
 import type { CharacterRow, TurnRow } from "@/lib/db/stories";
 import type { VoiceMap, StorySettings } from "@/lib/types";
 import { isCastVoiceActive, type VoiceEnabledSlugs } from "@/lib/tts/voiceActivation";
+import {
+  normalizeStoryContentLocale,
+  PROTAGONIST_SPEAKER_SLUG,
+} from "@/lib/story/protagonist";
 
 export function ChatTurnBubble({
   turn,
@@ -65,27 +69,39 @@ export function ChatTurnBubble({
   const [draft, setDraft] = useState(turn.content);
   const [busy, setBusy] = useState(false);
   const [copiedRaw, setCopiedRaw] = useState(false);
+  const contentLocale = normalizeStoryContentLocale(storyLocale);
   const displayContent = stripSpeakerTags(turn.content);
   const markedSnippets = useMemo(
     () =>
       showDialogueMarkup &&
       turn.role === "assistant" &&
       (turn.speaker_slug ?? "narrator") === "narrator"
-        ? extractMarkedSnippets(displayContent)
+        ? extractMarkedSnippets(displayContent, contentLocale)
         : [],
-    [showDialogueMarkup, turn.role, turn.speaker_slug, displayContent],
+    [
+      showDialogueMarkup,
+      turn.role,
+      turn.speaker_slug,
+      displayContent,
+      contentLocale,
+    ],
   );
   const llmAttribution = useDialogueAttribution(
     turn.id,
     turn.content,
     cast,
     markedSnippets.length > 0 && turn.role === "assistant",
+    {
+      locale: contentLocale,
+      protagonist: storySettings?.protagonist,
+    },
   );
   const markedLookup = useMemo(() => {
     const attribution = buildDialogueAttributionMap(
       turn.content,
       cast,
       llmAttribution ?? undefined,
+      contentLocale,
     );
     const map = new Map<string, string>();
     for (const s of markedSnippets) {
@@ -100,7 +116,8 @@ export function ChatTurnBubble({
       if (
         slug &&
         slug !== "narrator" &&
-        isCastVoiceActive(slug, voiceEnabledSlugs)
+        (slug === PROTAGONIST_SPEAKER_SLUG ||
+          isCastVoiceActive(slug, voiceEnabledSlugs))
       ) {
         out[snippet] = slug;
       }

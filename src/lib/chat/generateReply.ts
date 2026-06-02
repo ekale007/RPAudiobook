@@ -29,6 +29,7 @@ export type GenerateReplyParams = {
   /** Overrides default “continue” prompt (e.g. chosen story beat). */
   continuationPrompt?: string;
   onLoreCount?: (n: number) => void;
+  storyLocale?: string | null;
   signal?: AbortSignal;
 };
 
@@ -61,6 +62,7 @@ export async function streamAssistantReply(
     plotState: params.plotState,
     allCast: params.allCast ?? params.cast,
     settings: params.storySettings,
+    storyLocale: params.storyLocale,
   };
 
   const { messages, activeLoreCount } = buildChatMessages(promptCtx);

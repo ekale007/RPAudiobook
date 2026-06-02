@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import type { LlmAttributionMap } from "@/lib/chat/dialogueAttributionLlm";
-import { ensureDialogueAttribution } from "@/lib/chat/resolveDialogueAttribution";
+import {
+  ensureDialogueAttribution,
+  type DialogueAttributionOptions,
+} from "@/lib/chat/resolveDialogueAttribution";
 import type { CharacterRow } from "@/lib/db/stories";
 
 export function useDialogueAttribution(
@@ -10,6 +13,7 @@ export function useDialogueAttribution(
   content: string,
   cast: CharacterRow[],
   enabled: boolean,
+  options?: DialogueAttributionOptions,
 ): LlmAttributionMap | null {
   const [llmMap, setLlmMap] = useState<LlmAttributionMap | null>(null);
 
@@ -20,7 +24,7 @@ export function useDialogueAttribution(
     }
 
     let cancelled = false;
-    ensureDialogueAttribution(turnId, content, cast)
+    ensureDialogueAttribution(turnId, content, cast, undefined, options)
       .then((map) => {
         if (!cancelled) setLlmMap(map);
       })
@@ -31,7 +35,14 @@ export function useDialogueAttribution(
     return () => {
       cancelled = true;
     };
-  }, [turnId, content, cast, enabled]);
+  }, [
+    turnId,
+    content,
+    cast,
+    enabled,
+    options?.locale,
+    options?.protagonist?.displayName,
+  ]);
 
   return llmMap;
 }

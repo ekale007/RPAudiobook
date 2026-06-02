@@ -1,7 +1,20 @@
+import { extractMarkedSnippets } from "@/lib/chat/dialogueQuotes";
+import {
+  genderedActionPattern,
+  protagonistBeatBeforePattern,
+  speechActPattern,
+  speechVerbsPattern,
+} from "@/lib/chat/dialogueLocale";
 import { stripSpeakerTags } from "@/lib/chat/parseSpeakerBlocks";
 import { speakerDisplayName } from "@/lib/chat/speakerDisplay";
 import type { CharacterRow } from "@/lib/db/stories";
 import { slugifyCharacterName } from "@/lib/memory/characterMemory";
+import {
+  PROTAGONIST_SPEAKER_SLUG,
+  type StoryContentLocale,
+} from "@/lib/story/protagonist";
+
+export { extractMarkedSnippets } from "@/lib/chat/dialogueQuotes";
 
 export type DialogueSnippetAnalysis = {
   snippet: string;
@@ -21,10 +34,8 @@ type InferenceContext = {
   quoteEnd: number;
   lastNonNarratorSlug: string | null;
   previousQuoteEnd: number;
+  locale: StoryContentLocale;
 };
-
-const SPEECH_VERBS =
-  "said|says|asked|asks|replied|replies|whispered|whispers|muttered|mutters|shouted|shouts|added|adds|called|calls|continued|continues|offers|laughs|blinks";
 
 const REMOTE_DIALOGUE_CUES =
   /\b(on the other end|the other end|through the line|on the line|your phone|the phone|incoming call|switch(?:es|ed)? lines|making calls|voice comes through|comes through clear|line crackles|rustle of urgent|urgent preparation)\b/i;
@@ -83,46 +94,13 @@ const GENERIC_HINTS = new Set([
   "your",
 ]);
 
-export function extractMarkedSnippets(text: string): string[] {
-  const out: string[] = [];
-  const quoteRes = [
-    /„[^"\n]{2,260}"/g,
-    /[""][^"""\n]{2,260}["""]/g,
-    /["“][^"”\n]{2,260}["”]/g,
-  ];
-  for (const quoteRe of quoteRes) {
-    for (const m of text.matchAll(quoteRe)) out.push(m[0]);
-  }
-  const thoughtRe = /\*([^*\n]+)\*/g;
-  for (const m of text.matchAll(thoughtRe)) {
-    const inner = (m[1] ?? "").trim();
-    if (!isDialogueLikeThought(inner)) continue;
-    out.push(m[0]);
-  }
-  const uniq = new Set<string>();
-  return out.filter((s) => {
-    const key = s.trim();
-    if (!key || uniq.has(key)) return false;
-    uniq.add(key);
-    return true;
-  });
-}
-
-/** Skip emphasis (*Safe*, *life*) — keep real interior thoughts / longer phrases. */
-function isDialogueLikeThought(inner: string): boolean {
-  const t = inner.trim();
-  if (t.length < 10) return false;
-  const words = t.split(/\s+/).filter(Boolean);
-  if (words.length >= 2) return true;
-  return /\b(I|I'm|I've|you|we|they|never|always|why|how)\b/i.test(t);
-}
-
 export function inferSpeakerForSnippet(
   text: string,
   snippet: string,
   cast: CharacterRow[],
+  locale: StoryContentLocale = "en",
 ): string {
-  const ordered = inferSpeakersOrdered(text, [snippet], cast);
+  const ordered = inferSpeakersOrdered(text, [snippet], cast, locale);
   return ordered.get(snippet)?.slug ?? "narrator";
 }
 
@@ -130,6 +108,7 @@ export function inferSpeakersOrdered(
   text: string,
   snippets: string[],
   cast: CharacterRow[],
+  locale: StoryContentLocale = "en",
 ): Map<string, InferenceResult> {
   const out = new Map<string, InferenceResult>();
   let searchFrom = 0;
@@ -154,6 +133,7 @@ export function inferSpeakersOrdered(
       quoteEnd: idx + snippet.length,
       lastNonNarratorSlug: lastNonNarrator,
       previousQuoteEnd,
+      locale,
     });
     out.set(snippet, result);
     searchFrom = idx + snippet.length;
@@ -230,44 +210,54 @@ function inferSpeakerDetailed(
     };
   }
 
-  const pronounSpeaker = inferGenderedSpeakerBeforeQuote(beforeInPara, cast);
+  const locale = ctx.locale;
+  const pronounSpeaker = inferGenderedSpeakerBeforeQuote(
+    beforeInPara,
+    cast,
+    locale,
+  );
   if (pronounSpeaker) return pronounSpeaker;
 
   const genderedAction = inferGenderedActionBeforeQuote(
     beforeInPara,
     ctx.lastNonNarratorSlug,
     cast,
+    locale,
   );
   if (genderedAction) return genderedAction;
 
-  const approachingGuest = inferApproachingCharacterBeforeQuote(beforeInPara);
+  const approachingGuest = inferApproachingCharacterBeforeQuote(
+    beforeInPara,
+    locale,
+  );
   if (approachingGuest) return approachingGuest;
 
-  const speechAct = inferSpeechActSpeakerBeforeQuote(beforeInPara, cast);
+  const speechAct = inferSpeechActSpeakerBeforeQuote(beforeInPara, cast, locale);
   if (speechAct) return speechAct;
 
-  if (isProtagonistDialogue(snippet)) {
-    return { slug: "narrator", reasons: ["protagonist_dialogue"] };
+  if (isProtagonistDialogue(snippet, locale)) {
+    return { slug: PROTAGONIST_SPEAKER_SLUG, reasons: ["protagonist_dialogue"] };
   }
 
-  if (isProtagonistAddressingSomeone(snippet, cast)) {
-    return { slug: "narrator", reasons: ["protagonist_vocative_address"] };
+  if (isProtagonistAddressingSomeone(snippet, cast, locale)) {
+    return {
+      slug: PROTAGONIST_SPEAKER_SLUG,
+      reasons: ["protagonist_vocative_address"],
+    };
   }
 
-  if (
-    /\bYou\s+(shrug|say|ask|pull|look|turn|nod|smile|laugh|pause|dial|confirm|kneel|switch|glance|bounce|feel|nod)\b/i.test(
-      beforeInPara.slice(-120),
-    )
-  ) {
-    return { slug: "narrator", reasons: ["protagonist_beat_before_quote"] };
+  if (protagonistBeatBeforePattern(locale).test(beforeInPara.slice(-120))) {
+    return {
+      slug: PROTAGONIST_SPEAKER_SLUG,
+      reasons: ["protagonist_beat_before_quote"],
+    };
   }
 
-  if (
-    /\bYou\s+(shrug|say|ask|pull|look|turn|nod|smile|laugh|pause|dial|confirm|kneel|switch|glance)\b/i.test(
-      afterInPara.slice(0, 100),
-    )
-  ) {
-    return { slug: "narrator", reasons: ["protagonist_beat_after_quote"] };
+  if (protagonistBeatBeforePattern(locale).test(afterInPara.slice(0, 100))) {
+    return {
+      slug: PROTAGONIST_SPEAKER_SLUG,
+      reasons: ["protagonist_beat_after_quote"],
+    };
   }
 
   const continuity = inferSameSpeakerContinuity(
@@ -285,6 +275,7 @@ function inferSpeakerDetailed(
     bridgeFromPrev,
     ctx.lastNonNarratorSlug,
     cast,
+    locale,
   );
   if (remote) return remote;
 
@@ -296,7 +287,7 @@ function inferSpeakerDetailed(
     return { slug: roleNear, reasons: ["family_role_near_quote"] };
   }
 
-  const afterName = inferNameAfterQuote(afterInPara);
+  const afterName = inferNameAfterQuote(afterInPara, locale);
   if (afterName) {
     const resolved = resolveNameToSlug(afterName, cast);
     return {
@@ -311,6 +302,7 @@ function inferSpeakerDetailed(
   const explicit = inferCastByExplicitAttribution(
     `${beforeInPara}\n${afterInPara}`.toLowerCase(),
     cast,
+    locale,
   );
   if (explicit) {
     return { slug: explicit, reasons: ["explicit_name_verb"] };
@@ -333,9 +325,10 @@ function inferRemoteDialogueContinuity(
   bridgeFromPrev: string,
   lastSlug: string | null,
   cast: CharacterRow[],
+  locale: StoryContentLocale,
 ): InferenceResult | null {
   if (!lastSlug || lastSlug === "narrator") return null;
-  if (isProtagonistDialogue(snippet)) return null;
+  if (isProtagonistDialogue(snippet, locale)) return null;
 
   const bridge = bridgeFromPrev.trim();
   if (!bridge && !REMOTE_DIALOGUE_CUES.test(beforeInPara)) return null;
@@ -346,7 +339,9 @@ function inferRemoteDialogueContinuity(
 
   if (inferNameFromActionBeat(beforeInPara)) return null;
   if (inferNameFromActionBeat(bridge)) return null;
-  if (inferCastByExplicitAttribution(bridge.toLowerCase(), cast)) return null;
+  if (inferCastByExplicitAttribution(bridge.toLowerCase(), cast, locale)) {
+    return null;
+  }
   const newGuest = bridge.match(
     /\b([A-Z][a-z]{2,})\s+(?:said|asks|asked|replied|replies|whispers|calls)\b/,
   );
@@ -358,8 +353,26 @@ function inferRemoteDialogueContinuity(
   };
 }
 
-function isProtagonistDialogue(snippet: string): boolean {
-  const inner = snippet.replace(/^["“”']|["“”']$/g, "").trim();
+function isProtagonistDialogue(
+  snippet: string,
+  locale: StoryContentLocale,
+): boolean {
+  const inner = snippet
+    .replace(/^[„""“”'«»]|[""“”'«»]$/g, "")
+    .trim();
+  if (locale === "de") {
+    if (/^(du|dich|dir)\b/i.test(inner)) return true;
+    if (/^ich\b/i.test(inner)) return true;
+    if (
+      /^(ja|nein|okay|ok|gut|klar|vielleicht|sicher|danke|wahrscheinlich|genau)\b/i.test(
+        inner,
+      )
+    ) {
+      return true;
+    }
+    if (/^(hallo|hey)\b/i.test(inner)) return true;
+    return false;
+  }
   if (/^you\s+(mean|know|think|see|hear|remember|understand)\b/i.test(inner)) {
     return false;
   }
@@ -409,8 +422,17 @@ function isProtagonistDialogue(snippet: string): boolean {
 function isProtagonistAddressingSomeone(
   snippet: string,
   cast: CharacterRow[],
+  locale: StoryContentLocale,
 ): boolean {
-  const inner = snippet.replace(/^["“”']|["“”']$/g, "").trim();
+  const inner = snippet
+    .replace(/^[„""“”'«»]|[""“”'«»]$/g, "")
+    .trim();
+  if (locale === "de") {
+    const voc = inner.match(/^([A-ZÄÖÜ][a-zäöüß]+),\s+(.+)$/);
+    if (voc?.[2] && /\b(ich|muss|müssen|werde|will|lass)\b/i.test(voc[2])) {
+      return true;
+    }
+  }
   const vocative = inner.match(/^([A-Z][a-z]+),\s+(.+)$/);
   if (!vocative?.[1] || !vocative[2]) return false;
   const name = vocative[1];
@@ -486,7 +508,10 @@ function inferFamilyRoleNearQuote(before: string, after: string): string | null 
   if (/\b(?:your\s+)?mother\s+repeats\b/.test(ctx)) return "npc:mother";
   if (/\b(?:your\s+)?father\s+adds\b/.test(ctx)) return "npc:father";
   const roleVerb = ctx.match(
-    new RegExp(`\\b(mother|father|sister|brother)\\s+(?:${SPEECH_VERBS})\\b`),
+    new RegExp(
+      `\\b(mother|father|sister|brother|mutter|vater|schwester|bruder)\\s+(?:${speechVerbsPattern("en")})\\b`,
+      "i",
+    ),
   );
   if (roleVerb?.[1]) return `npc:${roleVerb[1]}`;
   return null;
@@ -495,13 +520,10 @@ function inferFamilyRoleNearQuote(before: string, after: string): string | null 
 function inferSpeechActSpeakerBeforeQuote(
   before: string,
   cast: CharacterRow[],
+  locale: StoryContentLocale,
 ): InferenceResult | null {
   const tail = before.slice(-160);
-  if (
-    !/\b(she|he)\s+(teases|teased|says|said|whispers|whispered|murmurs|murmured|adds|added|continues|continued|laughs|laughed)\b/i.test(
-      tail,
-    )
-  ) {
+  if (!speechActPattern(locale).test(tail)) {
     return null;
   }
 
@@ -524,13 +546,10 @@ function inferGenderedActionBeforeQuote(
   before: string,
   lastSlug: string | null,
   cast: CharacterRow[],
+  locale: StoryContentLocale,
 ): InferenceResult | null {
   const tail = before.slice(-240);
-  if (
-    !/\b(she|he)\s+(?:squeezes|turns|pauses|glances|looks|heads|steps|walks|exhales|laughs|smiles|nods|shakes|watches|waits)\b/i.test(
-      tail,
-    )
-  ) {
+  if (!genderedActionPattern(locale).test(tail)) {
     return null;
   }
 
@@ -560,15 +579,19 @@ function inferGenderedActionBeforeQuote(
 function inferGenderedSpeakerBeforeQuote(
   before: string,
   cast: CharacterRow[],
+  locale: StoryContentLocale,
 ): InferenceResult | null {
   const tail = before.slice(-120);
-  if (!/\b(she|he)\s+(?:${SPEECH_VERBS})\b/i.test(tail)) return null;
+  const verbs = speechVerbsPattern(locale);
+  if (!new RegExp(`\\b(she|he|sie|er)\\s+(?:${verbs})\\b`, "i").test(tail)) {
+    return null;
+  }
 
   const ctx = before.toLowerCase();
-  if (/\b(?:your\s+)?mother\b/.test(ctx)) {
+  if (/\b(?:your\s+|deine[rsm]?\s+)?mother\b/.test(ctx) || /\bmutter\b/.test(ctx)) {
     return { slug: "npc:mother", reasons: ["pronoun_she_he_with_mother"] };
   }
-  if (/\b(?:your\s+)?father\b/.test(ctx)) {
+  if (/\b(?:your\s+|deine[rsm]?\s+)?father\b/.test(ctx) || /\bvater\b/.test(ctx)) {
     return { slug: "npc:father", reasons: ["pronoun_she_he_with_father"] };
   }
 
@@ -592,10 +615,13 @@ function inferGenderedSpeakerBeforeQuote(
 
 function inferApproachingCharacterBeforeQuote(
   before: string,
+  locale: StoryContentLocale,
 ): InferenceResult | null {
-  const m = before.match(
-    /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:woman|man))\s+approaches\b/i,
-  );
+  const approaches =
+    locale === "de"
+      ? /\b([A-ZÄÖÜ][a-zäöüß]+(?:\s+[A-ZÄÖÜ][a-zäöüß]+)*\s+(?:Frau|Mann))\s+(?:kommt|nähert sich|tritt)\b/i
+      : /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:woman|man))\s+approaches\b/i;
+  const m = before.match(approaches);
   if (!m?.[1]) return null;
   const label = m[1].trim();
   return {
@@ -612,9 +638,10 @@ function inferSameSpeakerContinuity(
   bridgeFromPrev: string,
 ): InferenceResult | null {
   const last = ctx.lastNonNarratorSlug;
+  const locale = ctx.locale;
   if (!last || last === "narrator") return null;
-  if (isProtagonistDialogue(snippet)) return null;
-  if (isProtagonistAddressingSomeone(snippet, cast)) return null;
+  if (isProtagonistDialogue(snippet, locale)) return null;
+  if (isProtagonistAddressingSomeone(snippet, cast, locale)) return null;
   if (CALL_BREAK_CUES.test(bridgeFromPrev)) return null;
 
   const inner = snippet.replace(/^["“”']|["“”']$/g, "").trim();
@@ -637,7 +664,7 @@ function inferSameSpeakerContinuity(
   if (
     bridge.length > 0 &&
     bridge.length < 220 &&
-    !inferCastByExplicitAttribution(bridge.toLowerCase(), cast) &&
+    !inferCastByExplicitAttribution(bridge.toLowerCase(), cast, locale) &&
     inferFamilyRoleNearQuote(bridge, "") === last
   ) {
     return { slug: last, reasons: ["same_speaker_short_bridge"] };
@@ -646,10 +673,18 @@ function inferSameSpeakerContinuity(
   return null;
 }
 
-function inferNameAfterQuote(after: string): string | null {
+function inferNameAfterQuote(
+  after: string,
+  locale: StoryContentLocale,
+): string | null {
   const m = after
     .trim()
-    .match(new RegExp(`^["”']?\\s*([A-Z][a-z]{2,})\\s+(?:${SPEECH_VERBS})\\b`, "i"));
+    .match(
+      new RegExp(
+        `^["”']?\\s*([A-ZÄÖÜ][a-zäöüß]{2,})\\s+(?:${speechVerbsPattern(locale)})\\b`,
+        "i",
+      ),
+    );
   if (m?.[1] && !isFalseName(m[1])) return m[1];
   return null;
 }
@@ -685,8 +720,9 @@ function paragraphEnd(text: string, index: number): number {
 function inferCastByExplicitAttribution(
   local: string,
   cast: CharacterRow[],
+  locale: StoryContentLocale,
 ): string | null {
-  const verbs = SPEECH_VERBS;
+  const verbs = speechVerbsPattern(locale);
   for (const c of cast.filter((x) => x.role === "cast")) {
     const hints = buildSpeakerHints(c).map(escapeRegex);
     if (!hints.length) continue;

@@ -17,6 +17,11 @@ import type { StoryPlotState } from "@/lib/memory/plotState";
 import type { StoryPin } from "@/lib/memory/storyPins";
 import { stripSpeakerTags } from "@/lib/chat/parseSpeakerBlocks";
 import { buildStorytellerScriptInstructions } from "@/lib/prompt/storytellerScript";
+import {
+  normalizeStoryContentLocale,
+  protagonistPromptBlock,
+  type StoryContentLocale,
+} from "@/lib/story/protagonist";
 
 export interface PromptContext {
   character: WryTourCharacter;
@@ -33,6 +38,7 @@ export interface PromptContext {
   pinnedNotes?: StoryPin[];
   allCast?: CharacterRow[];
   settings?: Partial<StorySettings>;
+  storyLocale?: StoryContentLocale | string | null;
 }
 
 export function buildChatMessages(ctx: PromptContext): {
@@ -40,6 +46,7 @@ export function buildChatMessages(ctx: PromptContext): {
   activeLoreCount: number;
 } {
   const settings = { ...DEFAULT_STORY_SETTINGS, ...ctx.settings };
+  const locale = normalizeStoryContentLocale(ctx.storyLocale);
   const recent = ctx.turns.slice(-settings.recentTurnCount);
   const scanTexts = recent.map((t) => t.content);
 
@@ -96,8 +103,16 @@ export function buildChatMessages(ctx: PromptContext): {
     );
   }
 
+  if (settings.protagonist?.displayName?.trim()) {
+    systemParts.push(protagonistPromptBlock(settings.protagonist, locale));
+  }
+
   systemParts.push(
-    buildStorytellerScriptInstructions(ctx.allCast ?? []),
+    buildStorytellerScriptInstructions(
+      ctx.allCast ?? [],
+      locale,
+      settings.protagonist,
+    ),
   );
 
   const messages: Array<{

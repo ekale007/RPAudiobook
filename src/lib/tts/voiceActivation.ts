@@ -1,4 +1,5 @@
 import type { CharacterRow } from "@/lib/db/stories";
+import { PROTAGONIST_SPEAKER_SLUG } from "@/lib/story/protagonist";
 import type { StorySettings } from "@/lib/types";
 
 /** When undefined, every mapped cast slug may use its own voice (legacy). */
@@ -18,6 +19,7 @@ export function isCastVoiceActive(
 ): boolean {
   const slug = speakerSlug?.trim().toLowerCase();
   if (!slug || slug === "narrator") return false;
+  if (slug === PROTAGONIST_SPEAKER_SLUG) return true;
   if (enabledSlugs === undefined) return true;
   const target = normalizeVoiceSlug(slug);
   return enabledSlugs.some(
@@ -34,6 +36,10 @@ export function filterSegmentOverridesForActivation(
   const out: Record<string, string> = {};
   for (const [snippet, slug] of Object.entries(overrides)) {
     if (!snippet.trim() || !slug || slug === "narrator") continue;
+    if (slug === PROTAGONIST_SPEAKER_SLUG) {
+      out[snippet] = slug;
+      continue;
+    }
     if (isCastVoiceActive(slug, enabledSlugs)) {
       out[snippet] = slug;
     }

@@ -1,4 +1,9 @@
 import type { CharacterRow } from "@/lib/db/stories";
+import {
+  PROTAGONIST_SPEAKER_SLUG,
+  type StoryContentLocale,
+} from "@/lib/story/protagonist";
+import type { StoryProtagonistProfile } from "@/lib/types";
 
 const NPC_SLUGS = [
   "npc:mother",
@@ -10,44 +15,82 @@ const NPC_SLUGS = [
 /** Instructions appended to every storyteller chat system prompt. */
 export function buildStorytellerScriptInstructions(
   cast: CharacterRow[],
+  locale: StoryContentLocale = "en",
+  protagonist?: StoryProtagonistProfile | null,
 ): string {
   const castSlugs = cast
     .filter((c) => c.role === "cast" && (c.status ?? "active") === "active")
     .map((c) => `\`${c.slug}\` (${c.name})`);
   const slugList = [
-    "`narrator` (scene prose and the protagonist's spoken lines)",
+    "`narrator` (scene description only — no character dialogue)",
+    `\`${PROTAGONIST_SPEAKER_SLUG}\` (player / protagonist spoken lines)`,
     ...castSlugs,
     ...NPC_SLUGS.map((s) => `\`${s}\``),
-    "`guest:<name>` only when someone speaks who is not listed above (e.g. guest:zarek)",
+    "`guest:<name>` only when someone speaks who is not listed above",
   ];
+
+  const playerName =
+    protagonist?.displayName?.trim() ||
+    (locale === "de" ? "der Spieler" : "the player");
+
+  if (locale === "de") {
+    return `## Dialog-Skript (Pflicht in jeder Antwort)
+
+Markiere **wer spricht**, damit TTS die richtige Stimme nutzen kann.
+
+Format: \`<<speaker:slug>>\` in einer eigenen Zeile, danach Absatz (Prosa und/oder Zitat). Wechsel das Tag bei jedem Sprecherwechsel.
+
+Regeln:
+- Start mit \`<<speaker:narrator>>\` oder dem ersten Sprecher-Tag.
+- Jedes Tag **eigene Zeile** — nie mitten im Satz.
+- Szene / Erzählung → \`<<speaker:narrator>>\`
+- Gesprochene Zeilen von ${playerName} (Zweite Person „du“) → \`<<speaker:${PROTAGONIST_SPEAKER_SLUG}>>\`, nicht Cast-Slugs.
+- Zitate anderer Figuren → deren Cast-Slug, auch wenn „du“ im selben Absatz vorkommt.
+- Deutsche Anführungszeichen: „…“
+- Gäste: \`<<speaker:guest:name>>\` (kleingeschrieben).
+- Nur Figuren, die **in der Szene anwesend** sind, dürfen sprechen.
+- Gültige Slugs: ${slugList.join(", ")}.
+
+Beispiel:
+<<speaker:narrator>>
+Die Wirtin wischt sich die Hände ab und sieht dich an.
+
+<<speaker:marta>>
+„Noch ein Reisender im Nebel?“
+
+<<speaker:${PROTAGONIST_SPEAKER_SLUG}>>
+„Ich suche nur ein trockenes Zimmer.“
+
+<<speaker:marta>>
+„Dann hast du Glück — wenn du pünktlich zahlst.“`;
+  }
 
   return `## Dialogue script (required for every reply)
 
-You write one continuous scene. **Mark who is speaking** with inline tags so audio can use the correct voice.
+Mark **who is speaking** with inline tags so audio uses the correct voice.
 
-Format: \`<<speaker:slug>>\` on its own line, then that speaker's paragraph (prose and/or quoted dialogue). Switch tags whenever the speaker changes — including back to \`<<speaker:narrator>>\` for scene description and for the protagonist's lines.
+Format: \`<<speaker:slug>>\` on its own line, then that speaker's paragraph (prose and/or quoted dialogue). Switch tags whenever the speaker changes.
 
 Rules:
-- Start the reply with \`<<speaker:narrator>>\` or the first speaker's tag.
-- **Each tag must be on its own line** — never embed \`<<speaker:…>>\` inside a sentence or paragraph.
-- Put a tag before **each** stretch of text by a different speaker. Do not rely on the reader inferring speakers from nearby names.
-- Protagonist dialogue (including lines like "We're not done yet." or "How many?") uses \`<<speaker:narrator>>\`, not a cast member mentioned in the same paragraph.
-- Another character's quoted line uses **their** slug even if the protagonist or someone else is named nearby.
-- Guest speakers: \`<<speaker:guest:zarek>>\` (lowercase name after guest:).
-- Keep normal literary prose and punctuation; tags are stripped in the reader UI.
-- **Presence:** Only cast members who are physically in the current scene may speak. If plot state lists someone as absent or at a future meeting, do NOT give them dialogue until they explicitly return in the scene.
-- Valid slugs for this story: ${slugList.join(", ")}.
+- Start with \`<<speaker:narrator>>\` or the first speaker's tag.
+- **Each tag on its own line** — never embed tags inside a sentence.
+- Scene prose → \`<<speaker:narrator>>\`
+- ${playerName}'s spoken lines (second person "you") → \`<<speaker:${PROTAGONIST_SPEAKER_SLUG}>>\`, not a cast slug.
+- Another character's quoted line uses **their** slug even if "you" appears nearby.
+- Guest speakers: \`<<speaker:guest:name>>\` (lowercase after guest:).
+- Only cast who are **physically present** may speak.
+- Valid slugs: ${slugList.join(", ")}.
 
 Example:
+<<speaker:narrator>>
+Rain drums on the shingles as you push the door open.
+
 <<speaker:naya-vellen>>
 "You did it," she says simply.
 
-<<speaker:narrator>>
-"We're not done yet." You gesture toward Marcus, who's just finished another call. "How many?"
+<<speaker:${PROTAGONIST_SPEAKER_SLUG}>>
+"We're not done yet." You gesture toward the desk.
 
-<<speaker:marcus>>
-Marcus looks up from his notes. "Seventeen communities confirmed so far."
-
-<<speaker:guest:zarek>>
-Zarek exhales. "I am Zarek of the Kevali. We have too many."`;
+<<speaker:naya-vellen>>
+"Then tell me what you need."`;
 }

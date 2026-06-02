@@ -1,8 +1,12 @@
-import { extractMarkedSnippets } from "@/lib/chat/dialogueSpeakerInference";
+import { extractMarkedSnippets } from "@/lib/chat/dialogueQuotes";
 import { stripSpeakerTags } from "@/lib/chat/parseSpeakerBlocks";
 import type { CharacterRow } from "@/lib/db/stories";
 import { completeOpenRouter } from "@/lib/llm/openrouter";
-import type { OpenRouterSettings } from "@/lib/types";
+import {
+  PROTAGONIST_SPEAKER_SLUG,
+  type StoryContentLocale,
+} from "@/lib/story/protagonist";
+import type { OpenRouterSettings, StoryProtagonistProfile } from "@/lib/types";
 
 export type LlmAttributionEntry = {
   slug: string;
@@ -19,14 +23,26 @@ type LlmAttributionResponse = {
   }>;
 };
 
-function buildCastSlugList(cast: CharacterRow[]): string {
+function buildCastSlugList(
+  cast: CharacterRow[],
+  locale: StoryContentLocale,
+): string {
   const castSlugs = cast
     .filter((c) => c.role === "cast" && (c.status ?? "active") === "active")
     .map((c) => `- ${c.slug} (${c.name})`);
+  const narratorLine =
+    locale === "de"
+      ? "- narrator (nur Erzähltext, keine Dialogzeilen)"
+      : "- narrator (scene description only, not character dialogue)";
+  const protagonistLine =
+    locale === "de"
+      ? `- ${PROTAGONIST_SPEAKER_SLUG} (Spieler / Protagonist spricht)`
+      : `- ${PROTAGONIST_SPEAKER_SLUG} (player protagonist speaking)`;
   return [
-    "- narrator (scene description + protagonist Elias/Guardian speaking)",
+    narratorLine,
+    protagonistLine,
     ...castSlugs,
-    "- guest:<name> for one-off speakers (lowercase, e.g. guest:sera, guest:zarek)",
+    "- guest:<name> for one-off speakers (lowercase)",
     "- npc:mother, npc:father, npc:sister, npc:brother for family roles",
   ].join("\n");
 }
@@ -42,7 +58,6 @@ function parseLlmAttributionJson(raw: string): LlmAttributionResponse | null {
   }
 }
 
-/** Match LLM snippet to an extracted quote (exact or inner-text fallback). */
 function matchSnippetToExtracted(
   llmSnippet: string,
   extracted: string[],
@@ -51,9 +66,9 @@ function matchSnippetToExtracted(
   if (!t) return null;
   if (extracted.includes(t)) return t;
 
-  const inner = t.replace(/^["“”']|["“”']$/g, "").trim();
+  const inner = t.replace(/^["“”'„»«]|["“”'„»«]$/g, "").trim();
   for (const e of extracted) {
-    const eInner = e.replace(/^["“”']|["“”']$/g, "").trim();
+    const eInner = e.replace(/^["“”'„»«]|["“”'„»«]$/g, "").trim();
     if (eInner === inner || e.includes(inner) || inner.includes(eInner)) {
       return e;
     }
@@ -63,8 +78,16 @@ function matchSnippetToExtracted(
 
 function normalizeLlmSlug(raw: string): string {
   const s = raw.trim().toLowerCase();
-  if (!s || s === "narrator" || s === "protagonist" || s === "elias") {
-    return "narrator";
+  if (!s || s === "narrator") return "narrator";
+  if (
+    s === PROTAGONIST_SPEAKER_SLUG ||
+    s === "protagonist" ||
+    s === "player" ||
+    s === "elias" ||
+    s === "du" ||
+    s === "you"
+  ) {
+    return PROTAGONIST_SPEAKER_SLUG;
   }
   if (s.startsWith("guest:") || s.startsWith("npc:")) return s;
   return s.replace(/\s+/g, "-");
@@ -74,10 +97,15 @@ export async function attributeDialogueWithLlm(
   rawContent: string,
   cast: CharacterRow[],
   settings: OpenRouterSettings,
-  signal?: AbortSignal,
+  options?: {
+    locale?: StoryContentLocale;
+    protagonist?: StoryProtagonistProfile | null;
+    signal?: AbortSignal;
+  },
 ): Promise<LlmAttributionMap> {
+  const locale = options?.locale ?? "en";
   const text = stripSpeakerTags(rawContent);
-  const snippets = extractMarkedSnippets(text);
+  const snippets = extractMarkedSnippets(text, locale);
   const out: LlmAttributionMap = new Map();
 
   if (!snippets.length) return out;
@@ -86,7 +114,30 @@ export async function attributeDialogueWithLlm(
     .map((s, i) => `[${i + 1}] ${s.replace(/\s+/g, " ").slice(0, 220)}`)
     .join("\n");
 
-  const system = `You assign speakers to quoted dialogue in interactive fiction (second-person, protagonist = Elias/Guardian).
+  const playerName =
+    options?.protagonist?.displayName?.trim() ||
+    (locale === "de" ? "Spieler" : "player");
+
+  const system =
+    locale === "de"
+      ? `Du ordnest zitierte Dialogzeilen in interaktiver Literatur (Zweite Person, Protagonist = ${playerName}) Sprechern zu.
+
+Nur JSON:
+{
+  "attributions": [
+    { "snippet": "<exaktes Zitat aus der Liste>", "speaker_slug": "<slug>", "reason": "<kurz>" }
+  ]
+}
+
+Regeln:
+- Protagonist / „du“ spricht → ${PROTAGONIST_SPEAKER_SLUG}
+- Erzähltext ohne Figur → narrator (selten bei Zitaten)
+- Cast-Slugs exakt wenn eine Cast-Figur spricht
+- Einmalige Namen → guest:<name>
+- Familie → npc:mother usw.
+- „sagte sie“ / „flüsterte er“ vor dem Zitat → diese Figur
+- snippet muss exakt aus der Liste kopiert werden`
+      : `You assign speakers to quoted dialogue in interactive fiction (second person, protagonist = ${playerName}).
 
 Return JSON only:
 {
@@ -96,16 +147,15 @@ Return JSON only:
 }
 
 Rules:
-- Protagonist (Elias/Guardian/"You" speaking) → narrator
-- Use cast slugs exactly when a cast member speaks
+- Player / "you" speaking → ${PROTAGONIST_SPEAKER_SLUG}
+- Cast slugs exactly when a cast member speaks
 - One-off named characters → guest:<firstname lowercase>
 - Family roles → npc:mother etc.
-- "she teases" / "Naya laughs" before a quote → that character, not narrator
-- A paragraph may alternate speakers; each quote gets its own speaker
+- "she says" / name before a quote → that character
 - snippet must copy the quote text exactly from the input list`;
 
   const user = `Cast slugs:
-${buildCastSlugList(cast)}
+${buildCastSlugList(cast, locale)}
 
 Quotes to attribute:
 ${snippetList}
@@ -122,7 +172,7 @@ ${text.slice(0, 12000)}`;
     {
       maxTokens: 2048,
       temperature: 0.15,
-      signal,
+      signal: options?.signal,
       responseFormat: { type: "json_object" },
     },
   );

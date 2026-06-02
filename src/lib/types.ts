@@ -72,10 +72,19 @@ export type QwenVoiceProfile = {
   updatedAt?: string;
 };
 
+export type StoryProtagonistProfile = {
+  displayName: string;
+  /** de: du | sie | er — en: you | they */
+  pronouns: "du" | "sie" | "er" | "you" | "they";
+  gender?: "female" | "male" | "neutral";
+};
+
 export interface StorySettings {
   recentTurnCount: number;
   loreTokenBudget: number;
   voiceMap?: VoiceMap;
+  /** Player character — separate TTS slug `protagonist`. */
+  protagonist?: StoryProtagonistProfile;
   /** Per-slug Qwen instruct + preset when provider is qwen. */
   qwenVoiceProfiles?: Record<string, QwenVoiceProfile>;
   /** Auto mood from plot-state (location, threats). Default on. */

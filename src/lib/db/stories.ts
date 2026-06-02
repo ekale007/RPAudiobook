@@ -111,6 +111,18 @@ export async function deleteStory(storyId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function updateStoryLocale(
+  storyId: string,
+  locale: "de" | "en",
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("stories")
+    .update({ locale, updated_at: new Date().toISOString() })
+    .eq("id", storyId);
+  if (error) throw error;
+}
+
 export async function updateStoryTitle(
   storyId: string,
   title: string,

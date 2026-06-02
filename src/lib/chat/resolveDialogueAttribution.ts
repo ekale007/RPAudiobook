@@ -3,17 +3,26 @@ import {
   type LlmAttributionMap,
 } from "@/lib/chat/dialogueAttributionLlm";
 import { buildDialogueAttributionMap } from "@/lib/chat/dialogueScript";
-import { extractMarkedSnippets } from "@/lib/chat/dialogueSpeakerInference";
+import { extractMarkedSnippets } from "@/lib/chat/dialogueQuotes";
 import type { CharacterRow } from "@/lib/db/stories";
+import {
+  normalizeStoryContentLocale,
+  type StoryContentLocale,
+} from "@/lib/story/protagonist";
 import { loadOpenRouterSettings, isLlmReady } from "@/lib/storage/openRouterSettings";
 import {
   hashTurnContent,
   loadDialogueAttributionCache,
   saveDialogueAttributionCache,
 } from "@/lib/storage/dialogueAttributionCache";
-import type { OpenRouterSettings } from "@/lib/types";
+import type { OpenRouterSettings, StoryProtagonistProfile } from "@/lib/types";
 
 const inflight = new Map<string, Promise<LlmAttributionMap | null>>();
+
+export type DialogueAttributionOptions = {
+  locale?: StoryContentLocale | string | null;
+  protagonist?: StoryProtagonistProfile | null;
+};
 
 function cacheToMap(
   cached: NonNullable<ReturnType<typeof loadDialogueAttributionCache>>,
@@ -49,17 +58,16 @@ function saveMapToCache(
   });
 }
 
-/**
- * Resolve dialogue speakers for a turn (cache → LLM → heuristics-only map).
- * Safe to call multiple times; dedupes in-flight requests.
- */
 export async function ensureDialogueAttribution(
   turnId: string,
   content: string,
   cast: CharacterRow[],
   settings?: OpenRouterSettings | null,
+  options?: DialogueAttributionOptions,
 ): Promise<LlmAttributionMap | null> {
   if (!content.trim() || turnId.startsWith("tmp-")) return null;
+
+  const locale = normalizeStoryContentLocale(options?.locale ?? "en");
 
   const cached = loadDialogueAttributionCache(turnId, content);
   if (cached) return cacheToMap(cached);
@@ -68,14 +76,17 @@ export async function ensureDialogueAttribution(
   if (!orSettings) return null;
   if (!isLlmReady() && !orSettings.apiKey?.trim()) return null;
 
-  const snippets = extractMarkedSnippets(content);
+  const snippets = extractMarkedSnippets(content, locale);
   if (!snippets.length) return null;
 
-  const flightKey = `${turnId}:${hashTurnContent(content)}`;
+  const flightKey = `${turnId}:${hashTurnContent(content)}:${locale}`;
   const pending = inflight.get(flightKey);
   if (pending) return pending;
 
-  const work = attributeDialogueWithLlm(content, cast, orSettings)
+  const work = attributeDialogueWithLlm(content, cast, orSettings, {
+    locale,
+    protagonist: options?.protagonist,
+  })
     .then((map) => {
       if (map.size) saveMapToCache(turnId, content, map);
       return map.size ? map : null;
@@ -89,16 +100,17 @@ export async function ensureDialogueAttribution(
   return work;
 }
 
-/** Segment overrides for TTS (non-narrator only). */
 export function buildSegmentOverrides(
   rawContent: string,
   cast: CharacterRow[],
   llmMap: LlmAttributionMap | null | undefined,
+  locale: StoryContentLocale = "en",
 ): Record<string, string> {
   const attribution = buildDialogueAttributionMap(
     rawContent,
     cast,
     llmMap ?? undefined,
+    locale,
   );
   const out: Record<string, string> = {};
   for (const [snippet, slug] of attribution.entries()) {
@@ -111,20 +123,28 @@ export async function resolveSegmentOverridesForTurn(
   turnId: string,
   rawContent: string,
   cast: CharacterRow[],
+  options?: DialogueAttributionOptions,
 ): Promise<Record<string, string>> {
-  const llm = await ensureDialogueAttribution(turnId, rawContent, cast);
-  return buildSegmentOverrides(rawContent, cast, llm);
+  const locale = normalizeStoryContentLocale(options?.locale ?? "en");
+  const llm = await ensureDialogueAttribution(
+    turnId,
+    rawContent,
+    cast,
+    undefined,
+    options,
+  );
+  return buildSegmentOverrides(rawContent, cast, llm, locale);
 }
 
-/** Warm cache for upcoming playback (fire-and-forget). */
 export function prefetchDialogueAttributionBatch(
   turns: Array<{ id: string; content: string; role: string }>,
   cast: CharacterRow[],
+  options?: DialogueAttributionOptions,
 ): void {
   const settings = loadOpenRouterSettings();
   if (!isLlmReady() && !settings?.apiKey?.trim()) return;
   for (const t of turns) {
     if (t.role !== "assistant" || t.id.startsWith("tmp-")) continue;
-    void ensureDialogueAttribution(t.id, t.content, cast, settings);
+    void ensureDialogueAttribution(t.id, t.content, cast, settings, options);
   }
 }

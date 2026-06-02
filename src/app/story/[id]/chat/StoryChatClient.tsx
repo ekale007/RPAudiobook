@@ -10,6 +10,9 @@ import { isLlmReady } from "@/lib/storage/openRouterSettings";
 import { isTtsReady, loadTtsSettings } from "@/lib/storage/ttsSettings";
 import { useServerCapabilities } from "@/lib/server/useServerCapabilities";
 import Link from "next/link";
+import { ProtagonistSetupModal } from "@/components/story-hub/ProtagonistSetupModal";
+import { needsProtagonistSetup } from "@/lib/story/protagonist";
+import type { StorySettings } from "@/lib/types";
 
 function StoryChatInner() {
   const params = useParams();
@@ -24,6 +27,9 @@ function StoryChatInner() {
   const [bundle, setBundle] = useState<Awaited<
     ReturnType<typeof getStoryBundle>
   > | null>(null);
+  const [storySettings, setStorySettings] = useState<StorySettings | null>(
+    null,
+  );
 
   useEffect(() => {
     const supabase = createClient();
@@ -35,6 +41,7 @@ function StoryChatInner() {
       getStoryBundle(storyId, chapterParam)
         .then((b) => {
           setBundle(b);
+          setStorySettings(b.storySettings);
           setReady(true);
         })
         .catch((e) => setError(String(e)));
@@ -77,6 +84,10 @@ function StoryChatInner() {
         .join("\n\n") || null;
 
   const readOnly = bundle.activeChapter.status !== "active";
+  const showProtagonistSetup =
+    !readOnly &&
+    storySettings &&
+    needsProtagonistSetup(storySettings);
 
   return (
     <main className="flex h-dvh flex-col">
@@ -121,12 +132,26 @@ function StoryChatInner() {
             : null}
         </p>
       ) : null}
+      {showProtagonistSetup && storySettings ? (
+        <ProtagonistSetupModal
+          open
+          storyId={storyId}
+          storyLocale={(bundle.story.locale as string) ?? "de"}
+          storySettings={storySettings}
+          onComplete={(merged) => {
+            setStorySettings(merged);
+            setBundle((prev) =>
+              prev ? { ...prev, storySettings: merged } : prev,
+            );
+          }}
+        />
+      ) : null}
       <ChatView
         storyId={storyId}
         chapterId={bundle.activeChapter.id}
         character={bundle.narrator}
         cast={bundle.allCast}
-        storySettings={bundle.storySettings}
+        storySettings={storySettings ?? bundle.storySettings}
         loreEntries={bundle.loreEntries}
         chapter={bundle.activeChapter}
         bandSummary={bandSummary || null}

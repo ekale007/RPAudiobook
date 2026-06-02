@@ -15,6 +15,7 @@ import {
   preprocessAssistantMarkup,
   stripSpeakerTags,
 } from "@/lib/chat/parseSpeakerBlocks";
+import type { StoryContentLocale } from "@/lib/story/protagonist";
 
 export { hasSpeakerTags as hasSpeakerScriptTags };
 
@@ -34,13 +35,14 @@ export function buildDialogueAttributionMap(
   rawContent: string,
   cast: CharacterRow[],
   llm?: Map<string, { slug: string; reasons: string[] }>,
+  locale: StoryContentLocale = "en",
 ): Map<string, string> {
   const out = new Map<string, string>();
   const text = stripSpeakerTags(rawContent);
 
   if (!hasSpeakerTags(rawContent)) {
-    const snippets = extractMarkedSnippets(text);
-    const inferred = inferSpeakersOrdered(text, snippets, cast);
+    const snippets = extractMarkedSnippets(text, locale);
+    const inferred = inferSpeakersOrdered(text, snippets, cast, locale);
     for (const snippet of snippets) {
       const slug = inferred.get(snippet)?.slug ?? "narrator";
       if (slug !== "narrator") out.set(snippet, slug);
@@ -49,8 +51,8 @@ export function buildDialogueAttributionMap(
   }
 
   const blocks = parseSpeakerBlocks(rawContent);
-  const snippets = extractMarkedSnippets(text);
-  const inferred = inferSpeakersOrdered(text, snippets, cast);
+  const snippets = extractMarkedSnippets(text, locale);
+  const inferred = inferSpeakersOrdered(text, snippets, cast, locale);
 
   for (const snippet of snippets) {
     const block = findBlockForSnippet(blocks, snippet, text);
@@ -121,6 +123,7 @@ function findBlockForSnippet(
 
 function normalizeScriptSlug(slug: string, cast: CharacterRow[]): string {
   const lower = slug.toLowerCase().trim();
+  if (lower === "protagonist") return "protagonist";
   if (lower.startsWith("guest:") || lower.startsWith("npc:")) return lower;
   const hit = cast.find((c) => c.slug.toLowerCase() === lower);
   if (hit) return hit.slug;
@@ -131,12 +134,13 @@ export function analyzeDialogueAttribution(
   content: string,
   cast: CharacterRow[],
   llm?: Map<string, { slug: string; reasons: string[] }>,
+  locale: StoryContentLocale = "en",
 ): DialogueSnippetAnalysis[] {
   const text = stripSpeakerTags(content);
-  const snippets = extractMarkedSnippets(text);
+  const snippets = extractMarkedSnippets(text, locale);
   const tagged = hasSpeakerTags(content);
-  const attribution = buildDialogueAttributionMap(content, cast, llm);
-  const inferred = inferSpeakersOrdered(text, snippets, cast);
+  const attribution = buildDialogueAttributionMap(content, cast, llm, locale);
+  const inferred = inferSpeakersOrdered(text, snippets, cast, locale);
   const blocks = tagged ? parseSpeakerBlocks(content) : [];
 
   return snippets.map((snippet) => {
@@ -181,6 +185,7 @@ export function formatScriptAttributionDebug(
   content: string,
   cast: CharacterRow[],
   llm?: Map<string, { slug: string; reasons: string[] }>,
+  locale: StoryContentLocale = "en",
 ): string {
   const lines: string[] = [];
   const tagged = hasSpeakerTags(content);
@@ -194,7 +199,7 @@ export function formatScriptAttributionDebug(
   if (hasSpeakerTags(content)) {
     lines.push("script_blocks:");
     for (const block of parseSpeakerBlocks(content)) {
-      const quoteCount = extractMarkedSnippets(block.content).length;
+      const quoteCount = extractMarkedSnippets(block.content, locale).length;
       lines.push(
         `  - slug=${block.speakerSlug} | quotes=${quoteCount} | ${block.content.replace(/\s+/g, " ").slice(0, 80)}…`,
       );
@@ -203,7 +208,9 @@ export function formatScriptAttributionDebug(
 
   lines.push("");
   lines.push(
-    formatDialogueInferenceDebug(analyzeDialogueAttribution(content, cast, llm)),
+    formatDialogueInferenceDebug(
+      analyzeDialogueAttribution(content, cast, llm, locale),
+    ),
   );
   return lines.join("\n");
 }

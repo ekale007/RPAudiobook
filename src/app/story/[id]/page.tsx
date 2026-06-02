@@ -143,6 +143,7 @@ export default function StoryHubPage() {
         storyLocale={normalizeStoryLocale(data.story.locale as string)}
         activeChapterId={activeChapter?.id}
         onCastUpdated={load}
+        onLocaleUpdated={load}
         error={error}
         editingTitle={editingTitle}
         titleDraft={titleDraft}

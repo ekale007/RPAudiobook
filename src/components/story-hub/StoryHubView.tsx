@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { CastHubPanel } from "@/components/story-hub/CastHubPanel";
+import { StoryLocaleSection } from "@/components/story-hub/StoryLocaleSection";
 import { StoryCoverEditor } from "@/components/StoryCoverEditor";
 import type { ChapterRow, CharacterRow } from "@/lib/db/stories";
 import type { StorySettings } from "@/lib/types";
@@ -111,6 +112,7 @@ export function StoryHubView({
   onDeleteChapter,
   onToggleSummary,
   onCastUpdated,
+  onLocaleUpdated,
 }: {
   storyId: string;
   userId: string | null;
@@ -140,6 +142,7 @@ export function StoryHubView({
   onDeleteChapter: (ch: ChapterRow) => void;
   onToggleSummary: (id: string | null) => void;
   onCastUpdated?: () => void;
+  onLocaleUpdated?: () => void;
 }) {
   const [tab, setTab] = useState<HubTab>("story");
 
@@ -391,6 +394,11 @@ export function StoryHubView({
 
         {tab === "settings" ? (
           <div className="flex flex-col gap-1.5">
+            <StoryLocaleSection
+              storyId={storyId}
+              locale={storyLocale}
+              onUpdated={onLocaleUpdated}
+            />
             <SettingsLink
               href={`/story/${storyId}/world`}
               title="Welt & Lorebook"

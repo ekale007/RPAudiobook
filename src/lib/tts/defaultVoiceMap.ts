@@ -11,6 +11,7 @@ import {
 } from "@/lib/tts/elevenLabsVoices";
 import type { TtsProvider } from "@/lib/storage/ttsSettings";
 import { normalizeStoryLocale } from "@/lib/tts/ttsLocaleRouting";
+import { withProtagonistVoice } from "@/lib/story/protagonist";
 import { sanitizeVoiceMapForQwen } from "@/lib/tts/qwenVoiceSanitize";
 
 /** Default Kokoro voices for When Dawn Breaks cast (slug → voice id). */
@@ -47,13 +48,15 @@ export function mergeVoiceMapForProvider(
   locale: string | null | undefined,
   custom?: VoiceMap | null,
 ): VoiceMap {
+  let map: VoiceMap;
   if (provider === "elevenlabs") {
-    return mergeElevenVoiceMap(normalizeStoryLocale(locale), custom);
+    map = mergeElevenVoiceMap(normalizeStoryLocale(locale), custom);
+  } else if (provider === "qwen" || provider === "qwen-cloud") {
+    map = sanitizeVoiceMapForQwen({ ...DEFAULT_QWEN_VOICE_MAP, ...custom });
+  } else {
+    map = mergeVoiceMap(custom);
   }
-  if (provider === "qwen" || provider === "qwen-cloud") {
-    return sanitizeVoiceMapForQwen({ ...DEFAULT_QWEN_VOICE_MAP, ...custom });
-  }
-  return mergeVoiceMap(custom);
+  return withProtagonistVoice(map);
 }
 
 /** Normalize a voice map before persisting to story settings (provider-safe IDs only). */
@@ -90,6 +93,13 @@ export function voiceForSpeaker(
   const slug = (speakerSlug?.trim() || "narrator").toLowerCase();
   if (slug === "narrator") {
     return voiceMap.narrator ?? fallback;
+  }
+  if (slug === "protagonist") {
+    return (
+      voiceMap.protagonist?.trim() ||
+      voiceMap.narrator?.trim() ||
+      fallback
+    );
   }
 
   if (!isCastVoiceActive(slug, voiceEnabledSlugs)) {

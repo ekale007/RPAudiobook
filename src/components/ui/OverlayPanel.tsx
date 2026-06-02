@@ -8,17 +8,20 @@ export function OverlayPanel({
   title,
   children,
   wide,
+  blocking = false,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
   wide?: boolean;
+  /** When true, backdrop click and Escape do not close. */
+  blocking?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (!blocking && e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
@@ -27,18 +30,25 @@ export function OverlayPanel({
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [open, onClose]);
+  }, [open, onClose, blocking]);
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-      <button
-        type="button"
-        aria-label="Schließen"
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      {blocking ? (
+        <div
+          className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+          aria-hidden
+        />
+      ) : (
+        <button
+          type="button"
+          aria-label="Schließen"
+          className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+          onClick={onClose}
+        />
+      )}
       <div
         role="dialog"
         aria-modal="true"

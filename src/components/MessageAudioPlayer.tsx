@@ -255,6 +255,10 @@ export const MessageAudioPlayer = forwardRef<
           turnId,
           rawContent,
           cast,
+          {
+            locale: storyLocale,
+            protagonist: storySettings?.protagonist,
+          },
         );
       }
 

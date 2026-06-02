@@ -321,8 +321,11 @@ export function ChatView({
 
   useEffect(() => {
     if (!turns.length) return;
-    prefetchDialogueAttributionBatch(turns, allCast);
-  }, [turns, allCast]);
+    prefetchDialogueAttributionBatch(turns, allCast, {
+      locale: storyLocale,
+      protagonist: storySettings.protagonist,
+    });
+  }, [turns, allCast, storyLocale, storySettings.protagonist]);
 
   useEffect(() => {
     load().catch((e) => setError(String(e)));
@@ -715,6 +718,7 @@ export function ChatView({
         allCast: opts.allCast ?? allCast,
         continuation: opts.continuation,
         continuationPrompt: opts.continuationPrompt,
+        storyLocale,
         onLoreCount: setLoreCount,
         signal: abortRef.current.signal,
       });
@@ -821,6 +825,7 @@ export function ChatView({
     plotState,
     allCast,
     settings: storySettings,
+    storyLocale,
   });
 
   const requestBeatSuggestions = async () => {

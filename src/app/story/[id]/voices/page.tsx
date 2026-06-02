@@ -30,6 +30,7 @@ import {
 } from "@/lib/tts/qwenVoiceProfiles";
 import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
 import { defaultEnabledCastSlugs } from "@/lib/tts/voiceActivation";
+import { PROTAGONIST_SPEAKER_SLUG } from "@/lib/story/protagonist";
 import { normalizeStoryLocale } from "@/lib/tts/ttsLocaleRouting";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
 import type { QwenVoiceProfile, VoiceMap } from "@/lib/types";
@@ -86,6 +87,7 @@ export default function StoryVoicesPage() {
   const [storyLocale, setStoryLocale] = useState<"de" | "en">("de");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [protagonistLabel, setProtagonistLabel] = useState("Protagonist");
   const [expandedSlug, setExpandedSlug] = useState<string | null>("narrator");
 
   useEffect(() => {
@@ -129,6 +131,10 @@ export default function StoryVoicesPage() {
               settings.voiceEnabledSlugs ??
                 defaultEnabledCastSlugs(castRows),
             );
+            setProtagonistLabel(
+              settings.protagonist?.displayName?.trim() ||
+                (locale === "de" ? "Protagonist (du)" : "Protagonist (you)"),
+            );
           })
           .catch((e) => setError(String(e)));
       });
@@ -152,12 +158,23 @@ export default function StoryVoicesPage() {
     return [
       {
         slug: "narrator",
-        name: narrator?.name ?? "Narrator",
+        name: narrator?.name ?? (storyLocale === "de" ? "Erzähler" : "Narrator"),
         isNarrator: true,
+        isProtagonist: false,
       },
-      ...castSpeakers.map((c) => ({ ...c, isNarrator: false })),
+      {
+        slug: PROTAGONIST_SPEAKER_SLUG,
+        name: protagonistLabel,
+        isNarrator: false,
+        isProtagonist: true,
+      },
+      ...castSpeakers.map((c) => ({
+        ...c,
+        isNarrator: false,
+        isProtagonist: false,
+      })),
     ];
-  }, [cast]);
+  }, [cast, storyLocale, protagonistLabel]);
 
   const toggleVoiceActive = (slug: string, active: boolean) => {
     setVoiceEnabledSlugs((prev) => {
@@ -242,9 +259,13 @@ export default function StoryVoicesPage() {
         <ul className="flex flex-col gap-2">
           {speakers.map((s) => {
             const voiceActive =
-              s.isNarrator || voiceEnabledSlugs.includes(s.slug);
+              s.isNarrator ||
+              s.isProtagonist ||
+              voiceEnabledSlugs.includes(s.slug);
             const voiceDisabled =
-              !s.isNarrator && !voiceEnabledSlugs.includes(s.slug);
+              !s.isNarrator &&
+              !s.isProtagonist &&
+              !voiceEnabledSlugs.includes(s.slug);
             const currentVoice =
               voiceMap[s.slug] ?? defaults[s.slug] ?? fallback;
             const expanded = expandedSlug === s.slug;
@@ -281,6 +302,10 @@ export default function StoryVoicesPage() {
                   {s.isNarrator ? (
                     <span className="shrink-0 text-[9px] uppercase tracking-wide text-accent">
                       Erzähler
+                    </span>
+                  ) : s.isProtagonist ? (
+                    <span className="shrink-0 text-[9px] uppercase tracking-wide text-zinc-400">
+                      Du
                     </span>
                   ) : (
                     <label
