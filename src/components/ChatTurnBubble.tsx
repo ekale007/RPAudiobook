@@ -41,6 +41,7 @@ export function ChatTurnBubble({
   storyLocale,
   storySettings,
   chapterTitle,
+  onCloudQuotaChange,
 }: {
   turn: TurnRow;
   cast: CharacterRow[];
@@ -66,6 +67,7 @@ export function ChatTurnBubble({
   storyLocale?: string;
   storySettings?: StorySettings;
   chapterTitle?: string | null;
+  onCloudQuotaChange?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(turn.content);
@@ -294,6 +296,7 @@ export function ChatTurnBubble({
             storyLocale={storyLocale}
             storySettings={storySettings}
             chapterTitle={chapterTitle}
+            onCloudQuotaChange={onCloudQuotaChange}
           />
         ) : null}
 

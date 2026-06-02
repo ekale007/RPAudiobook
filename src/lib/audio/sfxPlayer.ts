@@ -4,6 +4,9 @@ type ActiveLoop = {
   id: string;
   source: AudioBufferSourceNode;
   gain: GainNode;
+  /** Base volume from catalog (restored on resume). */
+  baseVolume: number;
+  paused: boolean;
 };
 
 let ctx: AudioContext | null = null;
@@ -20,6 +23,19 @@ function getContext(): AudioContext | null {
     ctx = new Ctx();
   }
   return ctx;
+}
+
+async function ensureContextRunning(): Promise<AudioContext | null> {
+  const audioCtx = getContext();
+  if (!audioCtx) return null;
+  if (audioCtx.state === "suspended") {
+    try {
+      await audioCtx.resume();
+    } catch {
+      /* ignore */
+    }
+  }
+  return audioCtx;
 }
 
 async function loadBuffer(entry: SfxEntry): Promise<AudioBuffer | null> {
@@ -58,8 +74,14 @@ export async function playSfx(id: string): Promise<void> {
 }
 
 async function startLoop(entry: SfxEntry): Promise<void> {
-  if (activeLoops.has(entry.id)) return;
-  const audioCtx = getContext();
+  const existing = activeLoops.get(entry.id);
+  if (existing) {
+    if (existing.paused) {
+      resumeSfxLoop(entry.id);
+    }
+    return;
+  }
+  const audioCtx = await ensureContextRunning();
   if (!audioCtx) return;
   const buffer = await loadBuffer(entry);
   if (!buffer) return;
@@ -72,7 +94,46 @@ async function startLoop(entry: SfxEntry): Promise<void> {
   source.connect(gain);
   gain.connect(audioCtx.destination);
   source.start();
-  activeLoops.set(entry.id, { id: entry.id, source, gain });
+  activeLoops.set(entry.id, {
+    id: entry.id,
+    source,
+    gain,
+    baseVolume: entry.volume,
+    paused: false,
+  });
+}
+
+function resumeSfxLoop(id: string): void {
+  const active = activeLoops.get(id);
+  const entry = getSfxEntry(id);
+  if (!active || !entry) return;
+  const audioCtx = getContext();
+  if (!audioCtx) return;
+  active.paused = false;
+  active.gain.gain.setValueAtTime(active.baseVolume, audioCtx.currentTime);
+}
+
+/** Mute ambience loops while TTS is paused (keeps sources for seamless resume). */
+export function pauseAllSfxLoops(): void {
+  const audioCtx = getContext();
+  if (!audioCtx) return;
+  for (const active of activeLoops.values()) {
+    if (active.paused) continue;
+    active.paused = true;
+    active.gain.gain.setValueAtTime(0, audioCtx.currentTime);
+  }
+}
+
+/** Restore ambience loops after TTS resume. */
+export function resumeAllSfxLoops(): void {
+  void ensureContextRunning();
+  for (const id of activeLoops.keys()) {
+    resumeSfxLoop(id);
+  }
+}
+
+export function hasActiveAmbienceLoops(): boolean {
+  return activeLoops.size > 0;
 }
 
 export function stopSfxLoop(id: string): void {
@@ -92,8 +153,9 @@ export function stopAllSfx(): void {
   }
 }
 
-/** Play tags from turn text; loops persist until stopAllSfx. */
+/** Play tags from turn text; loops persist until stopAllSfx or pauseAllSfxLoops. */
 export async function playSfxForTags(tagIds: string[]): Promise<void> {
+  await ensureContextRunning();
   for (const id of tagIds) {
     await playSfx(id);
   }

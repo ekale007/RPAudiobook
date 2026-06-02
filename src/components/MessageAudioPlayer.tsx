@@ -10,18 +10,21 @@ import {
 } from "react";
 import type { MessageAudioPlayerHandle } from "@/lib/tts/messageAudioPlayerHandle";
 import { createClient } from "@/lib/supabase/client";
-import {
-  downloadTurnAudio,
-  setTurnAudioPath,
-  uploadTurnAudio,
-} from "@/lib/db/ttsStorage";
+import { downloadTurnAudio } from "@/lib/db/ttsStorage";
+import { storeTurnAudioToCloud } from "@/lib/tts/storeTurnAudioCloud";
 import { getNarratorAudio } from "@/lib/tts/narratorTts";
 import type { CharacterRow } from "@/lib/db/stories";
 import type { VoiceMap, StorySettings } from "@/lib/types";
 import { loadTtsSettings, ttsCacheVoiceKey } from "@/lib/storage/ttsSettings";
 import { ambienceIdsFromPlot, parseSfxTags } from "@/lib/audio/sfxCatalog";
 import { isStoryDeliveryEnabled } from "@/lib/tts/resolveStoryDelivery";
-import { playSfxForTags, stopAllSfx } from "@/lib/audio/sfxPlayer";
+import {
+  hasActiveAmbienceLoops,
+  pauseAllSfxLoops,
+  playSfxForTags,
+  resumeAllSfxLoops,
+  stopAllSfx,
+} from "@/lib/audio/sfxPlayer";
 import { isServerElevenLabsAvailable, refreshServerCapabilities } from "@/lib/server/serverCapabilities";
 import {
   clampPlaybackRate,
@@ -82,6 +85,7 @@ export const MessageAudioPlayer = forwardRef<
     storyLocale?: string;
     storySettings?: StorySettings;
     chapterTitle?: string | null;
+    onCloudQuotaChange?: () => void;
   }
 >(function MessageAudioPlayer(
   {
@@ -101,11 +105,13 @@ export const MessageAudioPlayer = forwardRef<
     storyLocale,
     storySettings,
     chapterTitle,
+    onCloudQuotaChange,
   },
   ref,
 ) {
   const [status, setStatus] = useState<Status>("idle");
   const [saving, setSaving] = useState(false);
+  const [cloudSaved, setCloudSaved] = useState(Boolean(audioStoragePath));
   const [error, setError] = useState<string | null>(null);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
@@ -159,6 +165,10 @@ export const MessageAudioPlayer = forwardRef<
   }, []);
 
   useEffect(() => {
+    setCloudSaved(Boolean(audioStoragePath));
+  }, [audioStoragePath]);
+
+  useEffect(() => {
     const audio = audioRef.current;
     if (audio) audio.playbackRate = playbackRate;
   }, [playbackRate]);
@@ -202,6 +212,7 @@ export const MessageAudioPlayer = forwardRef<
     setCurrentTime(0);
     setDuration(0);
     blobRef.current = null;
+    stopAllSfx();
   }, [turnId, text, rawContent, cleanupUrl]);
 
   const attachAudio = (audio: HTMLAudioElement) => {
@@ -327,15 +338,12 @@ export const MessageAudioPlayer = forwardRef<
           storySettings,
         });
 
-        const supabase = createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (user && !turnId.startsWith("tmp-")) {
-          const path = await uploadTurnAudio(user.id, turnId, blob);
-          if (path) {
-            await setTurnAudioPath(turnId, path);
-            onStoragePath?.(path);
+        if (!audioStoragePath && !turnId.startsWith("tmp-")) {
+          const stored = await storeTurnAudioToCloud(turnId, blob);
+          if (stored.ok && stored.path) {
+            setCloudSaved(true);
+            onStoragePath?.(stored.path);
+            onCloudQuotaChange?.();
           }
         }
       }
@@ -394,16 +402,25 @@ export const MessageAudioPlayer = forwardRef<
     reject(error instanceof Error ? error : new Error(String(error)));
   };
 
-  const startPlayback = async (audio: HTMLAudioElement): Promise<void> => {
+  const sfxIdsForTurn = useCallback((): string[] => {
     const sfxSource = rawContent ?? text;
-    const sfxIds = [
+    return [
       ...parseSfxTags(sfxSource),
       ...(isStoryDeliveryEnabled(storySettings)
         ? ambienceIdsFromPlot(storySettings?.plotState)
         : []),
     ].filter((id, i, arr) => arr.indexOf(id) === i);
-    if (sfxIds.length) {
-      void playSfxForTags(sfxIds);
+  }, [rawContent, text, storySettings]);
+
+  const startPlayback = async (
+    audio: HTMLAudioElement,
+    options?: { resumeAmbience?: boolean },
+  ): Promise<void> => {
+    const sfxIds = sfxIdsForTurn();
+    if (options?.resumeAmbience && hasActiveAmbienceLoops()) {
+      resumeAllSfxLoops();
+    } else if (sfxIds.length) {
+      await playSfxForTags(sfxIds);
     }
     await audio.play();
     setAutoplayBlocked(false);
@@ -440,6 +457,7 @@ export const MessageAudioPlayer = forwardRef<
 
   const pause = () => {
     audioRef.current?.pause();
+    pauseAllSfxLoops();
     setStatus("paused");
     syncTimesFromAudio();
     if ("mediaSession" in navigator) {
@@ -453,7 +471,7 @@ export const MessageAudioPlayer = forwardRef<
       return;
     }
     try {
-      await startPlayback(audio);
+      await startPlayback(audio, { resumeAmbience: status === "paused" });
     } catch (error) {
       if (isAutoplayBlockedError(error)) {
         setStatus("ready");
@@ -496,7 +514,7 @@ export const MessageAudioPlayer = forwardRef<
     }
   };
 
-  const saveToDevice = async () => {
+  const downloadToDevice = async () => {
     if (saving) return;
     setSaving(true);
     unlockAudioForAutoplay();
@@ -521,7 +539,49 @@ export const MessageAudioPlayer = forwardRef<
         storySettings,
         chapterTitle,
       });
-      if (!result.ok) setError(result.error ?? "Speichern fehlgeschlagen");
+      if (!result.ok) setError(result.error ?? "Download fehlgeschlagen");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveToCloud = async () => {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    unlockAudioForAutoplay();
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setError("Bitte einloggen, um in der Cloud zu speichern.");
+        return;
+      }
+      if (turnId.startsWith("tmp-")) {
+        setError("Nachricht noch nicht gespeichert — bitte kurz warten.");
+        return;
+      }
+
+      let blob = blobRef.current;
+      if (!blob) {
+        await ensureAudio();
+        blob = blobRef.current;
+      }
+      if (!blob) {
+        setError("Keine Audio-Datei — zuerst ▶ zum Erzeugen tippen.");
+        return;
+      }
+
+      const stored = await storeTurnAudioToCloud(turnId, blob);
+      if (stored.ok && stored.path) {
+        setCloudSaved(true);
+        onStoragePath?.(stored.path);
+        onCloudQuotaChange?.();
+        return;
+      }
+      setError(stored.error ?? "Cloud-Speichern fehlgeschlagen");
     } finally {
       setSaving(false);
     }
@@ -529,6 +589,7 @@ export const MessageAudioPlayer = forwardRef<
 
   const resetPlayback = () => {
     finishPlayWait();
+    stopAllSfx();
     stopTick();
     audioRef.current?.pause();
     if (audioRef.current) audioRef.current.currentTime = 0;
@@ -622,15 +683,30 @@ export const MessageAudioPlayer = forwardRef<
                     : "Anhören"}
         </span>
         {status !== "loading" ? (
-          <button
-            type="button"
-            onClick={() => void saveToDevice()}
-            disabled={saving}
-            className="shrink-0 rounded px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 disabled:opacity-40"
-            title="MP3 auf Gerät speichern"
-          >
-            {saving ? "…" : "Speichern"}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => void saveToCloud()}
+              disabled={saving || cloudSaved}
+              className="shrink-0 rounded px-2 py-1 text-xs text-accent hover:text-accent/90 disabled:opacity-50"
+              title={
+                cloudSaved
+                  ? "Bereits in der Cloud gespeichert"
+                  : "MP3 in Supabase Cloud speichern"
+              }
+            >
+              {saving ? "…" : cloudSaved ? "✓ Cloud" : "Cloud"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void downloadToDevice()}
+              disabled={saving}
+              className="shrink-0 rounded px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 disabled:opacity-40"
+              title="MP3 auf Gerät herunterladen"
+            >
+              ↓
+            </button>
+          </>
         ) : null}
         {showTransport ? (
           <button

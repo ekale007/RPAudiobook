@@ -35,6 +35,7 @@ Checkliste für Beta-Deploy mit Server-LLM/TTS (ElevenLabs + OpenRouter).
 | `BETA_LLM_COMPLETION_CENTS_PER_1K` | nein | Fallback-Schätzung wenn Modell unbekannt |
 | `RATE_LIMIT_LLM_PER_HOUR` | nein | Beta: `200`–`500` |
 | `RATE_LIMIT_TTS_PER_HOUR` | nein | Beta: `200`–`400` |
+| `TTS_STORAGE_MAX_PER_USER` | nein | Cloud-MP3 pro Account (Default `100`); Migration `008` |
 | `BETA_LLM_BUDGET_CENTS` | nein | Default `10000` (= 100 €) |
 
 3. Deploy auslösen → Build muss grün sein (`npm run build` lokal vorher testen)

@@ -77,6 +77,10 @@ import type { MessageAudioPlayerHandle } from "@/lib/tts/messageAudioPlayerHandl
 import { TtsAutoplayQueue } from "@/lib/tts/ttsAutoplayQueue";
 import { ttsPlayerWaitMs } from "@/lib/tts/mobilePlayback";
 import { unlockAudioForAutoplay, startAudioSession, stopAudioSession } from "@/lib/tts/audioUnlock";
+import {
+  fetchTtsStorageQuota,
+  type TtsStorageQuota,
+} from "@/lib/tts/storeTurnAudioCloud";
 import { TtsMobileUnlockBar } from "@/components/TtsMobileUnlockBar";
 import { saveTtsAutoplay } from "@/lib/storage/ttsPlaybackSettings";
 import { ChatScrollPane } from "@/components/ChatScrollPane";
@@ -182,6 +186,9 @@ export function ChatView({
   const [ttsPlayingTurnId, setTtsPlayingTurnId] = useState<string | null>(null);
   const [ttsQueuedTurnIds, setTtsQueuedTurnIds] = useState<string[]>([]);
   const [ttsBlockedTurnId, setTtsBlockedTurnId] = useState<string | null>(null);
+  const [ttsCloudQuota, setTtsCloudQuota] = useState<TtsStorageQuota | null>(
+    null,
+  );
   const [copiedChatDebug, setCopiedChatDebug] = useState(false);
   const bubbleRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const chatScrollRef = useRef<HTMLDivElement>(null);
@@ -210,6 +217,19 @@ export function ChatView({
       queue.setAutoplayClearedHandler(null);
     };
   }, []);
+
+  const refreshTtsCloudQuota = useCallback(() => {
+    void fetchTtsStorageQuota().then(setTtsCloudQuota);
+  }, []);
+
+  useEffect(() => {
+    if (!hasTts) return;
+    void createClient()
+      .auth.getUser()
+      .then(({ data: { user } }) => {
+        if (user) refreshTtsCloudQuota();
+      });
+  }, [hasTts, refreshTtsCloudQuota]);
 
   const registerTtsPlayer = useCallback(
     (turnId: string, player: MessageAudioPlayerHandle | null) => {
@@ -1248,6 +1268,7 @@ export function ChatView({
                       row.id === id ? { ...row, audio_storage_path: path } : row,
                     ),
                   );
+                  refreshTtsCloudQuota();
                 }}
                 registerTtsPlayer={hasTts ? registerTtsPlayer : undefined}
                 ttsAutoplayChain={ttsAutoplay && hasTts}
@@ -1261,6 +1282,7 @@ export function ChatView({
                 storyLocale={storyLocale}
                 storySettings={ttsStorySettings}
                 chapterTitle={chapterLabel}
+                onCloudQuotaChange={refreshTtsCloudQuota}
                 showDialogueMarkup
               />
             </div>
@@ -1301,6 +1323,14 @@ export function ChatView({
           onActivityCancel={toolsActivity?.onCancel}
         >
           <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+            {ttsCloudQuota ? (
+              <span
+                className="shrink-0 rounded-full border border-surface-border px-3 py-1 text-zinc-500"
+                title="Gespeicherte TTS-Aufnahmen in Supabase"
+              >
+                Cloud: {ttsCloudQuota.used}/{ttsCloudQuota.max}
+              </span>
+            ) : null}
             {hasTts ? (
               <TtsAutoplayToggle
                 enabled={ttsAutoplay}
