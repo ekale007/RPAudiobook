@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ElevenVoiceCatalogEntry } from "@/lib/tts/elevenLabsVoices";
 import {
+  clearElevenLabsVoiceCatalogCache,
   elevenVoiceOptionLabel,
-  loadElevenLabsVoiceCatalog,
+  loadElevenLabsVoiceCatalogDetailed,
 } from "@/lib/tts/elevenLabsCatalogClient";
 import { fetchElevenLabsPreview } from "@/lib/tts/elevenLabsPreview";
 import { isValidElevenLabsVoiceId } from "@/lib/tts/elevenLabsVoices";
@@ -25,6 +26,7 @@ export function ElevenLabsVoiceSelect({
   allowCustom?: boolean;
 }) {
   const [voices, setVoices] = useState<ElevenVoiceCatalogEntry[]>([]);
+  const [catalogHint, setCatalogHint] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [previewing, setPreviewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,11 +35,24 @@ export function ElevenLabsVoiceSelect({
   const [showCustomInput, setShowCustomInput] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const autoPickedRef = useRef(false);
 
   useEffect(() => {
-    loadElevenLabsVoiceCatalog()
-      .then(setVoices)
+    clearElevenLabsVoiceCatalogCache();
+    loadElevenLabsVoiceCatalogDetailed()
+      .then((result) => {
+        setCatalogHint(result.hint);
+        setVoices(result.voices);
+        if (!autoPickedRef.current && result.voices.length === 1) {
+          const only = result.voices[0]!.id;
+          if (!value || !result.voices.some((v) => v.id === value)) {
+            onChange(only);
+          }
+          autoPickedRef.current = true;
+        }
+      })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load catalog once per mount
   }, []);
 
   useEffect(() => {
@@ -137,6 +152,9 @@ export function ElevenLabsVoiceSelect({
       {label ? (
         <label className="mb-1 block text-[10px] text-zinc-500">{label}</label>
       ) : null}
+      {catalogHint && !loading ? (
+        <p className="mb-1 text-[10px] leading-snug text-zinc-500">{catalogHint}</p>
+      ) : null}
       {!known && value && !loading ? (
         <p className="mb-1 text-[10px] text-amber-200/90">
           Diese ID ist nicht in deinem ElevenLabs-Konto — bitte eine Stimme aus
@@ -151,7 +169,9 @@ export function ElevenLabsVoiceSelect({
           className="min-w-0 flex-1 rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-xs disabled:cursor-not-allowed"
         >
           {loading ? (
-            <option value={value}>Lade Stimmen…</option>
+            <option value={value}>Lade My Voices…</option>
+          ) : allOptions.length === 0 ? (
+            <option value="">Keine Stimmen in My Voices</option>
           ) : (
             allOptions.map((v) => (
               <option key={v.id} value={v.id}>

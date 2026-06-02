@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  getElevenLabsVoiceCatalog,
-  getElevenLabsVoiceCatalogStatic,
-} from "@/lib/server/elevenLabsCatalog";
-import { getElevenLabsApiKey } from "@/lib/server/env";
+import { getElevenLabsVoiceCatalog } from "@/lib/server/elevenLabsCatalog";
+import { ELEVEN_CATALOG_REVISION } from "@/lib/server/elevenLabsAccount";
 import { requireUser } from "@/lib/server/requireUser";
 import { ELEVEN_TTS_MODEL_OPTIONS } from "@/lib/tts/elevenLabsModels";
 
@@ -13,12 +10,16 @@ export async function GET(req: Request) {
   if ("error" in auth) return auth.error;
 
   try {
-    const voices = getElevenLabsApiKey()
-      ? await getElevenLabsVoiceCatalog()
-      : getElevenLabsVoiceCatalogStatic();
+    const catalog = await getElevenLabsVoiceCatalog();
     return NextResponse.json(
-      { voices, models: ELEVEN_TTS_MODEL_OPTIONS },
-      { headers: { "Cache-Control": "private, max-age=900" } },
+      {
+        revision: ELEVEN_CATALOG_REVISION,
+        voices: catalog.voices,
+        source: catalog.source,
+        hint: catalog.hint,
+        models: ELEVEN_TTS_MODEL_OPTIONS,
+      },
+      { headers: { "Cache-Control": "private, max-age=60" } },
     );
   } catch (e) {
     return NextResponse.json(
