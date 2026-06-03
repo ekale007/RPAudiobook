@@ -38,9 +38,17 @@ export function isIOSDevice(): boolean {
   return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
 }
 
-/** Prefer Web Audio for autoplay chains on iOS (and iPadOS desktop UA). */
-export function shouldUseWebAudioForTts(): boolean {
+/**
+ * Web Audio helped first iOS autoplay unlock; HTML <audio> is required for
+ * lock-screen / CarPlay Now Playing and chained clips while backgrounded.
+ */
+export function preferHtmlMediaPlayback(): boolean {
   return isIOSDevice();
+}
+
+/** @deprecated Use preferHtmlMediaPlayback — Web Audio does not chain on locked iOS. */
+export function shouldUseWebAudioForTts(): boolean {
+  return false;
 }
 
 export function isWebAudioTtsActive(): boolean {

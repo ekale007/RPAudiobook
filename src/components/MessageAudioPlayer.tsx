@@ -62,11 +62,17 @@ import {
   isWebAudioTtsActive,
   pauseWebAudioPlayback,
   playBlobViaWebAudio,
+  preferHtmlMediaPlayback,
   resumeWebAudioPlayback,
   seekWebAudioPlayback,
-  shouldUseWebAudioForTts,
   stopActiveTtsSource,
 } from "@/lib/tts/mobileAudioPlayback";
+import {
+  clearTtsNowPlaying,
+  setTtsMediaPlaybackState,
+  setTtsNowPlaying,
+  syncTtsMediaPosition,
+} from "@/lib/tts/ttsMediaSession";
 import {
   audioFilenameForTurn,
   downloadBlob,
@@ -74,6 +80,14 @@ import {
 import { saveTurnAudioToDevice } from "@/lib/audio/saveTurnAudio";
 
 type Status = "idle" | "loading" | "ready" | "playing" | "paused" | "error";
+
+function nowPlayingTitle(text: string, chapterTitle?: string | null): string {
+  const snippet = text.replace(/\s+/g, " ").trim().slice(0, 72);
+  if (chapterTitle?.trim()) {
+    return snippet ? `${chapterTitle} — ${snippet}` : chapterTitle;
+  }
+  return snippet || "Erzähler";
+}
 
 export type { MessageAudioPlayerHandle };
 
@@ -244,6 +258,17 @@ export const MessageAudioPlayer = forwardRef<
     audio.playbackRate = playbackRate;
     audio.ontimeupdate = () => {
       if (!seeking) setCurrentTime(audio.currentTime);
+      if (
+        !audio.paused &&
+        Number.isFinite(audio.duration) &&
+        audio.duration > 0
+      ) {
+        syncTtsMediaPosition(
+          audio.currentTime,
+          audio.duration,
+          audio.playbackRate,
+        );
+      }
     };
     audio.onloadedmetadata = () => {
       if (Number.isFinite(audio.duration)) setDuration(audio.duration);
@@ -253,9 +278,7 @@ export const MessageAudioPlayer = forwardRef<
       setStatus("ready");
       setCurrentTime(0);
       if (audioRef.current) audioRef.current.currentTime = 0;
-      if ("mediaSession" in navigator) {
-        navigator.mediaSession.playbackState = "none";
-      }
+      clearTtsNowPlaying();
       playEndRef.current?.();
       playEndRef.current = null;
     };
@@ -388,12 +411,6 @@ export const MessageAudioPlayer = forwardRef<
       audioRef.current = audio;
       attachAudio(audio);
 
-      if ("mediaSession" in navigator) {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: "Story narration",
-        });
-      }
-
       setStatus("ready");
       return audio;
     } catch (e) {
@@ -457,26 +474,30 @@ export const MessageAudioPlayer = forwardRef<
     stopAllSfx();
     setStatus("ready");
     setCurrentTime(0);
-    if ("mediaSession" in navigator) {
-      navigator.mediaSession.playbackState = "none";
-    }
+    clearTtsNowPlaying();
     playEndRef.current?.();
     playEndRef.current = null;
   }, []);
+
+  const publishNowPlaying = useCallback(() => {
+    setTtsNowPlaying({
+      title: nowPlayingTitle(text, chapterTitle),
+      album: turnId.startsWith("tmp-") ? undefined : `Turn ${turnId.slice(0, 8)}`,
+    });
+  }, [text, chapterTitle, turnId]);
 
   const startPlayback = async (
     audio: HTMLAudioElement,
     options?: { resumeAmbience?: boolean },
   ): Promise<void> => {
-    if (shouldUseWebAudioForTts() && blobRef.current) {
+    if (!preferHtmlMediaPlayback() && blobRef.current) {
       unlockAudioForAutoplay();
       await runSfxBeforePlay(options);
       setAutoplayBlocked(false);
       webAudioActiveRef.current = true;
       setStatus("playing");
-      if ("mediaSession" in navigator) {
-        navigator.mediaSession.playbackState = "playing";
-      }
+      publishNowPlaying();
+      setTtsMediaPlaybackState("playing");
       const { durationSec } = await playBlobViaWebAudio(
         blobRef.current,
         playbackRate,
@@ -487,13 +508,15 @@ export const MessageAudioPlayer = forwardRef<
     }
 
     await runSfxBeforePlay(options);
+    publishNowPlaying();
     await audio.play();
     setAutoplayBlocked(false);
     setStatus("playing");
-    if ("mediaSession" in navigator) {
-      navigator.mediaSession.playbackState = "playing";
-    }
+    setTtsMediaPlaybackState("playing");
     syncTimesFromAudio();
+    if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      syncTtsMediaPosition(0, audio.duration, audio.playbackRate);
+    }
   };
 
   const play = async (): Promise<void> => {
@@ -529,9 +552,7 @@ export const MessageAudioPlayer = forwardRef<
     pauseAllSfxLoops();
     setStatus("paused");
     syncTimesFromAudio();
-    if ("mediaSession" in navigator) {
-      navigator.mediaSession.playbackState = "paused";
-    }
+    setTtsMediaPlaybackState("paused");
   };
 
   const tryResumeOrPlay = async (audio: HTMLAudioElement | null) => {
@@ -546,9 +567,8 @@ export const MessageAudioPlayer = forwardRef<
         await runSfxBeforePlay({ resumeAmbience: true });
         setAutoplayBlocked(false);
         setStatus("playing");
-        if ("mediaSession" in navigator) {
-          navigator.mediaSession.playbackState = "playing";
-        }
+        publishNowPlaying();
+        setTtsMediaPlaybackState("playing");
         resumeWebAudioPlayback();
         syncTimesFromAudio();
       } catch (error) {
@@ -700,9 +720,7 @@ export const MessageAudioPlayer = forwardRef<
     setCurrentTime(0);
     setDuration(0);
     setAutoplayBlocked(false);
-    if ("mediaSession" in navigator) {
-      navigator.mediaSession.playbackState = "none";
-    }
+    clearTtsNowPlaying();
   };
 
   useImperativeHandle(
@@ -732,9 +750,7 @@ export const MessageAudioPlayer = forwardRef<
       setCurrentTime(t);
       if (status === "paused") {
         setStatus("playing");
-        if ("mediaSession" in navigator) {
-          navigator.mediaSession.playbackState = "playing";
-        }
+        setTtsMediaPlaybackState("playing");
       }
       return;
     }

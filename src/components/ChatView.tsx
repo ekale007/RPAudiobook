@@ -91,6 +91,10 @@ import { TtsAutoplayQueue } from "@/lib/tts/ttsAutoplayQueue";
 import { ttsPlayerWaitMs } from "@/lib/tts/mobilePlayback";
 import { unlockAudioForAutoplay, startAudioSession, stopAudioSession } from "@/lib/tts/audioUnlock";
 import {
+  clearTtsMediaSessionHandlers,
+  setTtsMediaSessionControls,
+} from "@/lib/tts/ttsMediaSession";
+import {
   fetchTtsStorageQuota,
   type TtsStorageQuota,
 } from "@/lib/tts/storeTurnAudioCloud";
@@ -198,6 +202,7 @@ export function ChatView({
   const knownTurnIdsRef = useRef<Set<string>>(new Set());
   const ttsBaselineReadyRef = useRef(false);
   const ttsQueueRef = useRef(new TtsAutoplayQueue());
+  const ttsPlayingTurnIdRef = useRef<string | null>(null);
   const [ttsAutoplay, setTtsAutoplay] = useState(false);
   const [hasTts, setHasTts] = useState(false);
   const [ttsQueueActive, setTtsQueueActive] = useState(false);
@@ -292,12 +297,29 @@ export function ChatView({
   const handleTtsPlaybackChange = useCallback(
     (turnId: string, active: boolean) => {
       setTtsPlayingTurnId((prev) => {
-        if (active) return turnId;
-        return prev === turnId ? null : prev;
+        const next = active ? turnId : prev === turnId ? null : prev;
+        ttsPlayingTurnIdRef.current = next;
+        return next;
       });
     },
     [],
   );
+
+  useEffect(() => {
+    if (!hasTts) {
+      setTtsMediaSessionControls(null);
+      return;
+    }
+    setTtsMediaSessionControls({
+      onPause: () => ttsQueueRef.current.pauseActive(),
+      onPlay: () => ttsQueueRef.current.resumeActive(),
+      onNext: () => ttsQueueRef.current.skipToNext(),
+    });
+    return () => {
+      setTtsMediaSessionControls(null);
+      clearTtsMediaSessionHandlers();
+    };
+  }, [hasTts]);
 
   const enqueueNewAssistantTts = useCallback(
     (rows: TurnRow[], force = false) => {

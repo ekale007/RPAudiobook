@@ -1,10 +1,7 @@
 import type { MessageAudioPlayerHandle } from "@/lib/tts/messageAudioPlayerHandle";
 import { isAutoplayBlockedError } from "@/lib/tts/autoplayPolicy";
 import { unlockAudioForAutoplay } from "@/lib/tts/audioUnlock";
-import {
-  primeTtsAudioContext,
-  shouldUseWebAudioForTts,
-} from "@/lib/tts/mobileAudioPlayback";
+import { primeTtsAudioContext } from "@/lib/tts/mobileAudioPlayback";
 import { ttsPlayerWaitMs } from "@/lib/tts/mobilePlayback";
 const PLAYER_POLL_MS = 50;
 const PREWARM_AHEAD = 4;
@@ -17,6 +14,7 @@ export class TtsAutoplayQueue {
   private draining = false;
   private stopped = false;
   private preparing = new Set<string>();
+  private playingTurnId: string | null = null;
   private onAutoplayBlocked: ((turnId: string) => void) | null = null;
   private onAutoplayCleared: (() => void) | null = null;
 
@@ -31,6 +29,41 @@ export class TtsAutoplayQueue {
   register(turnId: string, handle: MessageAudioPlayerHandle | null) {
     if (handle) this.players.set(turnId, handle);
     else this.players.delete(turnId);
+  }
+
+  getPlayer(turnId: string): MessageAudioPlayerHandle | undefined {
+    return this.players.get(turnId);
+  }
+
+  get activeTurnId(): string | null {
+    return this.playingTurnId;
+  }
+
+  /** Lock screen / CarPlay “next” — skip current clip and continue the queue. */
+  skipToNext(): void {
+    if (this.stopped) return;
+    const playing = this.playingTurnId;
+    if (playing) {
+      this.players.get(playing)?.stop();
+      this.playingTurnId = null;
+      const idx = this.queue.indexOf(playing);
+      if (idx >= 0) this.queue.splice(idx, 1);
+      else if (this.queue.length) this.queue.shift();
+    } else if (this.queue.length) {
+      this.queue.shift();
+    }
+    this.notifyQueue();
+    if (!this.draining) void this.drain();
+  }
+
+  pauseActive(): void {
+    const id = this.playingTurnId;
+    if (id) this.players.get(id)?.pause();
+  }
+
+  resumeActive(): void {
+    const id = this.playingTurnId;
+    if (id) void this.players.get(id)?.play().catch(() => undefined);
   }
 
   /** Chapter order of assistant turn ids (for chaining after the current clip). */
@@ -74,6 +107,7 @@ export class TtsAutoplayQueue {
   stop() {
     this.stopped = true;
     this.queue = [];
+    this.playingTurnId = null;
     for (const player of this.players.values()) {
       player.stop();
     }
@@ -119,15 +153,16 @@ export class TtsAutoplayQueue {
     if (!player) return "no-player";
     try {
       unlockAudioForAutoplay();
-      if (shouldUseWebAudioForTts()) {
-        await primeTtsAudioContext();
-      }
+      await primeTtsAudioContext();
       await player.prepare().catch(() => undefined);
       unlockAudioForAutoplay();
+      this.playingTurnId = turnId;
       await player.play();
+      this.playingTurnId = null;
       this.onAutoplayCleared?.();
       return "ok";
     } catch (error) {
+      this.playingTurnId = null;
       if (isAutoplayBlockedError(error)) return "blocked";
       return "error";
     }
@@ -234,14 +269,15 @@ export class TtsAutoplayQueue {
       this.notifyQueue();
       try {
         unlockAudioForAutoplay();
-        if (shouldUseWebAudioForTts()) {
-          await primeTtsAudioContext();
-        }
+        await primeTtsAudioContext();
         await player.prepare().catch(() => undefined);
         unlockAudioForAutoplay();
+        this.playingTurnId = turnId;
         await player.play();
+        this.playingTurnId = null;
         this.onAutoplayCleared?.();
       } catch (error) {
+        this.playingTurnId = null;
         if (isAutoplayBlockedError(error)) {
           this.queue.unshift(turnId);
           this.onAutoplayBlocked?.(turnId);

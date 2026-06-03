@@ -5,8 +5,14 @@ import { isAutoplayBlockedError } from "@/lib/tts/autoplayPolicy";
 import { unlockAudioForAutoplay } from "@/lib/tts/audioUnlock";
 import {
   playBlobViaWebAudio,
-  shouldUseWebAudioForTts,
+  preferHtmlMediaPlayback,
 } from "@/lib/tts/mobileAudioPlayback";
+import {
+  clearTtsNowPlaying,
+  setTtsMediaPlaybackState,
+  setTtsNowPlaying,
+  syncTtsMediaPosition,
+} from "@/lib/tts/ttsMediaSession";
 import { getNarratorAudio } from "@/lib/tts/narratorTts";
 import type { VoiceEnabledSlugs } from "@/lib/tts/voiceActivation";
 import type { StorySettings, VoiceMap } from "@/lib/types";
@@ -30,7 +36,7 @@ async function playBlobUntilEnd(
   blob: Blob,
   playbackRate: number,
 ): Promise<PlayTurnAudioResult> {
-  if (shouldUseWebAudioForTts()) {
+  if (!preferHtmlMediaPlayback()) {
     try {
       await playBlobViaWebAudio(blob, playbackRate);
       return "ok";
@@ -54,8 +60,26 @@ async function playBlobUntilEnd(
       URL.revokeObjectURL(url);
     };
 
+    setTtsNowPlaying({ title: "Erzähler" });
+    setTtsMediaPlaybackState("playing");
+
+    audio.ontimeupdate = () => {
+      if (
+        !audio.paused &&
+        Number.isFinite(audio.duration) &&
+        audio.duration > 0
+      ) {
+        syncTtsMediaPosition(
+          audio.currentTime,
+          audio.duration,
+          audio.playbackRate,
+        );
+      }
+    };
+
     audio.onended = () => {
       cleanup();
+      clearTtsNowPlaying();
       resolve("ok");
     };
     audio.onerror = () => {

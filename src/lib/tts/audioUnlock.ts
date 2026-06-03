@@ -27,6 +27,15 @@ function bindVisibilityResume(): void {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
       void primeTtsAudioContext();
+      return;
+    }
+    /* Keep silent keepalive running so the next HTML clip can start while locked. */
+    try {
+      if (sessionKeepalive && sessionKeepalive.paused) {
+        void sessionKeepalive.play().catch(() => undefined);
+      }
+    } catch {
+      /* ignore */
     }
   });
 }
