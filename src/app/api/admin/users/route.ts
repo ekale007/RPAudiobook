@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/server/adminAuth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { currentUsageMonthUtc } from "@/lib/server/llmUsage";
-import type { UserTier } from "@/lib/server/userTier";
+import { fetchTierLimitsMap } from "@/lib/server/tierLimitsSettings";
+import {
+  resolveTierLimits,
+  type UserTier,
+} from "@/lib/server/userTier";
 
 export async function GET(req: Request) {
   const auth = await requireAdmin(req);
@@ -20,6 +24,7 @@ export async function GET(req: Request) {
   }
 
   const periodMonth = currentUsageMonthUtc();
+  const tierDefaults = await fetchTierLimitsMap(admin);
 
   const { data: profiles, error: profileErr } = await admin
     .from("user_profiles")
@@ -56,16 +61,36 @@ export async function GET(req: Request) {
   const users = (profiles ?? []).map((p) => {
     const uid = p.user_id as string;
     const usage = usageByUser.get(uid);
+    const profile = {
+      user_id: uid,
+      tier: p.tier as UserTier,
+      display_name: (p.display_name as string | null) ?? null,
+      llm_budget_cents_override:
+        (p.llm_budget_cents_override as number | null) ?? null,
+      llm_hourly_limit_override:
+        (p.llm_hourly_limit_override as number | null) ?? null,
+      tts_hourly_limit_override:
+        (p.tts_hourly_limit_override as number | null) ?? null,
+      tts_storage_max_override:
+        (p.tts_storage_max_override as number | null) ?? null,
+    };
+    const limits = resolveTierLimits(profile, tierDefaults);
     return {
       userId: uid,
       email: (p.email as string | null) ?? null,
       displayName: (p.display_name as string | null) ?? null,
-      tier: p.tier as UserTier,
+      tier: limits.tier,
+      limits: {
+        llmBudgetCents: limits.llmBudgetCents,
+        llmPerHour: limits.llmPerHour,
+        ttsPerHour: limits.ttsPerHour,
+        ttsStorageMax: limits.ttsStorageMax,
+      },
       overrides: {
-        llmBudgetCents: p.llm_budget_cents_override as number | null,
-        llmHourly: p.llm_hourly_limit_override as number | null,
-        ttsHourly: p.tts_hourly_limit_override as number | null,
-        ttsStorage: p.tts_storage_max_override as number | null,
+        llmBudgetCents: profile.llm_budget_cents_override,
+        llmHourly: profile.llm_hourly_limit_override,
+        ttsHourly: profile.tts_hourly_limit_override,
+        ttsStorage: profile.tts_storage_max_override,
       },
       usage: usage ?? {
         requestCount: 0,

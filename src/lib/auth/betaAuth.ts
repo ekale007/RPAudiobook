@@ -1,9 +1,7 @@
-/** Invite-only beta: no public sign-up; guests need a Supabase invite. */
+/** Invite-only when NEXT_PUBLIC_BETA_INVITE_ONLY=1 — otherwise public e-mail sign-up is allowed. */
 export function isInviteOnlyBeta(): boolean {
-  const flag = process.env.NEXT_PUBLIC_BETA_INVITE_ONLY?.trim();
-  if (flag === "1" || flag === "true") return true;
-  if (flag === "0" || flag === "false") return false;
-  return process.env.NODE_ENV === "production";
+  const flag = process.env.NEXT_PUBLIC_BETA_INVITE_ONLY?.trim().toLowerCase();
+  return flag === "1" || flag === "true";
 }
 
 export function showAnonymousDevLogin(): boolean {

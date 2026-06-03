@@ -1,11 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  getRateLimitLlmPerHour,
-  getRateLimitTtsPerHour,
-} from "@/lib/server/env";
-import { getBetaLlmBudgetCents } from "@/lib/server/llmUsage";
-import { getTtsStorageMaxPerUser } from "@/lib/server/ttsStorageQuota";
+import { getRateLimitTtsPerHour } from "@/lib/server/env";
 import { getLlmModelCatalog, type LlmModelOption } from "@/lib/server/llmModels";
+import { fetchTierLimitsMap } from "@/lib/server/tierLimitsSettings";
 
 export type UserTier = "free" | "beta" | "pro";
 
@@ -30,12 +26,6 @@ export type TierLimits = {
   allowedModelIds: string[] | null;
 };
 
-const FREE_MODEL_IDS = [
-  "google/gemini-2.5-flash-lite",
-  "deepseek/deepseek-v4-flash",
-  "qwen/qwen3.5-flash-02-23",
-] as const;
-
 const TIER_LABELS: Record<UserTier, string> = {
   free: "Free",
   beta: "Beta",
@@ -45,57 +35,6 @@ const TIER_LABELS: Record<UserTier, string> = {
 function parseTier(raw: unknown): UserTier {
   if (raw === "beta" || raw === "pro" || raw === "free") return raw;
   return "free";
-}
-
-function envInt(name: string, fallback: number): number {
-  const raw = process.env[name]?.trim();
-  const n = raw ? Number.parseInt(raw, 10) : fallback;
-  return Number.isFinite(n) && n > 0 ? n : fallback;
-}
-
-function parseFreeModelIds(): string[] {
-  const raw = process.env.BETA_TIER_FREE_MODELS?.trim();
-  if (!raw) return [...FREE_MODEL_IDS];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [...FREE_MODEL_IDS];
-    const ids = parsed.filter(
-      (x): x is string => typeof x === "string" && x.trim().length > 0,
-    );
-    return ids.length ? ids : [...FREE_MODEL_IDS];
-  } catch {
-    return [...FREE_MODEL_IDS];
-  }
-}
-
-function baseLimitsForTier(tier: UserTier): Omit<TierLimits, "tier" | "tierLabel"> {
-  switch (tier) {
-    case "pro":
-      return {
-        llmBudgetCents: envInt("BETA_TIER_PRO_LLM_BUDGET_CENTS", 20_000),
-        llmPerHour: envInt("BETA_TIER_PRO_LLM_HOUR", 500),
-        ttsPerHour: envInt("BETA_TIER_PRO_TTS_HOUR", 400),
-        ttsStorageMax: envInt("BETA_TIER_PRO_TTS_STORAGE", 200),
-        allowedModelIds: null,
-      };
-    case "beta":
-      return {
-        llmBudgetCents: getBetaLlmBudgetCents(),
-        llmPerHour: getRateLimitLlmPerHour(),
-        ttsPerHour: getRateLimitTtsPerHour(),
-        ttsStorageMax: getTtsStorageMaxPerUser(),
-        allowedModelIds: null,
-      };
-    case "free":
-    default:
-      return {
-        llmBudgetCents: envInt("BETA_TIER_FREE_LLM_BUDGET_CENTS", 500),
-        llmPerHour: envInt("BETA_TIER_FREE_LLM_HOUR", 40),
-        ttsPerHour: envInt("BETA_TIER_FREE_TTS_HOUR", 80),
-        ttsStorageMax: envInt("BETA_TIER_FREE_TTS_STORAGE", 25),
-        allowedModelIds: parseFreeModelIds(),
-      };
-  }
 }
 
 export async function ensureUserProfile(
@@ -147,9 +86,12 @@ export async function ensureUserProfile(
   };
 }
 
-export function resolveTierLimits(profile: UserProfileRow): TierLimits {
+export function resolveTierLimits(
+  profile: UserProfileRow,
+  tierDefaults: Awaited<ReturnType<typeof fetchTierLimitsMap>>,
+): TierLimits {
   const tier = profile.tier;
-  const base = baseLimitsForTier(tier);
+  const base = tierDefaults[tier];
   return {
     tier,
     tierLabel: TIER_LABELS[tier],
@@ -166,8 +108,11 @@ export async function fetchUserTierLimits(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<TierLimits> {
-  const profile = await ensureUserProfile(supabase, userId);
-  return resolveTierLimits(profile);
+  const [profile, tierDefaults] = await Promise.all([
+    ensureUserProfile(supabase, userId),
+    fetchTierLimitsMap(supabase),
+  ]);
+  return resolveTierLimits(profile, tierDefaults);
 }
 
 export async function getTtsHourlyLimitForUser(

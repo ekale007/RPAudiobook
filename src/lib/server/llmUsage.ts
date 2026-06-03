@@ -197,6 +197,23 @@ export async function recordLlmUsage(
   return costCents;
 }
 
+/** Admin: reset monthly LLM usage counter for one user (service role). */
+export async function resetUserLlmUsage(
+  admin: SupabaseClient,
+  userId: string,
+  periodMonth?: string,
+): Promise<{ periodMonth: string; deleted: boolean }> {
+  const month = periodMonth?.trim() || currentUsageMonthUtc();
+  const { error } = await admin
+    .from("user_llm_usage")
+    .delete()
+    .eq("user_id", userId)
+    .eq("period_month", month);
+
+  if (error) throw error;
+  return { periodMonth: month, deleted: true };
+}
+
 export function formatCentsDe(cents: number): string {
   return new Intl.NumberFormat("de-DE", {
     style: "currency",

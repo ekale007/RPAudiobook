@@ -1,10 +1,13 @@
-# Beta-Auth: nur eingeladene Gäste
+# Beta-Auth: E-Mail-Login
 
-Die App kann im **Invite-only**-Modus laufen: Login nur für bestehende / eingeladene Accounts, kein öffentliches Registrieren.
+Zwei Betriebsarten:
+
+1. **Offene Registrierung** (Standard): Nutzer können sich mit E-Mail + Passwort anmelden und **Account erstellen**.
+2. **Invite-only**: Nur bestehende / eingeladene Accounts, kein öffentliches Registrieren.
 
 ## Supabase Dashboard (Pflicht)
 
-Projekt: [Supabase Dashboard](https://supabase.com/dashboard) → dein Projekt (`phyzqtxuhbodhupgbnfp` o. ä.)
+Projekt: [Supabase Dashboard](https://supabase.com/dashboard) → dein Projekt
 
 ### 1. URL Configuration
 
@@ -17,76 +20,71 @@ Projekt: [Supabase Dashboard](https://supabase.com/dashboard) → dein Projekt (
 | | `https://rp-audiobook.vercel.app/auth/callback` (falls Alias) |
 | | `http://localhost:3000/auth/callback` (Dev) |
 
-### 2. Registrierung abschalten
+### 2. E-Mail-Provider
 
 **Authentication → Providers → Email**
 
 - Email provider: **ON**
-- **Confirm email**: optional AUS (schneller für Beta-Gäste nach Invite)
-- **Authentication → Settings** (oder „Sign In / Providers“ je nach UI-Version):
-  - **Allow new users to sign up** → **OFF** / deaktivieren
-
-Damit funktioniert nur noch:
-
-- Login mit Passwort (bestehende User)
-- **Invite** über das Dashboard (neue Gäste)
+- **Confirm email**: optional AUS (schnellerer Einstieg; sonst Bestätigungs-Mail)
+- **Allow new users to sign up**: **ON** für offene Beta, **OFF** nur im Invite-only-Modus
 
 ### 3. Anonym deaktivieren (Prod)
 
 **Authentication → Providers → Anonymous** → **OFF**
 
-Sonst kann jeder ohne Einladung reinkommen.
+### 4. Invite-only (optional)
 
-### 4. Gäste einladen
+Nur wenn Sign-up in Supabase **aus** ist:
 
-**Authentication → Users → Invite user**
+**Authentication → Users → Invite user** — Supabase schickt Invite-Link.
 
-- E-Mail des Beta-Gasts eintragen
-- Supabase schickt Invite-Link → Gast setzt Passwort → kann sich danach normal anmelden
+### 5. SMTP (empfohlen)
 
-Alternativ: User manuell anlegen (Add user) mit temporärem Passwort.
-
-### 5. SMTP (empfohlen für Beta)
-
-Free-Tier: wenige Auth-Mails pro Stunde. Für mehr Gäste:
-
-**Project Settings → Authentication → SMTP** → Resend / SendGrid / eigener SMTP.
-
-### 6. Optional: E-Mail bestätigen
-
-Wenn **Confirm email** AN ist, muss jeder Invite die Mail bestätigen. Für kleine Beta-Gruppe oft AUS lassen.
+Free-Tier: wenige Auth-Mails pro Stunde. Für mehr Nutzer: **Project Settings → Authentication → SMTP**.
 
 ---
 
 ## App / Vercel
 
-| Variable | Prod | Dev |
-|----------|------|-----|
-| `NEXT_PUBLIC_BETA_INVITE_ONLY` | `1` | leer oder `0` |
+| Variable | Offene Beta | Invite-only |
+|----------|-------------|-------------|
+| `NEXT_PUBLIC_BETA_INVITE_ONLY` | leer / `0` | `1` |
 
-Wenn `1` (oder in Production standardmäßig):
+Wenn **nicht** gesetzt bzw. `0`:
 
-- Kein Button „Account erstellen“
-- Kein anonymer Dev-Login
+- Button **Account erstellen** auf `/login`
+- Hinweis: Anmelden oder registrieren
+
+Wenn `1`:
+
+- Kein „Account erstellen“
 - Hinweis: „Beta — Zugang nur mit Einladung“
 
-Nach dem ersten Login: in Supabase `user_profiles.tier = 'beta'` für eingeladene Tester setzen (siehe [BETA-BILLING.md](./BETA-BILLING.md)).
+Neue Nutzer starten mit Tarif `free` (Profil wird beim ersten API-Call angelegt). Tarif und Limits in der **Admin-UI** (`/admin`) oder Supabase `user_profiles` setzen — siehe [BETA-BILLING.md](./BETA-BILLING.md).
 
-## Checkliste nach dem Setup
+Migration **015** (`tier_limits` in `beta_billing_settings`) auf Supabase ausführen, damit Tarif-Limits in der Admin-UI speicherbar sind.
 
-- [ ] Sign-up in Supabase **aus**
+## Checkliste — offene Beta
+
+- [ ] Sign-up in Supabase **an**
+- [ ] `NEXT_PUBLIC_BETA_INVITE_ONLY` auf Vercel **nicht** auf `1`
 - [ ] Anonymous **aus**
 - [ ] Redirect URLs für Prod eingetragen
-- [ ] Test-Invite an dich selbst → Link → Passwort → Login OK
-- [ ] Öffentliches Registrieren in der App nicht sichtbar
-- [ ] Fremde E-Mail ohne Invite kann **keinen** Account anlegen
+- [ ] Test: Account erstellen → Login OK
+- [ ] Migration 015 angewendet (Admin Tarif-Limits)
+
+## Checkliste — Invite-only
+
+- [ ] Sign-up in Supabase **aus**
+- [ ] `NEXT_PUBLIC_BETA_INVITE_ONLY=1` auf Vercel
+- [ ] Test-Invite → Link → Passwort → Login OK
 
 ## Fehlerbilder
 
 | Symptom | Lösung |
 |---------|--------|
-| „Signups not allowed“ beim Registrieren | Erwartet — Gäste nur per Invite |
-| Invite-Link landet auf localhost | Site URL / Redirect URLs in Supabase prüfen |
+| „Signups not allowed“ | Sign-up in Supabase aktivieren oder Invite nutzen |
+| Invite-Link landet auf localhost | Site URL / Redirect URLs prüfen |
 | „Email rate limit“ | Warten oder SMTP konfigurieren |
 
 Siehe auch: [AUTH.md](./AUTH.md), [DEPLOY.md](./DEPLOY.md)

@@ -8,7 +8,11 @@ import { getRateLimitStatus } from "@/lib/server/rateLimit";
 import { requireUser } from "@/lib/server/requireUser";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 import { countUserTtsRecordings } from "@/lib/server/ttsStorageQuota";
-import { ensureUserProfile, resolveTierLimits } from "@/lib/server/userTier";
+import { fetchTierLimitsMap } from "@/lib/server/tierLimitsSettings";
+import {
+  ensureUserProfile,
+  resolveTierLimits,
+} from "@/lib/server/userTier";
 
 export async function GET(req: Request) {
   const auth = await requireUser(req);
@@ -22,8 +26,12 @@ export async function GET(req: Request) {
   let profile;
   let limits;
   try {
-    profile = await ensureUserProfile(supabase, auth.user.id);
-    limits = resolveTierLimits(profile);
+    const [p, tierDefaults] = await Promise.all([
+      ensureUserProfile(supabase, auth.user.id),
+      fetchTierLimitsMap(),
+    ]);
+    profile = p;
+    limits = resolveTierLimits(profile, tierDefaults);
   } catch (e) {
     return NextResponse.json(
       {

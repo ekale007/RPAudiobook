@@ -69,7 +69,7 @@ function LoginForm() {
     setError(null);
     setInfo(null);
     if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError("Passwort muss mindestens 8 Zeichen haben.");
       return;
     }
     setBusy(true);
@@ -86,7 +86,7 @@ function LoginForm() {
         return;
       }
       setInfo(
-        "Account created. If you are not signed in automatically, disable “Confirm email” in Supabase (Auth → Providers → Email) or confirm via mail.",
+        "Account erstellt. Wenn du nicht automatisch angemeldet wirst: In Supabase unter Auth → Providers → Email „Confirm email“ deaktivieren oder die Bestätigungs-Mail öffnen.",
       );
     } catch (err) {
       setError(formatAuthError(err));
@@ -160,11 +160,11 @@ function LoginForm() {
             </p>
           ) : (
             <p className="text-xs text-zinc-500">
-              Mit E-Mail und Passwort anmelden — funktioniert am Handy und am
-              PC.
+              Mit E-Mail und Passwort anmelden oder registrieren — am Handy und
+              am PC.
             </p>
           )}
-          <label className="text-sm text-zinc-400">Email</label>
+          <label className="text-sm text-zinc-400">E-Mail</label>
           <input
             type="email"
             required
@@ -173,7 +173,7 @@ function LoginForm() {
             className="rounded-xl border border-surface-border bg-surface-raised px-3 py-2 text-base"
             autoComplete="email"
           />
-          <label className="text-sm text-zinc-400">Password</label>
+          <label className="text-sm text-zinc-400">Passwort</label>
           <input
             type="password"
             required
@@ -192,14 +192,14 @@ function LoginForm() {
             }}
             className="self-start text-xs text-accent underline"
           >
-            Forgot password?
+            Passwort vergessen?
           </button>
           <button
             type="submit"
             disabled={busy}
             className="rounded-xl bg-accent py-3 text-base font-medium text-black disabled:opacity-50"
           >
-            Sign in
+            Anmelden
           </button>
           {!inviteOnly ? (
             <button
@@ -208,7 +208,7 @@ function LoginForm() {
               onClick={signUpPassword}
               className="rounded-xl border border-surface-border py-3 text-sm text-zinc-300 disabled:opacity-50"
             >
-              Create account
+              Account erstellen
             </button>
           ) : null}
         </form>

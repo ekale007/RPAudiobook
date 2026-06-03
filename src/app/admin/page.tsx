@@ -13,12 +13,69 @@ function formatEur(cents: number): string {
   }).format(cents / 100);
 }
 
+type TierLimitDefaults = {
+  llmBudgetCents: number;
+  llmPerHour: number;
+  ttsPerHour: number;
+  ttsStorageMax: number;
+};
+
+type TierLimitsMap = Record<UserTier, TierLimitDefaults>;
+
 type AdminUser = {
   userId: string;
   email: string | null;
   tier: UserTier;
+  limits: TierLimitDefaults;
   usage: { costCents: number; requestCount: number };
 };
+
+const TIERS: UserTier[] = ["free", "beta", "pro"];
+
+function draftFromTierLimits(map: TierLimitsMap): Record<UserTier, Record<keyof TierLimitDefaults, string>> {
+  const out = {} as Record<UserTier, Record<keyof TierLimitDefaults, string>>;
+  for (const tier of TIERS) {
+    out[tier] = {
+      llmBudgetCents: String(map[tier].llmBudgetCents),
+      llmPerHour: String(map[tier].llmPerHour),
+      ttsPerHour: String(map[tier].ttsPerHour),
+      ttsStorageMax: String(map[tier].ttsStorageMax),
+    };
+  }
+  return out;
+}
+
+function parseTierLimitsDraft(
+  draft: Record<UserTier, Record<keyof TierLimitDefaults, string>>,
+): TierLimitsMap | { error: string } {
+  const result = {} as TierLimitsMap;
+  for (const tier of TIERS) {
+    const row = draft[tier];
+    const llmBudgetCents = Number.parseInt(row.llmBudgetCents, 10);
+    const llmPerHour = Number.parseInt(row.llmPerHour, 10);
+    const ttsPerHour = Number.parseInt(row.ttsPerHour, 10);
+    const ttsStorageMax = Number.parseInt(row.ttsStorageMax, 10);
+    if (
+      !Number.isFinite(llmBudgetCents) ||
+      llmBudgetCents < 1 ||
+      !Number.isFinite(llmPerHour) ||
+      llmPerHour < 1 ||
+      !Number.isFinite(ttsPerHour) ||
+      ttsPerHour < 1 ||
+      !Number.isFinite(ttsStorageMax) ||
+      ttsStorageMax < 1
+    ) {
+      return { error: `Tarif „${tier}“: ungültige Limits` };
+    }
+    result[tier] = {
+      llmBudgetCents,
+      llmPerHour,
+      ttsPerHour,
+      ttsStorageMax,
+    };
+  }
+  return result;
+}
 
 type AdminLogEvent = {
   id: string;
@@ -56,12 +113,17 @@ export default function AdminPage() {
     "https://elevenlabs.io/pricing/api",
   );
   const [starterNote, setStarterNote] = useState<string | null>(null);
+  const [tierLimits, setTierLimits] = useState<TierLimitsMap | null>(null);
+  const [tierLimitsDraft, setTierLimitsDraft] = useState<
+    Record<UserTier, Record<keyof TierLimitDefaults, string>> | null
+  >(null);
 
   const loadBilling = useCallback(async () => {
     const res = await authFetch("/api/admin/billing-settings");
     if (!res.ok) return;
     const json = (await res.json()) as {
       settings: BillingSettingsState;
+      tierLimits?: TierLimitsMap;
       warning?: string;
       pricingUrl?: string;
       starterPlanNote?: string;
@@ -75,6 +137,10 @@ export default function AdminPage() {
     setBillingWarning(json.warning ?? null);
     if (json.pricingUrl) setPricingUrl(json.pricingUrl);
     setStarterNote(json.starterPlanNote ?? null);
+    if (json.tierLimits) {
+      setTierLimits(json.tierLimits);
+      setTierLimitsDraft(draftFromTierLimits(json.tierLimits));
+    }
   }, []);
 
   const loadUsers = useCallback(async () => {
@@ -155,6 +221,65 @@ export default function AdminPage() {
       }
       setMessage("Kurse gespeichert.");
       await loadBilling();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveTierLimits = async () => {
+    if (!tierLimitsDraft) return;
+    const parsed = parseTierLimitsDraft(tierLimitsDraft);
+    if ("error" in parsed) {
+      setMessage(parsed.error);
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await authFetch("/api/admin/billing-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tierLimits: parsed }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Speichern fehlgeschlagen (${res.status})`);
+      }
+      setMessage("Tarif-Limits gespeichert.");
+      await loadBilling();
+      await loadUsers();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resetLlmMonth = async (userId: string) => {
+    if (
+      !window.confirm(
+        `LLM-Verbrauch für ${periodMonth} wirklich zurücksetzen? Der Nutzer startet den Monat bei 0 €.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await authFetch("/api/admin/reset-llm-usage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, periodMonth }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Reset fehlgeschlagen (${res.status})`);
+      }
+      const body = (await res.json()) as { message?: string };
+      setMessage(body.message ?? "LLM-Monat zurückgesetzt.");
+      await loadUsers();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : String(e));
     } finally {
@@ -320,6 +445,94 @@ export default function AdminPage() {
             ) : null}
           </section>
 
+          {tierLimitsDraft ? (
+            <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
+              <h2 className="mb-1 text-sm font-medium text-accent">
+                Tarif-Limits (Standard)
+              </h2>
+              <p className="mb-3 text-xs text-zinc-500">
+                Gilt für alle Nutzer ohne Profil-Override. Werte in Cent (LLM
+                Monatsbudget), Stunden-Limits und max. TTS-Speicher (Anzahl).
+                Env-Defaults werden überschrieben, sobald gespeichert.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="text-zinc-500">
+                    <tr>
+                      <th className="px-2 py-1">Tarif</th>
+                      <th className="px-2 py-1">LLM Monat (ct)</th>
+                      <th className="px-2 py-1">LLM /h</th>
+                      <th className="px-2 py-1">TTS /h</th>
+                      <th className="px-2 py-1">TTS Storage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {TIERS.map((tier) => (
+                      <tr
+                        key={tier}
+                        className="border-t border-surface-border/50"
+                      >
+                        <td className="px-2 py-1.5 font-medium text-zinc-300">
+                          {tier}
+                        </td>
+                        {(
+                          [
+                            "llmBudgetCents",
+                            "llmPerHour",
+                            "ttsPerHour",
+                            "ttsStorageMax",
+                          ] as const
+                        ).map((field) => (
+                          <td key={field} className="px-2 py-1.5">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              disabled={busy}
+                              value={tierLimitsDraft[tier][field]}
+                              onChange={(e) =>
+                                setTierLimitsDraft((d) =>
+                                  d
+                                    ? {
+                                        ...d,
+                                        [tier]: {
+                                          ...d[tier],
+                                          [field]: e.target.value,
+                                        },
+                                      }
+                                    : d,
+                                )
+                              }
+                              className="w-20 rounded border border-surface-border bg-surface px-1.5 py-1 text-zinc-200"
+                            />
+                            {field === "llmBudgetCents" && tierLimits ? (
+                              <span className="ml-1 text-[10px] text-zinc-600">
+                                ≈{" "}
+                                {formatEur(
+                                  Number.parseInt(
+                                    tierLimitsDraft[tier].llmBudgetCents,
+                                    10,
+                                  ) || tierLimits[tier].llmBudgetCents,
+                                )}
+                              </span>
+                            ) : null}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button
+                type="button"
+                disabled={busy || !!billingWarning}
+                onClick={() => void saveTierLimits()}
+                className="mt-3 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-surface disabled:opacity-50"
+              >
+                Tarif-Limits speichern
+              </button>
+            </section>
+          ) : null}
+
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="rounded-xl border border-surface-border bg-surface-raised p-3">
               <h2 className="mb-2 text-sm font-medium text-accent">Nutzer</h2>
@@ -364,6 +577,10 @@ export default function AdminPage() {
                         </td>
                         <td className="px-2 py-1.5 text-right text-zinc-400">
                           {formatEur(u.usage.costCents)}
+                          <span className="text-zinc-600">
+                            {" "}
+                            / {formatEur(u.limits.llmBudgetCents)}
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -373,14 +590,26 @@ export default function AdminPage() {
             </section>
 
             <section className="rounded-xl border border-surface-border bg-surface-raised p-3">
-              <h2 className="mb-2 text-sm font-medium text-accent">
-                Protokoll
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-medium text-accent">
+                  Protokoll
+                  {selectedId ? (
+                    <span className="ml-1 font-normal text-zinc-500">
+                      ({selectedId.slice(0, 8)}…)
+                    </span>
+                  ) : null}
+                </h2>
                 {selectedId ? (
-                  <span className="ml-1 font-normal text-zinc-500">
-                    ({selectedId.slice(0, 8)}…)
-                  </span>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void resetLlmMonth(selectedId)}
+                    className="rounded-lg border border-amber-500/40 px-2 py-1 text-xs text-amber-200/90 disabled:opacity-50"
+                  >
+                    LLM-Monat zurücksetzen ({periodMonth})
+                  </button>
                 ) : null}
-              </h2>
+              </div>
               {!selectedId ? (
                 <p className="text-xs text-zinc-500">
                   Nutzer in der Liste auswählen.
