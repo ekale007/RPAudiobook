@@ -1353,7 +1353,10 @@ export function ChatView({
     <div
       className="flex min-h-0 flex-1 flex-col"
       onPointerDownCapture={() => {
-        if (hasTts) unlockAudioForAutoplay();
+        if (hasTts) {
+          unlockAudioForAutoplay();
+          if (ttsAutoplay) startAudioSession();
+        }
       }}
     >
       <div className="relative min-h-0 flex-1">

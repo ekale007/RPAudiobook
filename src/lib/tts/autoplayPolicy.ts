@@ -16,5 +16,5 @@ export function isAutoplayBlockedError(error: unknown): boolean {
 }
 
 export function autoplayBlockedHint(): string {
-  return "Autoplay blockiert — ▶ tippen zum Abspielen";
+  return "Autoplay blockiert — erneut ▶ oder TTS-Autoplay antippen";
 }

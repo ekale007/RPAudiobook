@@ -55,6 +55,12 @@ import {
 } from "@/lib/tts/autoplayPolicy";
 import { unlockAudioForAutoplay } from "@/lib/tts/audioUnlock";
 import {
+  configureMobileHtmlAudio,
+  playBlobViaWebAudio,
+  shouldUseWebAudioForTts,
+  stopActiveTtsSource,
+} from "@/lib/tts/mobileAudioPlayback";
+import {
   audioFilenameForTurn,
   downloadBlob,
 } from "@/lib/audio/downloadBlob";
@@ -218,6 +224,7 @@ export const MessageAudioPlayer = forwardRef<
   }, [turnId, text, rawContent, cleanupUrl]);
 
   const attachAudio = (audio: HTMLAudioElement) => {
+    configureMobileHtmlAudio(audio);
     audio.playbackRate = playbackRate;
     audio.ontimeupdate = () => {
       if (!seeking) setCurrentTime(audio.currentTime);
@@ -361,6 +368,7 @@ export const MessageAudioPlayer = forwardRef<
 
       audioRef.current?.pause();
       const audio = new Audio(url);
+      configureMobileHtmlAudio(audio);
       audioRef.current = audio;
       attachAudio(audio);
 
@@ -418,16 +426,44 @@ export const MessageAudioPlayer = forwardRef<
     ].filter((id, i, arr) => arr.indexOf(id) === i);
   }, [rawContent, text, storySettings]);
 
-  const startPlayback = async (
-    audio: HTMLAudioElement,
-    options?: { resumeAmbience?: boolean },
-  ): Promise<void> => {
+  const runSfxBeforePlay = async (options?: { resumeAmbience?: boolean }) => {
     const sfxIds = sfxIdsForTurn();
     if (options?.resumeAmbience && hasActiveAmbienceLoops()) {
       resumeAllSfxLoops();
     } else if (sfxIds.length) {
       await playSfxForTags(sfxIds);
     }
+  };
+
+  const startPlayback = async (
+    audio: HTMLAudioElement,
+    options?: { resumeAmbience?: boolean },
+  ): Promise<void> => {
+    if (shouldUseWebAudioForTts() && blobRef.current) {
+      unlockAudioForAutoplay();
+      await runSfxBeforePlay(options);
+      setAutoplayBlocked(false);
+      setStatus("playing");
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "playing";
+      }
+      const { durationSec } = await playBlobViaWebAudio(
+        blobRef.current,
+        playbackRate,
+      );
+      stopAllSfx();
+      setStatus("ready");
+      setCurrentTime(0);
+      if (durationSec > 0) setDuration(durationSec);
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "none";
+      }
+      playEndRef.current?.();
+      playEndRef.current = null;
+      return;
+    }
+
+    await runSfxBeforePlay(options);
     await audio.play();
     setAutoplayBlocked(false);
     setStatus("playing");
@@ -596,6 +632,7 @@ export const MessageAudioPlayer = forwardRef<
   const resetPlayback = () => {
     finishPlayWait();
     stopAllSfx();
+    stopActiveTtsSource();
     stopTick();
     audioRef.current?.pause();
     if (audioRef.current) audioRef.current.currentTime = 0;

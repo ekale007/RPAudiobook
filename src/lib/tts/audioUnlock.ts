@@ -1,4 +1,8 @@
 import {
+  primeTtsAudioContext,
+  stopTtsAudioContext,
+} from "@/lib/tts/mobileAudioPlayback";
+import {
   requestScreenWakeLock,
   releaseScreenWakeLock,
 } from "@/lib/tts/screenWakeLock";
@@ -9,14 +13,32 @@ const SILENT_WAV =
 
 let unlockEl: HTMLAudioElement | null = null;
 let sessionKeepalive: HTMLAudioElement | null = null;
+let visibilityBound = false;
+
+function configureUnlockElement(audio: HTMLAudioElement): void {
+  audio.setAttribute("playsinline", "true");
+  audio.setAttribute("webkit-playsinline", "true");
+  audio.preload = "auto";
+}
+
+function bindVisibilityResume(): void {
+  if (visibilityBound || typeof document === "undefined") return;
+  visibilityBound = true;
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      void primeTtsAudioContext();
+    }
+  });
+}
 
 /** Call synchronously inside click/touch handlers before async TTS work. */
 export function unlockAudioForAutoplay(): void {
   if (typeof window === "undefined") return;
+  void primeTtsAudioContext();
   try {
     if (!unlockEl) {
       unlockEl = new Audio(SILENT_WAV);
-      unlockEl.preload = "auto";
+      configureUnlockElement(unlockEl);
     }
     unlockEl.currentTime = 0;
     void unlockEl.play().catch(() => {
@@ -34,12 +56,13 @@ export function unlockAudioForAutoplay(): void {
 export function startAudioSession(): void {
   if (typeof window === "undefined") return;
   unlockAudioForAutoplay();
+  bindVisibilityResume();
   void requestScreenWakeLock();
   try {
     if (!sessionKeepalive) {
       sessionKeepalive = new Audio(SILENT_WAV);
       sessionKeepalive.loop = true;
-      sessionKeepalive.preload = "auto";
+      configureUnlockElement(sessionKeepalive);
     }
     sessionKeepalive.currentTime = 0;
     void sessionKeepalive.play().catch(() => {
@@ -51,15 +74,14 @@ export function startAudioSession(): void {
 }
 
 export function stopAudioSession(): void {
-  if (!sessionKeepalive) {
-    void releaseScreenWakeLock();
-    return;
+  if (sessionKeepalive) {
+    try {
+      sessionKeepalive.pause();
+      sessionKeepalive.currentTime = 0;
+    } catch {
+      /* ignore */
+    }
   }
-  try {
-    sessionKeepalive.pause();
-    sessionKeepalive.currentTime = 0;
-  } catch {
-    /* ignore */
-  }
+  stopTtsAudioContext();
   void releaseScreenWakeLock();
 }

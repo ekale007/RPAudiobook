@@ -3,6 +3,10 @@ import { loadPlaybackRate } from "@/lib/storage/ttsPlaybackSettings";
 import { loadTtsSettings } from "@/lib/storage/ttsSettings";
 import { isAutoplayBlockedError } from "@/lib/tts/autoplayPolicy";
 import { unlockAudioForAutoplay } from "@/lib/tts/audioUnlock";
+import {
+  playBlobViaWebAudio,
+  shouldUseWebAudioForTts,
+} from "@/lib/tts/mobileAudioPlayback";
 import { getNarratorAudio } from "@/lib/tts/narratorTts";
 import type { VoiceEnabledSlugs } from "@/lib/tts/voiceActivation";
 import type { StorySettings, VoiceMap } from "@/lib/types";
@@ -22,14 +26,26 @@ export type PlayAssistantTurnParams = {
 
 export type PlayTurnAudioResult = "ok" | "blocked" | "error";
 
-function playBlobUntilEnd(
+async function playBlobUntilEnd(
   blob: Blob,
   playbackRate: number,
 ): Promise<PlayTurnAudioResult> {
+  if (shouldUseWebAudioForTts()) {
+    try {
+      await playBlobViaWebAudio(blob, playbackRate);
+      return "ok";
+    } catch (error) {
+      if (isAutoplayBlockedError(error)) return "blocked";
+      return "error";
+    }
+  }
+
   return new Promise((resolve) => {
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
     audio.playbackRate = playbackRate;
+    audio.setAttribute("playsinline", "true");
+    audio.setAttribute("webkit-playsinline", "true");
     audio.preload = "auto";
 
     const cleanup = () => {

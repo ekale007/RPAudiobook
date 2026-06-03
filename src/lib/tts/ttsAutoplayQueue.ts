@@ -1,6 +1,10 @@
 import type { MessageAudioPlayerHandle } from "@/lib/tts/messageAudioPlayerHandle";
 import { isAutoplayBlockedError } from "@/lib/tts/autoplayPolicy";
 import { unlockAudioForAutoplay } from "@/lib/tts/audioUnlock";
+import {
+  primeTtsAudioContext,
+  shouldUseWebAudioForTts,
+} from "@/lib/tts/mobileAudioPlayback";
 import { ttsPlayerWaitMs } from "@/lib/tts/mobilePlayback";
 const PLAYER_POLL_MS = 50;
 const PREWARM_AHEAD = 4;
@@ -115,7 +119,11 @@ export class TtsAutoplayQueue {
     if (!player) return "no-player";
     try {
       unlockAudioForAutoplay();
+      if (shouldUseWebAudioForTts()) {
+        await primeTtsAudioContext();
+      }
       await player.prepare().catch(() => undefined);
+      unlockAudioForAutoplay();
       await player.play();
       this.onAutoplayCleared?.();
       return "ok";
@@ -226,7 +234,11 @@ export class TtsAutoplayQueue {
       this.notifyQueue();
       try {
         unlockAudioForAutoplay();
+        if (shouldUseWebAudioForTts()) {
+          await primeTtsAudioContext();
+        }
         await player.prepare().catch(() => undefined);
+        unlockAudioForAutoplay();
         await player.play();
         this.onAutoplayCleared?.();
       } catch (error) {
