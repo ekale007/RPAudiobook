@@ -7,7 +7,16 @@ import { ChatTurnBubble } from "@/components/ChatTurnBubble";
 import { AutoPlayControls } from "@/components/AutoPlayControls";
 import { formatLlmLimitError } from "@/components/LlmUsagePanel";
 import { MobileCollapsibleTools } from "@/components/MobileCollapsibleTools";
+import { ChatSteeringBar } from "@/components/ChatSteeringBar";
 import { StoryBeatPicker } from "@/components/StoryBeatPicker";
+import {
+  buildDialogueSteeringPrompt,
+  buildReactionSteeringPrompt,
+  normalizeSteeringDialogueInput,
+  steeringInputPlaceholder,
+  type QuickReactionId,
+} from "@/lib/chat/playerSteering";
+import { normalizeStoryContentLocale } from "@/lib/story/protagonist";
 import {
   readTtsAutoplayPreference,
   TtsAutoplayToggle,
@@ -141,6 +150,7 @@ export function ChatView({
 
   const [turns, setTurns] = useState<TurnRow[]>([]);
   const [input, setInput] = useState("");
+  const [inputExpanded, setInputExpanded] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loreCount, setLoreCount] = useState(0);
@@ -382,10 +392,15 @@ export function ChatView({
 
   useEffect(() => {
     if (turns.length > prevTurnCountRef.current) {
-      setBubbleFocusIndex(turns.length - 1);
+      const last = turns[turns.length - 1];
+      if (last?.role === "user" && hasTts) {
+        setBubbleFocusIndex(Math.max(0, turns.length - 2));
+      } else {
+        setBubbleFocusIndex(turns.length - 1);
+      }
     }
     prevTurnCountRef.current = turns.length;
-  }, [turns]);
+  }, [turns, hasTts]);
 
   const scrollToBubbleIndex = useCallback(
     (index: number) => {
@@ -868,12 +883,43 @@ export function ChatView({
     }
   }, []);
 
+  const steeringMode = hasTts && !readOnly;
+  const contentLocale = normalizeStoryContentLocale(storyLocale);
+
+  const sendSteering = async (
+    continuationPrompt: string,
+    opts?: { suppressTts?: boolean },
+  ) => {
+    if (generating || autoSession || readOnly || !turns.length) return;
+    setBeatOptions(null);
+    setError(null);
+    await runGeneration(turns, {
+      continuation: true,
+      continuationPrompt,
+      suppressTts: opts?.suppressTts,
+    });
+  };
+
+  const sendQuickReaction = async (reaction: QuickReactionId) => {
+    if (generating || autoSession || readOnly || !turns.length) return;
+    setInputExpanded(false);
+    await sendSteering(buildReactionSteeringPrompt(reaction, storyLocale));
+  };
+
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || generating || autoSession || readOnly) return;
 
     setInput("");
+    setInputExpanded(false);
     setError(null);
+
+    if (steeringMode) {
+      const line = normalizeSteeringDialogueInput(text);
+      if (!line) return;
+      await sendSteering(buildDialogueSteeringPrompt(line, storyLocale));
+      return;
+    }
 
     try {
       const userIndex = nextTurnIndex(turns);
@@ -1517,7 +1563,21 @@ export function ChatView({
         </MobileCollapsibleTools>
 
         {!readOnly ? (
-          <>
+          <ChatSteeringBar
+            expanded={inputExpanded}
+            onToggleExpanded={() => setInputExpanded((v) => !v)}
+            input={input}
+            onInputChange={setInput}
+            onSend={() => void sendMessage()}
+            onQuickReaction={(id) => void sendQuickReaction(id)}
+            onSay={() => setInput(contentLocale === "de" ? "„" : '"')}
+            placeholder={steeringInputPlaceholder(steeringMode, contentLocale)}
+            disabled={autoSession || readOnly || turns.length === 0}
+            generating={generating}
+            onCancel={cancelWork}
+            locale={storyLocale}
+            steeringMode={steeringMode}
+          >
             <StoryBeatPicker
               disabled={generating || autoSession || turns.length === 0}
               loading={beatsLoading}
@@ -1528,43 +1588,8 @@ export function ChatView({
               onQuickContinue={quickContinue}
               onAutoPlay={runMultiContinue}
             />
-          </>
+          </ChatSteeringBar>
         ) : null}
-
-        <div className="flex gap-2">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            rows={2}
-            placeholder={readOnly ? "Read-only chapter" : "What do you do?"}
-            className="flex-1 resize-none rounded-xl border border-surface-border bg-surface-raised px-3 py-2 text-base outline-none focus:border-accent"
-            disabled={generating || autoSession || readOnly}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                if (!generating) sendMessage();
-              }
-            }}
-          />
-          {generating ? (
-            <button
-              type="button"
-              onClick={cancelWork}
-              className="shrink-0 rounded-xl border border-red-500/50 bg-red-500/15 px-4 py-2 text-sm font-medium text-red-300"
-            >
-              Stop
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={sendMessage}
-              disabled={autoSession || readOnly || !input.trim()}
-              className="shrink-0 rounded-xl bg-accent px-4 py-2 text-sm font-medium text-black disabled:opacity-40"
-            >
-              Send
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );
