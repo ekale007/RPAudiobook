@@ -7,6 +7,8 @@ import {
 } from "@/lib/server/env";
 import { checkRateLimit } from "@/lib/server/rateLimit";
 import { requireUser } from "@/lib/server/requireUser";
+import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
+import { getTtsHourlyLimitForUser } from "@/lib/server/userTier";
 
 export async function GET() {
   return NextResponse.json({
@@ -19,10 +21,9 @@ export async function POST(req: Request) {
   const auth = await requireUser(req);
   if ("error" in auth) return auth.error;
 
-  const limit = checkRateLimit(
-    `tts-qwen:${auth.user.id}`,
-    getRateLimitTtsPerHour(),
-  );
+  const supabase = await createServerSupabaseFromRequest(req);
+  const ttsPerHour = await getTtsHourlyLimitForUser(supabase, auth.user.id);
+  const limit = checkRateLimit(`tts-qwen:${auth.user.id}`, ttsPerHour);
   if (!limit.ok) {
     return NextResponse.json(
       { error: "TTS rate limit exceeded", retryAfterSec: limit.retryAfterSec },

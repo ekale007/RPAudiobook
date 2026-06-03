@@ -26,6 +26,8 @@ type UsagePayload = {
     remaining: string;
   };
   warning?: string;
+  tier?: string;
+  tierLabel?: string;
 };
 
 function formatReset(resetAt: number): string {
@@ -111,10 +113,17 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
     <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
-          <h2 className="font-medium text-accent">Beta LLM — Verbrauch</h2>
+          <h2 className="font-medium text-accent">
+            LLM-Verbrauch
+            {data?.tierLabel ? (
+              <span className="ml-2 font-normal text-zinc-500">
+                · {data.tierLabel}
+              </span>
+            ) : null}
+          </h2>
           <p className="mt-0.5 text-xs text-zinc-500">
-            Geschätzte Kosten (OpenRouter). Stündliches Limit schützt vor
-            Spam; Monatsbudget pro Account.
+            Geschätzte Kosten (OpenRouter). Stündliches Limit und Monatsbudget
+            hängen an deinem Tarif — siehe Account.
           </p>
         </div>
         <button

@@ -4,13 +4,30 @@ import {
   getLlmModelCatalog,
 } from "@/lib/server/llmModels";
 import { requireUser } from "@/lib/server/requireUser";
+import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
+import {
+  fetchUserTierLimits,
+  filterCatalogForTier,
+} from "@/lib/server/userTier";
 
 /** Allowed LLM models for user picker (admin catalog via BETA_LLM_MODELS). */
 export async function GET(req: Request) {
   const auth = await requireUser(req);
   if ("error" in auth) return auth.error;
 
-  const models = getLlmModelCatalog().map((m) => ({
+  const supabase = await createServerSupabaseFromRequest(req);
+  let limits;
+  try {
+    limits = await fetchUserTierLimits(supabase, auth.user.id);
+  } catch {
+    limits = null;
+  }
+
+  const catalog = limits
+    ? filterCatalogForTier(getLlmModelCatalog(), limits)
+    : getLlmModelCatalog();
+
+  const models = catalog.map((m) => ({
     id: m.id,
     label: m.label,
     promptCentsPer1k: m.promptCentsPer1k,
@@ -18,5 +35,9 @@ export async function GET(req: Request) {
     priceHint: formatModelPriceHint(m),
   }));
 
-  return NextResponse.json({ models });
+  return NextResponse.json({
+    models,
+    tier: limits?.tier ?? null,
+    tierLabel: limits?.tierLabel ?? null,
+  });
 }

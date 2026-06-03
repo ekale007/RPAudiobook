@@ -8,22 +8,31 @@ import {
 import { getRateLimitStatus } from "@/lib/server/rateLimit";
 import { requireUser } from "@/lib/server/requireUser";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
+import { fetchUserTierLimits } from "@/lib/server/userTier";
 
 export async function GET(req: Request) {
   const auth = await requireUser(req);
   if ("error" in auth) return auth.error;
 
   const supabase = await createServerSupabaseFromRequest(req);
-  const hourly = getRateLimitStatus(
-    `llm:${auth.user.id}`,
-    getRateLimitLlmPerHour(),
-  );
+  let tierLimits;
+  try {
+    tierLimits = await fetchUserTierLimits(supabase, auth.user.id);
+  } catch {
+    tierLimits = null;
+  }
+
+  const llmPerHour = tierLimits?.llmPerHour ?? getRateLimitLlmPerHour();
+  const hourly = getRateLimitStatus(`llm:${auth.user.id}`, llmPerHour);
 
   try {
     const monthly = await fetchMonthlyUsage(supabase, auth.user.id);
     return NextResponse.json({
       hourly,
       monthly,
+      tier: monthly.tier ?? tierLimits?.tier,
+      tierLabel: monthly.tierLabel ?? tierLimits?.tierLabel,
+      limits: tierLimits,
       labels: {
         used: formatCentsDe(monthly.costCents),
         budget: formatCentsDe(monthly.budgetCents),
@@ -31,7 +40,8 @@ export async function GET(req: Request) {
       },
     });
   } catch (e) {
-    const budgetCents = getBetaLlmBudgetCents();
+    const budgetCents =
+      tierLimits?.llmBudgetCents ?? getBetaLlmBudgetCents();
     return NextResponse.json({
       hourly,
       monthly: {
@@ -42,7 +52,12 @@ export async function GET(req: Request) {
         costCents: 0,
         budgetCents,
         budgetRemainingCents: budgetCents,
+        tier: tierLimits?.tier,
+        tierLabel: tierLimits?.tierLabel,
       },
+      tier: tierLimits?.tier,
+      tierLabel: tierLimits?.tierLabel,
+      limits: tierLimits,
       labels: {
         used: formatCentsDe(0),
         budget: formatCentsDe(budgetCents),

@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
-import { resolveAllowedLlmModel } from "@/lib/server/llmModels";
+import { resolveAllowedLlmModelForTier } from "@/lib/server/userTier";
+import { fetchUserTierLimits } from "@/lib/server/userTier";
 import {
   getOpenRouterApiKey,
   getOpenRouterModel,
   getRateLimitLlmPerHour,
+  getRateLimitTtsPerHour,
 } from "@/lib/server/env";
+import { getBetaLlmBudgetCents } from "@/lib/server/llmUsage";
 import {
   extractOpenRouterErrorMessage,
   formatOpenRouterErrorMessage,
@@ -36,6 +39,13 @@ export async function POST(req: Request) {
 
   const supabase = await createServerSupabaseFromRequest(req);
 
+  let tierLimits;
+  try {
+    tierLimits = await fetchUserTierLimits(supabase, auth.user.id);
+  } catch {
+    tierLimits = null;
+  }
+
   let monthly;
   try {
     monthly = await fetchMonthlyUsage(supabase, auth.user.id);
@@ -55,10 +65,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const limit = checkRateLimit(
-    `llm:${auth.user.id}`,
-    getRateLimitLlmPerHour(),
-  );
+  const llmPerHour = tierLimits?.llmPerHour ?? getRateLimitLlmPerHour();
+  const limit = checkRateLimit(`llm:${auth.user.id}`, llmPerHour);
   if (!limit.ok) {
     return NextResponse.json(
       {
@@ -97,7 +105,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing messages" }, { status: 400 });
   }
 
-  const resolved = resolveAllowedLlmModel(body.model);
+  const resolved = tierLimits
+    ? resolveAllowedLlmModelForTier(body.model, tierLimits)
+    : resolveAllowedLlmModelForTier(body.model, {
+        tier: "beta",
+        tierLabel: "Beta",
+        llmBudgetCents: getBetaLlmBudgetCents(),
+        llmPerHour: getRateLimitLlmPerHour(),
+        ttsPerHour: getRateLimitTtsPerHour(),
+        ttsStorageMax: 100,
+        allowedModelIds: null,
+      });
   const model = resolved.id;
 
   const payload: Record<string, unknown> = {
@@ -118,7 +136,17 @@ export async function POST(req: Request) {
     const message = extractOpenRouterErrorMessage(errText);
     const formatted = formatOpenRouterErrorMessage(message, upstream.status);
 
-    const fallbackModel = resolveAllowedLlmModel(getOpenRouterModel()).id;
+    const fallbackModel = tierLimits
+      ? resolveAllowedLlmModelForTier(getOpenRouterModel(), tierLimits).id
+      : resolveAllowedLlmModelForTier(getOpenRouterModel(), {
+          tier: "beta",
+          tierLabel: "Beta",
+          llmBudgetCents: getBetaLlmBudgetCents(),
+          llmPerHour: getRateLimitLlmPerHour(),
+          ttsPerHour: getRateLimitTtsPerHour(),
+          ttsStorageMax: 100,
+          allowedModelIds: null,
+        }).id;
     if (
       upstream.status === 404 &&
       isOpenRouterPrivacyError(message) &&

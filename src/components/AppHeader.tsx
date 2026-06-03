@@ -34,8 +34,17 @@ export function AppHeader({
           </div>
         ) : null}
 
-        <div className="flex flex-1 justify-end">
-          <Link href="/settings" className="shrink-0 text-xs text-zinc-400 sm:text-sm">
+        <div className="flex flex-1 items-center justify-end gap-3">
+          <Link
+            href="/account"
+            className="shrink-0 text-xs text-zinc-400 sm:text-sm"
+          >
+            Account
+          </Link>
+          <Link
+            href="/settings"
+            className="shrink-0 text-xs text-zinc-400 sm:text-sm"
+          >
             Settings
           </Link>
         </div>

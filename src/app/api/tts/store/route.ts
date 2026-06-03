@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import {
   canStoreNewTtsRecording,
   countUserTtsRecordings,
-  getTtsStorageMaxPerUser,
   getTurnForCloudStorage,
 } from "@/lib/server/ttsStorageQuota";
 import { requireUser } from "@/lib/server/requireUser";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
+import { fetchUserTierLimits } from "@/lib/server/userTier";
 
 export const runtime = "nodejs";
 
@@ -43,7 +43,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Turn nicht gefunden" }, { status: 404 });
   }
 
-  const max = getTtsStorageMaxPerUser();
+  const tierLimits = await fetchUserTierLimits(supabase, auth.user.id);
+  const max = tierLimits.ttsStorageMax;
   const used = await countUserTtsRecordings(supabase);
   const existingPath = turn.audio_storage_path;
 

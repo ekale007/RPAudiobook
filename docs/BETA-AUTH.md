@@ -70,6 +70,8 @@ Wenn `1` (oder in Production standardmäßig):
 - Kein anonymer Dev-Login
 - Hinweis: „Beta — Zugang nur mit Einladung“
 
+Nach dem ersten Login: in Supabase `user_profiles.tier = 'beta'` für eingeladene Tester setzen (siehe [BETA-BILLING.md](./BETA-BILLING.md)).
+
 ## Checkliste nach dem Setup
 
 - [ ] Sign-up in Supabase **aus**

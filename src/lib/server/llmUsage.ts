@@ -3,6 +3,8 @@ import {
   getLlmModelById,
   resolveAllowedLlmModel,
 } from "@/lib/server/llmModels";
+import type { UserTier } from "@/lib/server/userTier";
+import { fetchUserTierLimits } from "@/lib/server/userTier";
 
 export type LlmUsageSnapshot = {
   periodMonth: string;
@@ -12,6 +14,8 @@ export type LlmUsageSnapshot = {
   costCents: number;
   budgetCents: number;
   budgetRemainingCents: number;
+  tier?: UserTier;
+  tierLabel?: string;
 };
 
 export function currentUsageMonthUtc(): string {
@@ -89,7 +93,8 @@ export async function fetchMonthlyUsage(
   userId: string,
 ): Promise<LlmUsageSnapshot> {
   const periodMonth = currentUsageMonthUtc();
-  const budgetCents = getBetaLlmBudgetCents();
+  const tierLimits = await fetchUserTierLimits(supabase, userId);
+  const budgetCents = tierLimits.llmBudgetCents;
 
   const { data, error } = await supabase
     .from("user_llm_usage")
@@ -109,6 +114,8 @@ export async function fetchMonthlyUsage(
     costCents,
     budgetCents,
     budgetRemainingCents: Math.max(0, budgetCents - costCents),
+    tier: tierLimits.tier,
+    tierLabel: tierLimits.tierLabel,
   };
 }
 
