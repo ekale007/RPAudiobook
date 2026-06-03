@@ -1,10 +1,10 @@
 import { completeOpenRouter } from "@/lib/llm/openrouter";
 import { slugifyCharacterName } from "@/lib/memory/characterMemory";
-import type { WryTourSeedPack } from "@/lib/import/wrytour";
+import type { StorySeedPack } from "@/lib/import/storySeed";
 import type {
   OpenRouterSettings,
-  WryTourCharacter,
-  WryTourLorebook,
+  StoryCharacterCard,
+  StoryLorebook,
 } from "@/lib/types";
 
 export interface StoryDraftInput {
@@ -20,11 +20,11 @@ export interface StoryDraft {
   bandTitle: string;
   chapterTitle: string;
   phaseHint?: string;
-  worldLorebook: WryTourLorebook;
+  worldLorebook: StoryLorebook;
   characters: Array<{
     slug: string;
     role: "narrator" | "cast";
-    card: WryTourCharacter;
+    card: StoryCharacterCard;
   }>;
 }
 
@@ -165,7 +165,7 @@ export function parseStoryDraftJson(raw: string, locale: string): StoryDraft {
   };
 }
 
-export function draftToSeedPack(draft: StoryDraft): WryTourSeedPack {
+export function draftToSeedPack(draft: StoryDraft): StorySeedPack {
   return {
     characters: draft.characters,
     lorebooks: [{ slug: "world-bible", book: draft.worldLorebook }],
@@ -196,7 +196,7 @@ export async function generateStoryDraft(
     [
       {
         role: "system",
-        content: `You are a story bible designer for an interactive audiobook RPG app (WryTour-style character cards + lorebook).
+        content: `You are a story bible designer for an interactive audiobook RPG app (character cards + lorebook JSON).
 
 Design ONE cohesive story package:
 - Exactly 1 narrator character (role narrator) with rich system_prompt, first_mes opening scene (800-1500 words for narrator), second-person if appropriate.

@@ -422,7 +422,7 @@ export function StoryHubView({
             <SettingsLink
               href={`/story/${storyId}/export`}
               title="Karten & Lorebooks exportieren"
-              description="WryTour-JSON für Figuren und Lore herunterladen"
+              description="Story-JSON für Figuren und Lore herunterladen"
             />
             <Link
               href="/story/new"

@@ -1,5 +1,5 @@
-/** WryTour / flat character card export */
-export interface WryTourCharacter {
+/** Interactive story character card (JSON import/export). */
+export interface StoryCharacterCard {
   name: string;
   description?: string;
   personality?: string;
@@ -26,7 +26,7 @@ export interface LoreEntry {
   constant?: boolean;
 }
 
-export interface WryTourLorebook {
+export interface StoryLorebook {
   name: string;
   description?: string;
   entries: LoreEntry[];

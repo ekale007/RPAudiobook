@@ -5,7 +5,7 @@ import { CharacterAvatar } from "@/components/CharacterAvatar";
 import { uploadCharacterAvatar } from "@/lib/db/characterAvatarStorage";
 import { getHoerbuchkiExtensions, setAvatarStoragePath } from "@/lib/images/characterAvatar";
 import { updateCharacterCard } from "@/lib/db/stories";
-import type { WryTourCharacter } from "@/lib/types";
+import type { StoryCharacterCard } from "@/lib/types";
 
 export function CharacterAvatarUpload({
   userId,
@@ -21,8 +21,8 @@ export function CharacterAvatarUpload({
   storyId: string;
   characterId: string;
   name: string;
-  card: WryTourCharacter;
-  onUpdated: (card: WryTourCharacter) => void;
+  card: StoryCharacterCard;
+  onUpdated: (card: StoryCharacterCard) => void;
   onPersisted?: () => void;
   compact?: boolean;
 }) {

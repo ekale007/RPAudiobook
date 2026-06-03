@@ -1,6 +1,6 @@
 # HörbuchKI
 
-Interactive story roleplay (WryTour / SillyTavern-style) in the browser, with optional narrator audio and Supabase cloud saves.
+Interactive story roleplay in the browser (character cards + lore), with optional narrator audio and Supabase cloud saves.
 
 ## Features
 
@@ -12,7 +12,7 @@ Interactive story roleplay (WryTour / SillyTavern-style) in the browser, with op
 | D — Multi-voice + group chat | Done |
 | E — Chat edit, rewind, reroll, continue | Done |
 
-- **Cards & lore:** WryTour-compatible JSON, keyword lore injection
+- **Cards & lore:** Character-card JSON import/export, keyword lore injection
 - **Structure:** Story → Band → Chapter → Turns + AI summaries
 - **Keys:** OpenRouter + TTS stay in **browser localStorage**
 - **Cloud:** Supabase for stories only
@@ -60,7 +60,7 @@ Add `HF_TOKEN=hf_...` to `.env.local` (Hugging Face read token) so Kokoro can do
 | `npm run dev` | App (LAN-friendly `-H 0.0.0.0`) |
 | `npm run tts:server` | edge-tts (port 5123, internet) |
 | `npm run tts:kokoro` | Kokoro-82M (port 5124, GPU/CPU) |
-| `npm run seed:sync -- "D:\…\WryTour"` | Refresh bundled seed JSON |
+| `npm run seed:sync -- "D:\…\source"` | Refresh bundled library seed JSON |
 | `npm run start:local` | Kokoro + Next in zwei Fenstern (Windows) |
 
 ## Navigation

@@ -2,7 +2,7 @@ import { completeOpenRouter } from "@/lib/llm/openrouter";
 import { parseModelJson } from "@/lib/llm/parseModelJson";
 import { slugifyCharacterName } from "@/lib/memory/characterMemory";
 import type { CharacterRow } from "@/lib/db/stories";
-import type { OpenRouterSettings, WryTourCharacter } from "@/lib/types";
+import type { OpenRouterSettings, StoryCharacterCard } from "@/lib/types";
 import {
   formatSpeakerHintsForPrompt,
   hintToCandidate,
@@ -23,7 +23,7 @@ export type StoryCharacterCandidate = {
 };
 
 export type AdaptedCharacterCard = Pick<
-  WryTourCharacter,
+  StoryCharacterCard,
   "name" | "description" | "personality" | "scenario" | "mes_example"
 > & {
   character_memory?: string;

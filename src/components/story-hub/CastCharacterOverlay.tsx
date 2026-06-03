@@ -29,7 +29,7 @@ import type {
   QwenVoiceProfile,
   StorySettings,
   VoiceMap,
-  WryTourCharacter,
+  StoryCharacterCard,
 } from "@/lib/types";
 import { voiceMapForStorage } from "@/lib/tts/defaultVoiceMap";
 import { emptyQwenProfile } from "@/lib/tts/qwenVoiceProfiles";
@@ -38,7 +38,7 @@ type CharDraft = {
   memory: string;
   archived: boolean;
   reason: string;
-  card: WryTourCharacter;
+  card: StoryCharacterCard;
 };
 
 export function CastCharacterOverlay({

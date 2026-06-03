@@ -3,7 +3,7 @@
 import { CharacterAvatar } from "@/components/CharacterAvatar";
 import { getHoerbuchkiExtensions } from "@/lib/images/characterAvatar";
 import type { CharacterRow } from "@/lib/db/stories";
-import type { WryTourCharacter } from "@/lib/types";
+import type { StoryCharacterCard } from "@/lib/types";
 
 export function CastVisitCard({
   character,
@@ -44,7 +44,7 @@ export function CastVisitCard({
           <CharacterAvatar
             name={character.name}
             avatarStoragePath={
-              getHoerbuchkiExtensions(card as WryTourCharacter).avatarStoragePath
+              getHoerbuchkiExtensions(card as StoryCharacterCard).avatarStoragePath
             }
             className="h-9 w-9 ring-2 ring-surface-border/80"
           />

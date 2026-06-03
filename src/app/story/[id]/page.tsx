@@ -6,7 +6,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { StoryHubView } from "@/components/story-hub/StoryHubView";
 import { createClient } from "@/lib/supabase/client";
 import { getStoryConcept } from "@/lib/story/storyOrigin";
-import type { WryTourCharacter } from "@/lib/types";
+import type { StoryCharacterCard } from "@/lib/types";
 import {
   deleteChapter,
   getStoryOverview,
@@ -105,7 +105,7 @@ export default function StoryHubPage() {
   const storySettings = (data.story.settings ?? {}) as Record<string, unknown>;
   const storyConcept = getStoryConcept(
     storySettings,
-    data.narrator as WryTourCharacter,
+    data.narrator as StoryCharacterCard,
   );
 
   const saveTitle = async () => {

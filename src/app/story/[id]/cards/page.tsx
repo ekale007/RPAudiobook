@@ -14,7 +14,7 @@ import {
   updateCharacterCard,
   type CharacterRow,
 } from "@/lib/db/stories";
-import type { WryTourCharacter } from "@/lib/types";
+import type { StoryCharacterCard } from "@/lib/types";
 
 type CardField =
   | "name"
@@ -56,7 +56,7 @@ export default function StoryCharacterCardsPage() {
   const [storyTitle, setStoryTitle] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
   const [characters, setCharacters] = useState<CharacterRow[]>([]);
-  const [drafts, setDrafts] = useState<Record<string, WryTourCharacter>>({});
+  const [drafts, setDrafts] = useState<Record<string, StoryCharacterCard>>({});
   const [openId, setOpenId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -67,7 +67,7 @@ export default function StoryCharacterCardsPage() {
       (c) => c.role === "narrator" || c.role === "cast",
     );
     setCharacters(all);
-    const next: Record<string, WryTourCharacter> = {};
+    const next: Record<string, StoryCharacterCard> = {};
     for (const c of all) {
       next[c.id] = structuredClone(c.card_json);
     }

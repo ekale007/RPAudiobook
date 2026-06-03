@@ -1,4 +1,4 @@
-import type { WryTourCharacter } from "@/lib/types";
+import type { StoryCharacterCard } from "@/lib/types";
 
 export const HOERBUCHKI_EXT_KEY = "hoerbuchki";
 
@@ -7,7 +7,7 @@ export type HoerbuchkiCharacterExtensions = {
 };
 
 export function getHoerbuchkiExtensions(
-  card: WryTourCharacter,
+  card: StoryCharacterCard,
 ): HoerbuchkiCharacterExtensions {
   const raw = card.extensions?.[HOERBUCHKI_EXT_KEY];
   if (!raw || typeof raw !== "object") return {};
@@ -19,9 +19,9 @@ export function getHoerbuchkiExtensions(
 }
 
 export function setAvatarStoragePath(
-  card: WryTourCharacter,
+  card: StoryCharacterCard,
   storagePath: string | null,
-): WryTourCharacter {
+): StoryCharacterCard {
   const prev = getHoerbuchkiExtensions(card);
   const nextExt: HoerbuchkiCharacterExtensions = {
     ...prev,

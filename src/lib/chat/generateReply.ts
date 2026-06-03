@@ -4,14 +4,14 @@ import { preprocessAssistantMarkup } from "@/lib/chat/parseSpeakerBlocks";
 import { completeOpenRouterWithUsage } from "@/lib/llm/openrouter";
 import { resolveChatModelSettings } from "@/lib/storage/openRouterSettings";
 import type { OpenRouterSettings } from "@/lib/types";
-import type { ChatTurn, LoreEntry, StorySettings, WryTourCharacter } from "@/lib/types";
+import type { ChatTurn, LoreEntry, StorySettings, StoryCharacterCard } from "@/lib/types";
 import type { CharacterRow } from "@/lib/db/stories";
 import type { StoryPlotState } from "@/lib/memory/plotState";
 import { defaultContinuePrompt } from "@/lib/chat/storyBeatSuggestions";
 
 export type GenerateReplyParams = {
   settings: OpenRouterSettings;
-  character: WryTourCharacter;
+  character: StoryCharacterCard;
   cast: CharacterRow[];
   loreEntries: LoreEntry[];
   turns: ChatTurn[];

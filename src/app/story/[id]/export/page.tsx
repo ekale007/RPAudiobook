@@ -67,7 +67,7 @@ export default function StoryExportPage() {
       <AppHeader title="Export" backHref={`/story/${storyId}`} />
       <div className="flex flex-col gap-4 p-4">
         <p className="text-sm text-zinc-400">
-          Download WryTour-compatible JSON files for SillyTavern or backup.
+          Download character-card JSON files for SillyTavern or backup.
         </p>
         {!ready ? (
           <p className="text-zinc-500">Loading…</p>

@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
+import { BetaOnboardingModal } from "@/components/BetaOnboardingModal";
+import { LegalFooter } from "@/components/legal/LegalFooter";
 import {
   StoryLibraryShelf,
   StoryListCard,
@@ -115,6 +117,7 @@ export default function HomePage() {
             Settings
           </Link>
         </div>
+        <LegalFooter className="mt-auto" />
       </main>
     );
   }
@@ -143,6 +146,7 @@ export default function HomePage() {
             Sign in
           </Link>
         </div>
+        <LegalFooter className="mt-auto" />
       </main>
     );
   }
@@ -286,6 +290,9 @@ export default function HomePage() {
           }}
         />
       ) : null}
+
+      <BetaOnboardingModal openGate />
+      <LegalFooter />
     </main>
   );
 }

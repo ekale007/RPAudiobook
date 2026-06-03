@@ -25,6 +25,7 @@ Thumbs.db
 .venv-kokoro/
 test-output/
 .venv-qwen/
+.venv-omnivoice/
 .venv-covers/
 __pycache__/
 *.py[cod]

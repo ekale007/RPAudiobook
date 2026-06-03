@@ -9,7 +9,7 @@ import {
   listLorebooksForStory,
   updateStoryLorebook,
 } from "@/lib/db/stories";
-import type { LoreEntry, WryTourLorebook } from "@/lib/types";
+import type { LoreEntry, StoryLorebook } from "@/lib/types";
 
 function parseKeysInput(raw: string): string[] {
   return raw
@@ -32,7 +32,7 @@ export default function StoryWorldPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [lorebookId, setLorebookId] = useState<string | null>(null);
-  const [book, setBook] = useState<WryTourLorebook | null>(null);
+  const [book, setBook] = useState<StoryLorebook | null>(null);
 
   const load = useCallback(async () => {
     const rows = await listLorebooksForStory(storyId);
@@ -43,7 +43,7 @@ export default function StoryWorldPage() {
     }
     const first = rows[0] as {
       id: string;
-      book_json: WryTourLorebook;
+      book_json: StoryLorebook;
     };
     setLorebookId(first.id);
     setBook(structuredClone(first.book_json));
@@ -99,7 +99,7 @@ export default function StoryWorldPage() {
     setError(null);
     setMessage(null);
     try {
-      const normalized: WryTourLorebook = {
+      const normalized: StoryLorebook = {
         ...book,
         name: book.name.trim() || "World",
         entries: book.entries.map((e, i) => ({

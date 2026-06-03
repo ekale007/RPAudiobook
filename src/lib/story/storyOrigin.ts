@@ -2,7 +2,7 @@ import {
   getLibraryTemplate,
   type LibraryTemplateId,
 } from "@/lib/story/libraryTemplates";
-import type { WryTourCharacter } from "@/lib/types";
+import type { StoryCharacterCard } from "@/lib/types";
 
 export type StoryOrigin = "personal" | "library" | "editor";
 
@@ -33,7 +33,7 @@ export function storyOriginLabel(origin: StoryOrigin): string {
 /** Story pitch / concept for hub summary (stored or inferred). */
 export function getStoryConcept(
   settings: unknown,
-  narrator?: WryTourCharacter | null,
+  narrator?: StoryCharacterCard | null,
 ): string | null {
   const o = (settings ?? {}) as { storyConcept?: unknown };
   if (typeof o.storyConcept === "string" && o.storyConcept.trim()) {

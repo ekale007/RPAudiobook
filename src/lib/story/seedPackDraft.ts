@@ -1,13 +1,13 @@
-import { mergeLoreEntries, type WryTourSeedPack } from "@/lib/import/wrytour";
+import { mergeLoreEntries, type StorySeedPack } from "@/lib/import/storySeed";
 import type { StoryDraft } from "@/lib/story/generateStoryDraft";
-import type { WryTourCharacter } from "@/lib/types";
+import type { StoryCharacterCard } from "@/lib/types";
 
-function cloneCard(card: WryTourCharacter): WryTourCharacter {
+function cloneCard(card: StoryCharacterCard): StoryCharacterCard {
   return structuredClone(card);
 }
 
 export function seedPackToStoryDraft(
-  pack: WryTourSeedPack,
+  pack: StorySeedPack,
   meta: {
     storyTitle: string;
     bandTitle: string;

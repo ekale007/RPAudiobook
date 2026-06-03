@@ -59,7 +59,7 @@ import type {
   LoreEntry,
   StorySettings,
   VoiceMap,
-  WryTourCharacter,
+  StoryCharacterCard,
 } from "@/lib/types";
 import {
   appendTurn,
@@ -130,7 +130,7 @@ export function ChatView({
 }: {
   storyId: string;
   chapterId: string;
-  character: WryTourCharacter;
+  character: StoryCharacterCard;
   cast: CharacterRow[];
   storySettings: StorySettings;
   loreEntries: LoreEntry[];

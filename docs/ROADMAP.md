@@ -1,7 +1,7 @@
 # HörbuchKI — Roadmap & offene Punkte
 
 Stand: nach Phase E (Chat edit / rewind / reroll / continue).  
-Ziel: WryTour-ähnliches RPG im Browser, PWA am Handy, Kokoro lokal am PC.
+Ziel: Interaktives Story-RPG im Browser, PWA am Handy, Kokoro lokal am PC.
 
 ---
 
@@ -118,6 +118,6 @@ Notizen unten eintragen:
 | `scripts/` | Kokoro, edge-tts, install, env loader |
 | `supabase/migrations/` | SQL 001–003 |
 | `docs/` | AUTH, MOBILE, KOKORO, ROADMAP |
-| `src/data/seed/wrytour/` | Bundled Seed (kein HTTP) |
+| `src/data/seed/library/` | Bundled library seed (kein HTTP) |
 
 Nicht versionieren: `node_modules/`, `.venv-*`, `.env.local`, `.next/`

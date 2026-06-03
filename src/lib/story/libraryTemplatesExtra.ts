@@ -1,11 +1,11 @@
-import type { WryTourSeedPack } from "@/lib/import/wrytour";
+import type { StorySeedPack } from "@/lib/import/storySeed";
 import type { LibraryTemplateDefinition } from "@/lib/story/libraryTemplates";
-import type { WryTourCharacter, WryTourLorebook } from "@/lib/types";
+import type { StoryCharacterCard, StoryLorebook } from "@/lib/types";
 
 function narrator(
   name: string,
-  card: Partial<WryTourCharacter> & Pick<WryTourCharacter, "first_mes" | "system_prompt">,
-): WryTourCharacter {
+  card: Partial<StoryCharacterCard> & Pick<StoryCharacterCard, "first_mes" | "system_prompt">,
+): StoryCharacterCard {
   return {
     name,
     description: card.description ?? "",
@@ -27,8 +27,8 @@ function narrator(
 
 function castCard(
   name: string,
-  card: Partial<WryTourCharacter>,
-): WryTourCharacter {
+  card: Partial<StoryCharacterCard>,
+): StoryCharacterCard {
   return {
     name,
     description: card.description ?? "",
@@ -45,8 +45,8 @@ function castCard(
   };
 }
 
-function loadSchattenKaiserPack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadSchattenKaiserPack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "Das Schattenreich von Valdris",
     description: "Dark-Fantasy-Isekai: fremdes Reich, verlorene Erinnerung, Schatten-Imperium.",
     entries: [
@@ -111,8 +111,8 @@ function loadSchattenKaiserPack(): WryTourSeedPack {
   };
 }
 
-function loadAkademieArkanumPack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadAkademieArkanumPack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "Akademie Arkanum",
     description: "Magie-Akademie: Sortierung, Cliquen, verbotenes Archiv.",
     entries: [
@@ -177,8 +177,8 @@ function loadAkademieArkanumPack(): WryTourSeedPack {
   };
 }
 
-function loadSystemNullPack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadSystemNullPack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "Welt Null — Systeminterface",
     description: "Isekai mit RPG-System: Statusfenster, Quests, unbekannte Klasse.",
     entries: [
@@ -243,8 +243,8 @@ function loadSystemNullPack(): WryTourSeedPack {
   };
 }
 
-function loadBlutmondPaktPack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadBlutmondPaktPack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "Neonstadt — Blutmond-Viertel",
     description: "Urban Fantasy: Vampir-Clans, Nachtclub, verschwundener Pakt.",
     entries: [
@@ -309,8 +309,8 @@ function loadBlutmondPaktPack(): WryTourSeedPack {
   };
 }
 
-function loadZug47Pack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadZug47Pack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "Zug 47 — Untergrund",
     description: "Post-apokalyptisch: Bunkerzug, letzte Linie, Funkstille bricht.",
     entries: [
@@ -375,8 +375,8 @@ function loadZug47Pack(): WryTourSeedPack {
   };
 }
 
-function loadSecondLifeProtocolPack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadSecondLifeProtocolPack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "Second Life Protocol",
     description: "Isekai via corporate VR: logged in, cannot log out, admin message pending.",
     entries: [
@@ -443,8 +443,8 @@ function loadSecondLifeProtocolPack(): WryTourSeedPack {
   };
 }
 
-function loadGuildLastLightPack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadGuildLastLightPack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "Guild of the Last Light",
     description: "Classic adventurer guild RP: failing guild hall, dungeon rumor, new recruit.",
     entries: [
@@ -511,8 +511,8 @@ function loadGuildLastLightPack(): WryTourSeedPack {
   };
 }
 
-function loadStarlitCourtPack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadStarlitCourtPack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "The Starlit Court",
     description: "Space opera: imperial court, assassin masquerade, fleet on the border.",
     entries: [
@@ -579,8 +579,8 @@ function loadStarlitCourtPack(): WryTourSeedPack {
   };
 }
 
-function loadHexboundAcademyPack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadHexboundAcademyPack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "Hexbound Academy",
     description: "Magic school: cursed dorm, rival houses, forbidden hex on the founder statue.",
     entries: [
@@ -647,8 +647,8 @@ function loadHexboundAcademyPack(): WryTourSeedPack {
   };
 }
 
-function loadGhostSignalPack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadGhostSignalPack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "Ghost Signal Division",
     description: "Spy thriller: memory wipe, dead handler, encrypted broadcast on loop.",
     entries: [

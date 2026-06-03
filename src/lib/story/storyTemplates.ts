@@ -1,4 +1,4 @@
-import type { WryTourSeedPack } from "@/lib/import/wrytour";
+import type { StorySeedPack } from "@/lib/import/storySeed";
 import type { StoryDraft } from "@/lib/story/generateStoryDraft";
 import {
   libraryTemplateToDraft,
@@ -16,8 +16,8 @@ export interface StoryTemplateDefinition {
   defaultConcept: string;
   defaultGenre: string;
   defaultTone: string;
-  loadPack: () => WryTourSeedPack;
-  toDraft: (pack: WryTourSeedPack) => StoryDraft;
+  loadPack: () => StorySeedPack;
+  toDraft: (pack: StorySeedPack) => StoryDraft;
 }
 
 export { seedPackToStoryDraft };

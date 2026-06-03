@@ -9,10 +9,10 @@ import {
   type StoryProtagonistProfile,
   type StorySettings,
   type VoiceMap,
-  type WryTourCharacter,
-  type WryTourLorebook,
+  type StoryCharacterCard,
+  type StoryLorebook,
 } from "@/lib/types";
-import type { WryTourSeedPack } from "@/lib/import/wrytour";
+import type { StorySeedPack } from "@/lib/import/storySeed";
 import type { StoryOrigin } from "@/lib/story/storyOrigin";
 import {
   getLibraryTemplate,
@@ -144,7 +144,7 @@ export async function updateStoryTitle(
 
 export interface CreateStoryFromPackOptions {
   userId: string;
-  pack: WryTourSeedPack;
+  pack: StorySeedPack;
   title: string;
   locale?: string;
   bandTitle?: string;
@@ -346,7 +346,7 @@ export async function importFromLibraryTemplate(
 /** @deprecated Use importFromLibraryTemplate(userId, "when-dawn-breaks") */
 export async function importWhenDawnBreaks(
   userId: string,
-  _pack: WryTourSeedPack,
+  _pack: StorySeedPack,
 ): Promise<{ storyId: string; chapterId: string }> {
   return importFromLibraryTemplate(userId, "when-dawn-breaks");
 }
@@ -366,7 +366,7 @@ export interface CharacterRow {
   slug: string;
   role: string;
   name: string;
-  card_json: WryTourCharacter;
+  card_json: StoryCharacterCard;
   created_at?: string;
   status?: CharacterCastStatus;
   character_memory?: string | null;
@@ -413,7 +413,7 @@ function mapCharacterRow(c: Record<string, unknown>): CharacterRow {
     slug: c.slug as string,
     role: c.role as string,
     name: c.name as string,
-    card_json: c.card_json as WryTourCharacter,
+    card_json: c.card_json as StoryCharacterCard,
     created_at: (c.created_at as string | undefined) ?? undefined,
     status: (c.status as CharacterCastStatus) ?? "active",
     character_memory: (c.character_memory as string | null) ?? null,
@@ -509,7 +509,7 @@ export async function createCastCharacter(
   payload: {
     slug: string;
     name: string;
-    card_json?: WryTourCharacter;
+    card_json?: StoryCharacterCard;
     character_memory?: string | null;
     first_seen_chapter_id?: string | null;
   },
@@ -577,7 +577,7 @@ export async function updateCharacterManual(
 export async function updateStoryLorebook(
   lorebookId: string,
   storyId: string,
-  book: WryTourLorebook,
+  book: StoryLorebook,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
@@ -594,7 +594,7 @@ export async function updateStoryLorebook(
 export async function updateCharacterCard(
   characterId: string,
   storyId: string,
-  card: WryTourCharacter,
+  card: StoryCharacterCard,
 ): Promise<void> {
   const supabase = createClient();
   const name = card.name?.trim() || "Character";
@@ -650,14 +650,14 @@ export async function getStoryBundle(
   if (lErr) throw lErr;
 
   const lorebookIds = (links ?? []).map((l) => l.lorebook_id as string);
-  let lorebooks: Array<{ book_json: WryTourLorebook }> = [];
+  let lorebooks: Array<{ book_json: StoryLorebook }> = [];
   if (lorebookIds.length) {
     const { data: lbs, error: lbErr } = await supabase
       .from("lorebooks")
       .select("book_json")
       .in("id", lorebookIds);
     if (lbErr) throw lbErr;
-    lorebooks = (lbs ?? []) as Array<{ book_json: WryTourLorebook }>;
+    lorebooks = (lbs ?? []) as Array<{ book_json: StoryLorebook }>;
   }
 
   const narrator = (characters ?? []).find((c) => c.role === "narrator");
@@ -699,7 +699,7 @@ export async function getStoryBundle(
 
   return {
     story,
-    narrator: narrator.card_json as WryTourCharacter,
+    narrator: narrator.card_json as StoryCharacterCard,
     cast,
     allCast,
     storySettings: parseStorySettings(story.settings),

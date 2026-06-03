@@ -1,9 +1,9 @@
-import type { WryTourSeedPack } from "@/lib/import/wrytour";
-import { loadWhenDawnBreaksSeed } from "@/lib/import/wrytour";
+import type { StorySeedPack } from "@/lib/import/storySeed";
+import { loadWhenDawnBreaksSeed } from "@/lib/import/storySeed";
 import { EXTENDED_LIBRARY_TEMPLATES } from "@/lib/story/libraryTemplatesExtra";
 import { seedPackToStoryDraft } from "@/lib/story/seedPackDraft";
 import type { StoryDraft } from "@/lib/story/generateStoryDraft";
-import type { WryTourCharacter, WryTourLorebook } from "@/lib/types";
+import type { StoryCharacterCard, StoryLorebook } from "@/lib/types";
 
 export type LibraryTemplateId =
   | "crossroads-inn"
@@ -48,13 +48,13 @@ export interface LibraryTemplateDefinition {
   spineTitle?: string;
   /** Prompt for external image generators (portrait cover ~2:3) */
   coverImagePrompt: string;
-  loadPack: () => WryTourSeedPack;
+  loadPack: () => StorySeedPack;
 }
 
 function narrator(
   name: string,
-  card: Partial<WryTourCharacter> & Pick<WryTourCharacter, "first_mes" | "system_prompt">,
-): WryTourCharacter {
+  card: Partial<StoryCharacterCard> & Pick<StoryCharacterCard, "first_mes" | "system_prompt">,
+): StoryCharacterCard {
   return {
     name,
     description: card.description ?? "",
@@ -76,8 +76,8 @@ function narrator(
 
 function castCard(
   name: string,
-  card: Partial<WryTourCharacter>,
-): WryTourCharacter {
+  card: Partial<StoryCharacterCard>,
+): StoryCharacterCard {
   return {
     name,
     description: card.description ?? "",
@@ -94,8 +94,8 @@ function castCard(
   };
 }
 
-function loadCrossroadsInnPack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadCrossroadsInnPack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "Das Gasthaus am Scheideweg",
     description: "Fantasy-Starter: Nebel, Handelswege, leise Magie.",
     entries: [
@@ -164,8 +164,8 @@ function loadCrossroadsInnPack(): WryTourSeedPack {
   };
 }
 
-function loadStationEchoPack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadStationEchoPack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "Relay Station Omega-7",
     description: "Sci-fi starter: isolated relay, unknown signal.",
     entries: [
@@ -232,8 +232,8 @@ function loadStationEchoPack(): WryTourSeedPack {
   };
 }
 
-function loadLastLetterPack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadLastLetterPack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "Stadt am Fluss",
     description: "Mystery-Starter: Brief, alte Freunde, offene Fragen.",
     entries: [
@@ -300,8 +300,8 @@ function loadLastLetterPack(): WryTourSeedPack {
   };
 }
 
-function loadHauntedLakePack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadHauntedLakePack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "Das Haus am Schwarzen See",
     description: "Horror-Starter: verlassenes Seehaus, Sturm, etwas unter dem Dock.",
     entries: [
@@ -369,8 +369,8 @@ function loadHauntedLakePack(): WryTourSeedPack {
   };
 }
 
-function loadMidnightBakeryPack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadMidnightBakeryPack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "Bäckerei Sonnenaufgang",
     description: "Cozy Mystery: Mitternachts-Schicht, fehlende Rezeptur, freundliche Stadt.",
     entries: [
@@ -437,8 +437,8 @@ function loadMidnightBakeryPack(): WryTourSeedPack {
   };
 }
 
-function loadIronRepublicPack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadIronRepublicPack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "The Iron Republic",
     description: "Steampunk starter: airship dock, brass politics, clockwork plague rumor.",
     entries: [
@@ -505,8 +505,8 @@ function loadIronRepublicPack(): WryTourSeedPack {
   };
 }
 
-function loadNeonWitnessPack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadNeonWitnessPack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "Neon District 9",
     description: "Cyberpunk noir: rain, corporate witness, encrypted memory chip.",
     entries: [
@@ -573,8 +573,8 @@ function loadNeonWitnessPack(): WryTourSeedPack {
   };
 }
 
-function loadDesertOathPack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadDesertOathPack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "Die Oase von Kharim",
     description: "Abenteuer-Fantasy: Karawane, Sandsturm, alter Eid.",
     entries: [
@@ -641,8 +641,8 @@ function loadDesertOathPack(): WryTourSeedPack {
   };
 }
 
-function loadTideLinePack(): WryTourSeedPack {
-  const world: WryTourLorebook = {
+function loadTideLinePack(): StorySeedPack {
+  const world: StoryLorebook = {
     name: "The Tide Line",
     description: "Coastal drama-thriller: family cottage, low tide reveals, buried voicemail.",
     entries: [

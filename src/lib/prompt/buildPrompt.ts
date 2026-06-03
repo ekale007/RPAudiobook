@@ -7,7 +7,7 @@ import type {
   ChatTurn,
   LoreEntry,
   StorySettings,
-  WryTourCharacter,
+  StoryCharacterCard,
 } from "@/lib/types";
 import { DEFAULT_STORY_SETTINGS } from "@/lib/types";
 import { formatCastMemoryForPrompt } from "@/lib/memory/characterMemory";
@@ -24,7 +24,7 @@ import {
 } from "@/lib/story/protagonist";
 
 export interface PromptContext {
-  character: WryTourCharacter;
+  character: StoryCharacterCard;
   loreEntries: LoreEntry[];
   turns: ChatTurn[];
   bandSummary?: string | null;

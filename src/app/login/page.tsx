@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AppHeader } from "@/components/AppHeader";
+import { LegalFooter } from "@/components/legal/LegalFooter";
 import { createClient } from "@/lib/supabase/client";
 import { formatAuthError } from "@/lib/auth/errors";
 import {
@@ -298,6 +299,7 @@ export default function LoginPage() {
       >
         <LoginForm />
       </Suspense>
+      <LegalFooter className="mt-auto" />
     </main>
   );
 }

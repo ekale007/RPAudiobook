@@ -1,6 +1,6 @@
 import { completeOpenRouter } from "@/lib/llm/openrouter";
 import { parseModelJson } from "@/lib/llm/parseModelJson";import type { CharacterRow } from "@/lib/db/stories";
-import type { ChatTurn, OpenRouterSettings, WryTourCharacter } from "@/lib/types";
+import type { ChatTurn, OpenRouterSettings, StoryCharacterCard } from "@/lib/types";
 
 export type CharacterCastStatus = "active" | "archived";
 
@@ -192,7 +192,7 @@ function normalizeUpdate(
   };
 }
 
-export function minimalCharacterCard(name: string): WryTourCharacter {
+export function minimalCharacterCard(name: string): StoryCharacterCard {
   return {
     name,
     description: "Character discovered during play.",
