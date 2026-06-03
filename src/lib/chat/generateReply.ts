@@ -1,7 +1,7 @@
 import { buildChatMessages } from "@/lib/prompt/buildPrompt";
 import { ensureSpeakerScript } from "@/lib/chat/dialogueScript";
 import { preprocessAssistantMarkup } from "@/lib/chat/parseSpeakerBlocks";
-import { completeOpenRouter } from "@/lib/llm/openrouter";
+import { completeOpenRouterWithUsage } from "@/lib/llm/openrouter";
 import { resolveChatModelSettings } from "@/lib/storage/openRouterSettings";
 import type { OpenRouterSettings } from "@/lib/types";
 import type { ChatTurn, LoreEntry, StorySettings, WryTourCharacter } from "@/lib/types";
@@ -33,10 +33,15 @@ export type GenerateReplyParams = {
   signal?: AbortSignal;
 };
 
+export type AssistantReplyResult = {
+  content: string;
+  llmCostCents?: number;
+};
+
 /** Full reply in one request (no token streaming — simpler on mobile). */
 export async function streamAssistantReply(
   params: GenerateReplyParams,
-): Promise<string> {
+): Promise<AssistantReplyResult> {
   const history = params.continuation
     ? [
         ...params.turns,
@@ -69,7 +74,7 @@ export async function streamAssistantReply(
   params.onLoreCount?.(activeLoreCount);
 
   const chatSettings = resolveChatModelSettings(params.settings);
-  return completeOpenRouter(chatSettings, messages, {
+  return completeOpenRouterWithUsage(chatSettings, messages, {
     maxTokens: chatSettings.maxTokens,
     temperature: chatSettings.temperature,
     signal: params.signal,

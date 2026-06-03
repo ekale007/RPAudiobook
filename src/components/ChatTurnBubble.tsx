@@ -42,6 +42,7 @@ export function ChatTurnBubble({
   storySettings,
   chapterTitle,
   onCloudQuotaChange,
+  onTtsCostCents,
 }: {
   turn: TurnRow;
   cast: CharacterRow[];
@@ -68,7 +69,10 @@ export function ChatTurnBubble({
   storySettings?: StorySettings;
   chapterTitle?: string | null;
   onCloudQuotaChange?: () => void;
+  onTtsCostCents?: (cents: number) => void;
 }) {
+  const llmCents = turn.llm_cost_cents ?? null;
+  const ttsCents = turn.tts_cost_cents ?? null;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(turn.content);
   const [busy, setBusy] = useState(false);
@@ -297,7 +301,12 @@ export function ChatTurnBubble({
             storySettings={storySettings}
             chapterTitle={chapterTitle}
             onCloudQuotaChange={onCloudQuotaChange}
+            onTtsCostCents={onTtsCostCents}
           />
+        ) : null}
+
+        {turn.role === "assistant" && !turn.id.startsWith("tmp-") ? (
+          <TurnCostFooter llmCents={llmCents} ttsCents={ttsCents} />
         ) : null}
 
         {!readOnly && !turn.id.startsWith("tmp-") ? (
@@ -587,6 +596,27 @@ function colorForSpeaker(
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function TurnCostFooter({
+  llmCents,
+  ttsCents,
+}: {
+  llmCents: number | null;
+  ttsCents: number | null;
+}) {
+  const chat = llmCents != null && llmCents > 0 ? llmCents : 0;
+  const tts = ttsCents != null && ttsCents > 0 ? ttsCents : 0;
+  if (chat <= 0 && tts <= 0) return null;
+  const total = chat + tts;
+  return (
+    <p className="mt-2 text-right text-[10px] leading-relaxed tabular-nums text-zinc-500">
+      {chat > 0 ? <span>Chat: {chat} ct</span> : null}
+      {chat > 0 && tts > 0 ? <span> · </span> : null}
+      {tts > 0 ? <span>TTS: {tts} ct</span> : null}
+      {total > 0 ? <span> · Σ {total} ct</span> : null}
+    </p>
+  );
 }
 
 function ActionBtn({

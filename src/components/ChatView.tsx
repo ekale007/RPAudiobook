@@ -68,7 +68,11 @@ import {
   type CharacterRow,
   type TurnRow,
 } from "@/lib/db/stories";
-import { truncateTurnsFrom, updateTurnContent } from "@/lib/db/turns";
+import {
+  patchTurnCosts,
+  truncateTurnsFrom,
+  updateTurnContent,
+} from "@/lib/db/turns";
 import { createClient } from "@/lib/supabase/client";
 import { mergeVoiceMapForProvider } from "@/lib/tts/defaultVoiceMap";
 import { isTtsReady, loadTtsSettings } from "@/lib/storage/ttsSettings";
@@ -659,6 +663,7 @@ export function ChatView({
     history: TurnRow[],
     forceTtsEnqueue = false,
     skipTtsEnqueue = false,
+    llmCostCents?: number,
   ) => {
     await truncateTurnsFrom(chapterId, startIndex, storyId);
     const blocks = parseAssistantBlocks(full);
@@ -669,6 +674,9 @@ export function ChatView({
       blocks[0]?.content ?? full,
       storyId,
       blocks[0]?.speakerSlug ?? "narrator",
+      llmCostCents != null && llmCostCents > 0
+        ? { llmCostCents }
+        : undefined,
     );
 
     const base = history.filter((t) => t.index_in_chapter < startIndex);
@@ -745,8 +753,9 @@ export function ChatView({
     abortRef.current = new AbortController();
 
     let full = "";
+    let llmCostCents: number | undefined;
     try {
-      full = await streamAssistantReply({
+      const reply = await streamAssistantReply({
         settings: chatSettings,
         character,
         cast: opts.allCast ?? allCast,
@@ -768,6 +777,8 @@ export function ChatView({
         onLoreCount: setLoreCount,
         signal: abortRef.current.signal,
       });
+      full = reply.content;
+      llmCostCents = reply.llmCostCents;
     } catch (e) {
       if ((e as Error).name !== "AbortError") {
         setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
@@ -801,6 +812,7 @@ export function ChatView({
         history,
         opts.forceTts ?? false,
         opts.suppressTts ?? false,
+        llmCostCents,
       );
     } catch (e) {
       setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
@@ -1133,6 +1145,23 @@ export function ChatView({
     await syncStoryMemory(rows);
   };
 
+  const handleTurnTtsCost = useCallback(
+    async (turnId: string, ttsCostCents: number) => {
+      if (ttsCostCents <= 0 || turnId.startsWith("tmp-")) return;
+      try {
+        await patchTurnCosts(turnId, { ttsCostCents }, storyId);
+      } catch {
+        return;
+      }
+      setTurns((prev) =>
+        prev.map((row) =>
+          row.id === turnId ? { ...row, tts_cost_cents: ttsCostCents } : row,
+        ),
+      );
+    },
+    [storyId],
+  );
+
   const handleRewind = async (turnId: string) => {
     const turn = turns.find((t) => t.id === turnId);
     if (!turn) return;
@@ -1383,6 +1412,7 @@ export function ChatView({
                 storySettings={ttsStorySettings}
                 chapterTitle={chapterLabel}
                 onCloudQuotaChange={refreshTtsCloudQuota}
+                onTtsCostCents={(cents) => void handleTurnTtsCost(t.id, cents)}
                 showDialogueMarkup
               />
             </div>

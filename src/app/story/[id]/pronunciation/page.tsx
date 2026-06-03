@@ -98,7 +98,7 @@ export default function StoryPronunciationPage() {
     setOk(null);
     try {
       const normalized = prepareTextForTts(text, speaker, cast);
-      const audio = await getNarratorAudio(tts, normalized, {
+      const { blob: audio } = await getNarratorAudio(tts, normalized, {
         speakerSlug: speaker,
         cast,
       });

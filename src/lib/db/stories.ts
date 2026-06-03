@@ -52,6 +52,8 @@ export interface TurnRow {
   created_at: string;
   audio_storage_path?: string | null;
   speaker_slug?: string | null;
+  llm_cost_cents?: number | null;
+  tts_cost_cents?: number | null;
 }
 
 export function parseStorySettings(raw: unknown): StorySettings {
@@ -707,17 +709,25 @@ export async function appendTurn(
   content: string,
   storyId?: string,
   speakerSlug?: string | null,
+  costs?: { llmCostCents?: number; ttsCostCents?: number },
 ): Promise<TurnRow> {
   const supabase = createClient();
+  const row: Record<string, unknown> = {
+    chapter_id: chapterId,
+    index_in_chapter: index,
+    role,
+    content,
+    speaker_slug: speakerSlug ?? null,
+  };
+  if (costs?.llmCostCents != null && costs.llmCostCents >= 0) {
+    row.llm_cost_cents = costs.llmCostCents;
+  }
+  if (costs?.ttsCostCents != null && costs.ttsCostCents >= 0) {
+    row.tts_cost_cents = costs.ttsCostCents;
+  }
   const { data, error } = await supabase
     .from("turns")
-    .insert({
-      chapter_id: chapterId,
-      index_in_chapter: index,
-      role,
-      content,
-      speaker_slug: speakerSlug ?? null,
-    })
+    .insert(row)
     .select("*")
     .single();
   if (error) throw error;

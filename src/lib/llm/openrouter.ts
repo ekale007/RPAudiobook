@@ -1,5 +1,6 @@
 import type { OpenRouterSettings } from "@/lib/types";
 
+import { readCostCentsHeader, LLM_COST_HEADER } from "@/lib/llm/openRouterCompletion";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { isServerLlmAvailable } from "@/lib/server/serverCapabilities";
 import { resolveChatModelSettings } from "@/lib/storage/openRouterSettings";
@@ -256,43 +257,65 @@ async function consumeSseStream(
 
 
 
-export async function completeOpenRouter(
+export type OpenRouterCompleteResult = {
+  content: string;
+  llmCostCents?: number;
+};
 
-  settings: OpenRouterSettings,
-
-  messages: Array<{ role: string; content: string }>,
-
-  opts?: {
-
-    maxTokens?: number;
-
-    temperature?: number;
-
-    signal?: AbortSignal;
-
-    responseFormat?:
-
-      | { type: "json_object" }
-
-      | {
-
-          type: "json_schema";
-
-          json_schema: {
-
-            name: string;
-
-            strict?: boolean;
-
-            schema: Record<string, unknown>;
-
-          };
-
+type CompleteOpts = {
+  maxTokens?: number;
+  temperature?: number;
+  signal?: AbortSignal;
+  responseFormat?:
+    | { type: "json_object" }
+    | {
+        type: "json_schema";
+        json_schema: {
+          name: string;
+          strict?: boolean;
+          schema: Record<string, unknown>;
         };
+      };
+};
 
-  },
+async function estimateLlmCostFromUsage(
+  usage: unknown,
+  modelId: string,
+): Promise<number | undefined> {
+  if (!usage || typeof usage !== "object") return undefined;
+  const u = usage as Record<string, unknown>;
+  const promptTokens = Number(u.prompt_tokens ?? 0);
+  const completionTokens = Number(u.completion_tokens ?? 0);
+  const providerCostUsd =
+    typeof u.cost === "number" && Number.isFinite(u.cost) ? u.cost : null;
+  if (promptTokens <= 0 && completionTokens <= 0 && providerCostUsd == null) {
+    return undefined;
+  }
+  try {
+    const res = await authFetch("/api/usage/estimate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "llm",
+        promptTokens,
+        completionTokens,
+        modelId,
+        providerCostUsd,
+      }),
+    });
+    if (!res.ok) return undefined;
+    const json = (await res.json()) as { costCents?: number };
+    return typeof json.costCents === "number" ? json.costCents : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
-): Promise<string> {
+export async function completeOpenRouterWithUsage(
+  settings: OpenRouterSettings,
+  messages: Array<{ role: string; content: string }>,
+  opts?: CompleteOpts,
+): Promise<OpenRouterCompleteResult> {
   if (isServerLlmAvailable()) {
     const res = await authFetch("/api/llm/chat", {
       method: "POST",
@@ -308,90 +331,67 @@ export async function completeOpenRouter(
       signal: opts?.signal,
     });
 
-
-
     if (!res.ok) {
-
       throw new Error(`LLM ${res.status}: ${await parseErrorResponse(res)}`);
-
     }
 
-
-
     const json = (await res.json()) as {
-
       choices?: Array<{ message?: { content?: string } }>;
-
     };
-
-    return json.choices?.[0]?.message?.content?.trim() ?? "";
-
+    return {
+      content: json.choices?.[0]?.message?.content?.trim() ?? "",
+      llmCostCents: readCostCentsHeader(res, LLM_COST_HEADER),
+    };
   }
 
-
-
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-
     method: "POST",
-
     headers: {
-
       Authorization: `Bearer ${settings.apiKey}`,
-
       "Content-Type": "application/json",
-
       "HTTP-Referer":
-
         typeof window !== "undefined" ? window.location.origin : "",
-
       "X-Title": "HörbuchKI",
-
     },
-
     body: JSON.stringify({
       model: settings.model,
       messages,
-
       max_tokens: opts?.maxTokens ?? 1024,
-
       temperature: opts?.temperature ?? 0.5,
-
       response_format: opts?.responseFormat,
-
     }),
-
     signal: opts?.signal,
-
   });
 
-
-
   if (!res.ok) {
-
     const errText = await res.text();
-
     const message = formatOpenRouterErrorMessage(
-
       extractOpenRouterErrorMessage(errText),
-
       res.status,
-
     );
-
     throw new Error(`OpenRouter ${res.status}: ${message}`);
-
   }
 
-
-
   const json = (await res.json()) as {
-
     choices?: Array<{ message?: { content?: string } }>;
-
+    usage?: unknown;
   };
+  const llmCostCents = await estimateLlmCostFromUsage(
+    json.usage,
+    settings.model,
+  );
+  return {
+    content: json.choices?.[0]?.message?.content?.trim() ?? "",
+    llmCostCents,
+  };
+}
 
-  return json.choices?.[0]?.message?.content?.trim() ?? "";
-
+export async function completeOpenRouter(
+  settings: OpenRouterSettings,
+  messages: Array<{ role: string; content: string }>,
+  opts?: CompleteOpts,
+): Promise<string> {
+  return (await completeOpenRouterWithUsage(settings, messages, opts)).content;
 }
 
 

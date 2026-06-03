@@ -86,6 +86,7 @@ export const MessageAudioPlayer = forwardRef<
     storySettings?: StorySettings;
     chapterTitle?: string | null;
     onCloudQuotaChange?: () => void;
+    onTtsCostCents?: (cents: number) => void;
   }
 >(function MessageAudioPlayer(
   {
@@ -106,6 +107,7 @@ export const MessageAudioPlayer = forwardRef<
     storySettings,
     chapterTitle,
     onCloudQuotaChange,
+    onTtsCostCents,
   },
   ref,
 ) {
@@ -327,7 +329,7 @@ export const MessageAudioPlayer = forwardRef<
       }
 
       if (!blob) {
-        blob = await getNarratorAudio(settings, baseText, {
+        const audioResult = await getNarratorAudio(settings, baseText, {
           speakerSlug,
           voiceMap,
           segmentOverrides: activeOverrides,
@@ -337,6 +339,10 @@ export const MessageAudioPlayer = forwardRef<
           storyLocale,
           storySettings,
         });
+        blob = audioResult.blob;
+        if (audioResult.ttsCostCents != null && audioResult.ttsCostCents > 0) {
+          onTtsCostCents?.(audioResult.ttsCostCents);
+        }
 
         if (!audioStoragePath && !turnId.startsWith("tmp-")) {
           const stored = await storeTurnAudioToCloud(turnId, blob);

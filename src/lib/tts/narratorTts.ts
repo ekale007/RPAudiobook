@@ -36,6 +36,7 @@ import {
   getElevenLabsVoiceSettings,
   mergeElevenVoiceMap,
 } from "@/lib/tts/elevenLabsVoices";
+import { readCostCentsHeader, TTS_COST_HEADER } from "@/lib/llm/openRouterCompletion";
 import { authFetch } from "@/lib/supabase/authFetch";
 import {
   isServerElevenLabsAvailable,
@@ -180,7 +181,7 @@ async function synthesizeChunkElevenLabs(
     storySettings?: StorySettings | null;
     segmentText?: string;
   },
-): Promise<Blob> {
+): Promise<{ blob: Blob; ttsCostCents: number }> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
@@ -227,7 +228,9 @@ async function synthesizeChunkElevenLabs(
     throw new Error(message);
   }
 
-  return res.blob();
+  const blob = await res.blob();
+  const ttsCostCents = readCostCentsHeader(res, TTS_COST_HEADER) ?? 0;
+  return { blob, ttsCostCents };
 }
 
 type TtsChunkContext = {
@@ -243,24 +246,26 @@ async function synthesizeChunk(
   storyLocale?: TtsStoryLocale,
   qwenExtras?: { language?: string; instruct?: string | null },
   deliveryContext?: TtsChunkContext,
-): Promise<Blob> {
+): Promise<{ blob: Blob; ttsCostCents: number }> {
   if (settings.provider === "local") {
-    return synthesizeChunkLocal(
+    const blob = await synthesizeChunkLocal(
       settings,
       text,
       voice,
       storyLocale,
       qwenExtras,
     );
+    return { blob, ttsCostCents: 0 };
   }
   if (settings.provider === "qwen" || settings.provider === "qwen-cloud") {
-    return synthesizeChunkQwen(
+    const blob = await synthesizeChunkQwen(
       settings,
       text,
       voice,
       storyLocale,
       qwenExtras,
     );
+    return { blob, ttsCostCents: 0 };
   }
   return synthesizeChunkElevenLabs(settings, text, voice, storyLocale, {
     speakerSlug: deliveryContext?.speakerSlug,
@@ -441,7 +446,7 @@ export async function getNarratorAudio(
     /** Qwen instruct + plot-state mood (RunPod / local Qwen). */
     storySettings?: StorySettings | null;
   },
-): Promise<Blob> {
+): Promise<{ blob: Blob; ttsCostCents?: number }> {
   const splitSource = stripSpeakerTags(
     stripSfxTags(options?.rawContent ?? text),
   );
@@ -475,9 +480,10 @@ export async function getNarratorAudio(
     : cacheVoiceKey(settings, voice, storyLocale);
   const cacheKey = buildTtsCacheKey(voiceKey, settings.provider, normalizedText);
   const cached = await getCachedAudio(cacheKey);
-  if (cached) return cached;
+  if (cached) return { blob: cached };
 
   const chunkLimit = ttsChunkCharLimit(settings.provider);
+  let ttsCostCentsTotal = 0;
 
   const qwenForSpeaker = (
     slug: string | null | undefined,
@@ -506,16 +512,16 @@ export async function getNarratorAudio(
     for (const chunk of chunks) {
       if (!isSpeakableForTts(chunk)) continue;
       const chunkQwen = qwenForSpeaker(options?.speakerSlug, chunk) ?? qwen;
-      parts.push(
-        await synthesizeChunk(
-          settings,
-          chunk,
-          chunkQwen?.voice ?? voice,
-          storyLocale,
-          chunkQwen ?? undefined,
-          deliveryCtx(options?.speakerSlug ?? null, chunk),
-        ),
+      const chunkResult = await synthesizeChunk(
+        settings,
+        chunk,
+        chunkQwen?.voice ?? voice,
+        storyLocale,
+        chunkQwen ?? undefined,
+        deliveryCtx(options?.speakerSlug ?? null, chunk),
       );
+      parts.push(chunkResult.blob);
+      ttsCostCentsTotal += chunkResult.ttsCostCents;
     }
   } else {
     const segments = splitByOverrides(splitSource, activeOverrides);
@@ -540,16 +546,16 @@ export async function getNarratorAudio(
       for (const chunk of chunks) {
         if (!isSpeakableForTts(chunk)) continue;
         const chunkQwen = qwenForSpeaker(seg.speakerSlug, chunk) ?? qwen;
-        parts.push(
-          await synthesizeChunk(
-            settings,
-            chunk,
-            chunkQwen?.voice ?? segVoice,
-            storyLocale,
-            chunkQwen ?? undefined,
-            deliveryCtx(seg.speakerSlug, chunk),
-          ),
+        const chunkResult = await synthesizeChunk(
+          settings,
+          chunk,
+          chunkQwen?.voice ?? segVoice,
+          storyLocale,
+          chunkQwen ?? undefined,
+          deliveryCtx(seg.speakerSlug, chunk),
         );
+        parts.push(chunkResult.blob);
+        ttsCostCentsTotal += chunkResult.ttsCostCents;
       }
     }
   }
@@ -560,7 +566,10 @@ export async function getNarratorAudio(
 
   const merged = await concatAudioBlobs(parts);
   await setCachedAudio(cacheKey, merged);
-  return merged;
+  return {
+    blob: merged,
+    ttsCostCents: ttsCostCentsTotal > 0 ? ttsCostCentsTotal : undefined,
+  };
 }
 
 const EDGE_NAME_HINTS: Array<{ source: string; replacement: string }> = [

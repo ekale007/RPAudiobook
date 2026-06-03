@@ -68,7 +68,7 @@ export async function resolveTurnAudioBlob(
   }
 
   try {
-    return await getNarratorAudio(settings, baseText, {
+    const audio = await getNarratorAudio(settings, baseText, {
       speakerSlug: input.speakerSlug,
       voiceMap: input.voiceMap,
       cast: input.cast,
@@ -77,6 +77,7 @@ export async function resolveTurnAudioBlob(
       storyLocale: input.storyLocale,
       storySettings: input.storySettings,
     });
+    return audio.blob;
   } catch {
     return null;
   }

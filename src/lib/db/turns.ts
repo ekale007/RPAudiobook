@@ -26,6 +26,25 @@ export async function removeTurnAudio(
   await supabase.storage.from("tts-audio").remove([path]);
 }
 
+export async function patchTurnCosts(
+  turnId: string,
+  patch: { llmCostCents?: number; ttsCostCents?: number },
+  storyId?: string,
+): Promise<void> {
+  const supabase = createClient();
+  const row: Record<string, number> = {};
+  if (patch.llmCostCents != null && patch.llmCostCents >= 0) {
+    row.llm_cost_cents = patch.llmCostCents;
+  }
+  if (patch.ttsCostCents != null && patch.ttsCostCents >= 0) {
+    row.tts_cost_cents = patch.ttsCostCents;
+  }
+  if (!Object.keys(row).length) return;
+  const { error } = await supabase.from("turns").update(row).eq("id", turnId);
+  if (error) throw error;
+  if (storyId) await touchStoryUpdated(storyId);
+}
+
 export async function updateTurnContent(
   turnId: string,
   content: string,

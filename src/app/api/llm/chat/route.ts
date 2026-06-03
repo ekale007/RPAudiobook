@@ -218,10 +218,16 @@ async function forwardOpenRouterResponse(
   }
 
   const json = await upstream.json();
+  let llmCostCents = 0;
   try {
-    await recordUsageFromJsonResponse(supabase, json, modelId);
+    llmCostCents = await recordUsageFromJsonResponse(supabase, json, modelId);
   } catch (e) {
     console.warn("LLM usage record failed:", e);
   }
-  return NextResponse.json(json);
+  return NextResponse.json(json, {
+    headers:
+      llmCostCents > 0
+        ? { "X-LLM-Cost-Cents": String(llmCostCents) }
+        : undefined,
+  });
 }

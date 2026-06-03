@@ -230,6 +230,9 @@ export async function POST(req: Request) {
       ...(usedVoice !== requestedVoice
         ? { "X-TTS-Voice-Coerced": usedVoice }
         : {}),
+      ...(ttsCostCents > 0
+        ? { "X-TTS-Cost-Cents": String(ttsCostCents) }
+        : {}),
     },
   });
 }
