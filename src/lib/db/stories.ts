@@ -268,11 +268,13 @@ export async function createStoryFromSeedPack(
   return { storyId, chapterId: chapter.id as string };
 }
 
+/** Active (non-archived) library import for this template, if any. */
 export async function findStoryByLibraryTemplate(
   templateId: LibraryTemplateId,
 ): Promise<{ id: string; title: string } | null> {
   const rows = await listStories(true);
   for (const row of rows) {
+    if (isStoryArchived(row.settings)) continue;
     if (getLibraryTemplateId(row.settings) === templateId) {
       return { id: row.id, title: row.title };
     }

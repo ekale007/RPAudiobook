@@ -81,7 +81,7 @@ export default function HomePage() {
     } catch (e) {
       if (e instanceof DuplicateLibraryImportError) {
         const go = window.confirm(
-          `„${e.existingTitle}“ hast du schon aus der Bibliothek importiert.\n\nZur bestehenden Story wechseln?`,
+          `„${e.existingTitle}“ ist bereits als aktive Story aus der Bibliothek da.\n\nZur bestehenden Story wechseln? (Archivierte Kopien blockieren keinen Neu-Import.)`,
         );
         if (go) window.location.href = `/story/${e.existingStoryId}`;
         setImportingId(null);
