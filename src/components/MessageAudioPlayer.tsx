@@ -68,6 +68,11 @@ import {
   stopActiveTtsSource,
 } from "@/lib/tts/mobileAudioPlayback";
 import {
+  getExclusiveTtsTurn,
+  isExclusiveTtsTurn,
+  setExclusiveTtsTurn,
+} from "@/lib/tts/ttsExclusivePlayback";
+import {
   clearTtsNowPlaying,
   setTtsMediaPlaybackState,
   setTtsNowPlaying,
@@ -157,6 +162,7 @@ export const MessageAudioPlayer = forwardRef<
   const playEndRef = useRef<(() => void) | null>(null);
   const blobRef = useRef<Blob | null>(null);
   const webAudioActiveRef = useRef(false);
+  const statusRef = useRef<Status>("idle");
 
   const cleanupUrl = useCallback(() => {
     if (objectUrlRef.current) {
@@ -200,6 +206,25 @@ export const MessageAudioPlayer = forwardRef<
   useEffect(() => {
     setPlaybackRate(loadPlaybackRate());
   }, []);
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const owner = getExclusiveTtsTurn();
+      if (!owner || owner === turnId) return;
+      const audio = audioRef.current;
+      if (audio && !audio.paused) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [turnId]);
 
   useEffect(() => {
     setCloudSaved(Boolean(audioStoragePath));
@@ -520,6 +545,14 @@ export const MessageAudioPlayer = forwardRef<
   };
 
   const play = async (): Promise<void> => {
+    const owner = getExclusiveTtsTurn();
+    if (owner && owner !== turnId) {
+      return;
+    }
+    if (statusRef.current === "playing") {
+      return;
+    }
+
     unlockAudioForAutoplay();
     const audio = await ensureAudio();
     if (!audio) {
@@ -601,6 +634,11 @@ export const MessageAudioPlayer = forwardRef<
       setStatus("error");
       setError(error instanceof Error ? error.message : String(error));
     }
+  };
+
+  const resumeIfPaused = async (): Promise<void> => {
+    if (statusRef.current !== "paused") return;
+    await tryResumeOrPlay(audioRef.current);
   };
 
   const togglePlay = async () => {
@@ -720,6 +758,7 @@ export const MessageAudioPlayer = forwardRef<
     setCurrentTime(0);
     setDuration(0);
     setAutoplayBlocked(false);
+    if (isExclusiveTtsTurn(turnId)) setExclusiveTtsTurn(null);
     clearTtsNowPlaying();
   };
 
@@ -729,6 +768,7 @@ export const MessageAudioPlayer = forwardRef<
       prepare,
       play,
       pause,
+      resumeIfPaused,
       stop: resetPlayback,
     }),
     // play/pause/resetPlayback close over latest state — acceptable for queue control

@@ -1,6 +1,10 @@
 import type { MessageAudioPlayerHandle } from "@/lib/tts/messageAudioPlayerHandle";
 import { isAutoplayBlockedError } from "@/lib/tts/autoplayPolicy";
 import { unlockAudioForAutoplay } from "@/lib/tts/audioUnlock";
+import {
+  getExclusiveTtsTurn,
+  setExclusiveTtsTurn,
+} from "@/lib/tts/ttsExclusivePlayback";
 import { primeTtsAudioContext } from "@/lib/tts/mobileAudioPlayback";
 import { ttsPlayerWaitMs } from "@/lib/tts/mobilePlayback";
 const PLAYER_POLL_MS = 50;
@@ -15,6 +19,7 @@ export class TtsAutoplayQueue {
   private stopped = false;
   private preparing = new Set<string>();
   private playingTurnId: string | null = null;
+  private userPausedTurnId: string | null = null;
   private onAutoplayBlocked: ((turnId: string) => void) | null = null;
   private onAutoplayCleared: (() => void) | null = null;
 
@@ -39,13 +44,50 @@ export class TtsAutoplayQueue {
     return this.playingTurnId;
   }
 
+  /** True while a clip is actively playing (ignore spurious Media Session “play”). */
+  isClipPlaying(): boolean {
+    return this.playingTurnId != null;
+  }
+
+  /** Pause stray <audio> elements when returning from lock screen / app switch. */
+  stabilizeOnForeground(): void {
+    const id = this.playingTurnId;
+    if (id) this.stopOthersExcept(id);
+  }
+
+  private stopOthersExcept(keepId: string): void {
+    for (const [id, player] of this.players) {
+      if (id !== keepId) player.stop();
+    }
+  }
+
+  private async playExclusive(
+    turnId: string,
+    player: MessageAudioPlayerHandle,
+  ): Promise<void> {
+    this.stopOthersExcept(turnId);
+    this.playingTurnId = turnId;
+    setExclusiveTtsTurn(turnId);
+    try {
+      await player.play();
+    } finally {
+      if (this.playingTurnId === turnId) this.playingTurnId = null;
+      if (getExclusiveTtsTurn() === turnId) setExclusiveTtsTurn(null);
+    }
+  }
+
+  private clearExclusiveIf(turnId: string): void {
+    if (this.playingTurnId === turnId) this.playingTurnId = null;
+    setExclusiveTtsTurn(null);
+  }
+
   /** Lock screen / CarPlay “next” — skip current clip and continue the queue. */
   skipToNext(): void {
     if (this.stopped) return;
     const playing = this.playingTurnId;
     if (playing) {
       this.players.get(playing)?.stop();
-      this.playingTurnId = null;
+      this.clearExclusiveIf(playing);
       const idx = this.queue.indexOf(playing);
       if (idx >= 0) this.queue.splice(idx, 1);
       else if (this.queue.length) this.queue.shift();
@@ -58,12 +100,18 @@ export class TtsAutoplayQueue {
 
   pauseActive(): void {
     const id = this.playingTurnId;
-    if (id) this.players.get(id)?.pause();
+    if (!id) return;
+    this.userPausedTurnId = id;
+    this.players.get(id)?.pause();
   }
 
-  resumeActive(): void {
-    const id = this.playingTurnId;
-    if (id) void this.players.get(id)?.play().catch(() => undefined);
+  /** Lock-screen play — only resume a user-paused clip, never restart while playing. */
+  resumeActiveIfPaused(): void {
+    if (this.isClipPlaying()) return;
+    const id = this.userPausedTurnId;
+    if (!id) return;
+    this.userPausedTurnId = null;
+    void this.players.get(id)?.resumeIfPaused().catch(() => undefined);
   }
 
   /** Chapter order of assistant turn ids (for chaining after the current clip). */
@@ -108,6 +156,8 @@ export class TtsAutoplayQueue {
     this.stopped = true;
     this.queue = [];
     this.playingTurnId = null;
+    this.userPausedTurnId = null;
+    setExclusiveTtsTurn(null);
     for (const player of this.players.values()) {
       player.stop();
     }
@@ -156,13 +206,11 @@ export class TtsAutoplayQueue {
       await primeTtsAudioContext();
       await player.prepare().catch(() => undefined);
       unlockAudioForAutoplay();
-      this.playingTurnId = turnId;
-      await player.play();
-      this.playingTurnId = null;
+      await this.playExclusive(turnId, player);
       this.onAutoplayCleared?.();
       return "ok";
     } catch (error) {
-      this.playingTurnId = null;
+      this.clearExclusiveIf(turnId);
       if (isAutoplayBlockedError(error)) return "blocked";
       return "error";
     }
@@ -272,12 +320,10 @@ export class TtsAutoplayQueue {
         await primeTtsAudioContext();
         await player.prepare().catch(() => undefined);
         unlockAudioForAutoplay();
-        this.playingTurnId = turnId;
-        await player.play();
-        this.playingTurnId = null;
+        await this.playExclusive(turnId, player);
         this.onAutoplayCleared?.();
       } catch (error) {
-        this.playingTurnId = null;
+        this.clearExclusiveIf(turnId);
         if (isAutoplayBlockedError(error)) {
           this.queue.unshift(turnId);
           this.onAutoplayBlocked?.(turnId);

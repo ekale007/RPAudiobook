@@ -312,13 +312,24 @@ export function ChatView({
     }
     setTtsMediaSessionControls({
       onPause: () => ttsQueueRef.current.pauseActive(),
-      onPlay: () => ttsQueueRef.current.resumeActive(),
+      onPlay: () => ttsQueueRef.current.resumeActiveIfPaused(),
       onNext: () => ttsQueueRef.current.skipToNext(),
     });
     return () => {
       setTtsMediaSessionControls(null);
       clearTtsMediaSessionHandlers();
     };
+  }, [hasTts]);
+
+  useEffect(() => {
+    if (!hasTts) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        ttsQueueRef.current.stabilizeOnForeground();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [hasTts]);
 
   const enqueueNewAssistantTts = useCallback(
@@ -1421,9 +1432,10 @@ export function ChatView({
     <div
       className="flex min-h-0 flex-1 flex-col"
       onPointerDownCapture={() => {
-        if (hasTts) {
-          unlockAudioForAutoplay();
-          if (ttsAutoplay) startAudioSession();
+        if (!hasTts) return;
+        unlockAudioForAutoplay();
+        if (ttsAutoplay && !ttsQueueRef.current.isClipPlaying()) {
+          startAudioSession();
         }
       }}
     >
