@@ -268,31 +268,30 @@ export async function createStoryFromSeedPack(
   return { storyId, chapterId: chapter.id as string };
 }
 
-/** Active (non-archived) library import for this template, if any. */
-export async function findStoryByLibraryTemplate(
+/** Titles of active (non-archived) stories from the same library template. */
+export async function listActiveLibraryImportTitles(
   templateId: LibraryTemplateId,
-): Promise<{ id: string; title: string } | null> {
-  const rows = await listStories(true);
-  for (const row of rows) {
-    if (isStoryArchived(row.settings)) continue;
-    if (getLibraryTemplateId(row.settings) === templateId) {
-      return { id: row.id, title: row.title };
-    }
-  }
-  return null;
+): Promise<string[]> {
+  const rows = await listStories(false);
+  return rows
+    .filter((row) => getLibraryTemplateId(row.settings) === templateId)
+    .map((row) => row.title);
 }
 
-export class DuplicateLibraryImportError extends Error {
-  readonly code = "DUPLICATE_LIBRARY_IMPORT" as const;
-
-  constructor(
-    readonly existingStoryId: string,
-    readonly existingTitle: string,
-    readonly templateId: LibraryTemplateId,
-  ) {
-    super(`Library template "${templateId}" already imported as "${existingTitle}".`);
-    this.name = "DuplicateLibraryImportError";
+/** „Titel“, „Titel (2)“, … — mehrere parallele Durchläufe derselben Vorlage. */
+export function nextLibraryImportTitle(
+  baseTitle: string,
+  existingTitles: string[],
+): string {
+  const norm = (s: string) => s.trim().toLowerCase();
+  const used = new Set(existingTitles.map(norm));
+  const base = baseTitle.trim();
+  if (!used.has(norm(base))) return base;
+  for (let n = 2; n < 500; n++) {
+    const candidate = `${base} (${n})`;
+    if (!used.has(norm(candidate))) return candidate;
   }
+  return `${base} (${Date.now()})`;
 }
 
 export async function importFromLibraryTemplate(
@@ -302,20 +301,14 @@ export async function importFromLibraryTemplate(
   const template = getLibraryTemplate(templateId);
   if (!template) throw new Error("Unknown library template");
 
-  const existing = await findStoryByLibraryTemplate(templateId);
-  if (existing) {
-    throw new DuplicateLibraryImportError(
-      existing.id,
-      existing.title,
-      templateId,
-    );
-  }
+  const peerTitles = await listActiveLibraryImportTitles(templateId);
+  const title = nextLibraryImportTitle(template.title, peerTitles);
 
   const pack = template.loadPack();
   return createStoryFromSeedPack({
     userId,
     pack,
-    title: template.title,
+    title,
     locale: template.locale,
     bandTitle: template.bandTitle,
     chapterTitle: template.chapterTitle,
