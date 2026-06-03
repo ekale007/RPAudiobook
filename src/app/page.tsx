@@ -8,6 +8,7 @@ import {
   StoryListCard,
 } from "@/components/StoryHomeSections";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { LibraryImportProtagonistModal } from "@/components/story-hub/LibraryImportProtagonistModal";
 import {
   deleteStory,
   importFromLibraryTemplate,
@@ -15,6 +16,7 @@ import {
   listStories,
   setStoryArchived,
   updateStoryTitle,
+  type StoryProtagonistImportSetup,
   type StoryRow,
 } from "@/lib/db/stories";
 import type { LibraryTemplateId } from "@/lib/story/libraryTemplates";
@@ -32,6 +34,8 @@ export default function HomePage() {
   const [importingId, setImportingId] = useState<LibraryTemplateId | null>(
     null,
   );
+  const [importSetupTemplateId, setImportSetupTemplateId] =
+    useState<LibraryTemplateId | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [busyStoryId, setBusyStoryId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -70,16 +74,30 @@ export default function HomePage() {
       .catch((e) => setMessage(String(e)));
   }, [user, showArchived]);
 
-  const handleLibraryImport = async (templateId: LibraryTemplateId) => {
+  const handleLibraryImport = (templateId: LibraryTemplateId) => {
+    if (!user) return;
+    setMessage(null);
+    setImportSetupTemplateId(templateId);
+  };
+
+  const runLibraryImport = async (
+    templateId: LibraryTemplateId,
+    setup: StoryProtagonistImportSetup,
+  ) => {
     if (!user) return;
     setImportingId(templateId);
     setMessage(null);
     try {
-      const { storyId } = await importFromLibraryTemplate(user.id, templateId);
+      const { storyId } = await importFromLibraryTemplate(
+        user.id,
+        templateId,
+        setup,
+      );
       window.location.href = `/story/${storyId}`;
     } catch (e) {
       setMessage(String(e));
       setImportingId(null);
+      setImportSetupTemplateId(templateId);
     }
   };
 
@@ -251,6 +269,23 @@ export default function HomePage() {
           onImport={handleLibraryImport}
         />
       </div>
+
+      {importSetupTemplateId ? (
+        <LibraryImportProtagonistModal
+          templateId={importSetupTemplateId}
+          open
+          busy={importingId === importSetupTemplateId}
+          onClose={() => {
+            if (importingId) return;
+            setImportSetupTemplateId(null);
+          }}
+          onConfirm={(setup) => {
+            const id = importSetupTemplateId;
+            setImportSetupTemplateId(null);
+            void runLibraryImport(id, setup);
+          }}
+        />
+      ) : null}
     </main>
   );
 }

@@ -5,7 +5,10 @@ import { parsePlotState } from "@/lib/memory/plotState";
 import { parseStoryPins } from "@/lib/memory/storyPins";
 import {
   DEFAULT_STORY_SETTINGS,
+  type QwenVoiceProfile,
+  type StoryProtagonistProfile,
   type StorySettings,
+  type VoiceMap,
   type WryTourCharacter,
   type WryTourLorebook,
 } from "@/lib/types";
@@ -296,9 +299,16 @@ export function nextLibraryImportTitle(
   return `${base} (${Date.now()})`;
 }
 
+export type StoryProtagonistImportSetup = {
+  protagonist: StoryProtagonistProfile;
+  voiceMap: VoiceMap;
+  qwenVoiceProfiles?: Record<string, QwenVoiceProfile>;
+};
+
 export async function importFromLibraryTemplate(
   userId: string,
   templateId: LibraryTemplateId,
+  protagonistSetup?: StoryProtagonistImportSetup,
 ): Promise<{ storyId: string; chapterId: string }> {
   const template = getLibraryTemplate(templateId);
   if (!template) throw new Error("Unknown library template");
@@ -307,6 +317,7 @@ export async function importFromLibraryTemplate(
   const title = nextLibraryImportTitle(template.title, peerTitles);
 
   const pack = template.loadPack();
+  const locale = normalizeStoryLocale(template.locale);
   return createStoryFromSeedPack({
     userId,
     pack,
@@ -319,7 +330,15 @@ export async function importFromLibraryTemplate(
     libraryTemplateId: template.id,
     storyConcept: template.defaultConcept,
     settings: {
-      voiceMap: defaultElevenVoiceMap(normalizeStoryLocale(template.locale)),
+      voiceMap:
+        protagonistSetup?.voiceMap ??
+        defaultElevenVoiceMap(locale),
+      ...(protagonistSetup?.protagonist
+        ? { protagonist: protagonistSetup.protagonist }
+        : {}),
+      ...(protagonistSetup?.qwenVoiceProfiles
+        ? { qwenVoiceProfiles: protagonistSetup.qwenVoiceProfiles }
+        : {}),
     },
   });
 }
