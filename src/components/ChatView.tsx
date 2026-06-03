@@ -1570,7 +1570,7 @@ export function ChatView({
             onInputChange={setInput}
             onSend={() => void sendMessage()}
             onQuickReaction={(id) => void sendQuickReaction(id)}
-            onSay={() => setInput(contentLocale === "de" ? "„" : '"')}
+            onEnsureExpanded={() => setInputExpanded(true)}
             placeholder={steeringInputPlaceholder(steeringMode, contentLocale)}
             disabled={autoSession || readOnly || turns.length === 0}
             generating={generating}

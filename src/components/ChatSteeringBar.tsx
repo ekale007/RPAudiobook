@@ -1,7 +1,10 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
-import type { QuickReactionId } from "@/lib/chat/playerSteering";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
+import {
+  emptyDialogueInput,
+  type QuickReactionId,
+} from "@/lib/chat/playerSteering";
 import { normalizeStoryContentLocale } from "@/lib/story/protagonist";
 
 const REACTIONS: Array<{
@@ -22,7 +25,7 @@ export function ChatSteeringBar({
   onInputChange,
   onSend,
   onQuickReaction,
-  onSay,
+  onEnsureExpanded,
   placeholder,
   disabled,
   generating,
@@ -37,7 +40,8 @@ export function ChatSteeringBar({
   onInputChange: (value: string) => void;
   onSend: () => void;
   onQuickReaction: (id: QuickReactionId) => void;
-  onSay: () => void;
+  /** Open the input panel without toggling closed. */
+  onEnsureExpanded?: () => void;
   placeholder: string;
   disabled?: boolean;
   generating?: boolean;
@@ -48,19 +52,25 @@ export function ChatSteeringBar({
   steeringMode?: boolean;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const pendingDialogueCursor = useRef<number | null>(null);
   const contentLocale = normalizeStoryContentLocale(locale);
   const de = contentLocale === "de";
 
+  useLayoutEffect(() => {
+    if (pendingDialogueCursor.current === null) return;
+    const el = textareaRef.current;
+    if (!el) return;
+    const pos = pendingDialogueCursor.current;
+    pendingDialogueCursor.current = null;
+    el.focus();
+    el.setSelectionRange(pos, pos);
+  }, [input]);
+
   const handleSay = () => {
-    onSay();
-    onToggleExpanded();
-    requestAnimationFrame(() => {
-      const el = textareaRef.current;
-      if (!el) return;
-      el.focus();
-      const len = el.value.length;
-      el.setSelectionRange(len, len);
-    });
+    if (!expanded) onEnsureExpanded?.();
+    const { text, cursor } = emptyDialogueInput(contentLocale);
+    pendingDialogueCursor.current = cursor;
+    onInputChange(text);
   };
 
   return (

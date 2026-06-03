@@ -55,6 +55,17 @@ export function steeringInputPlaceholder(
   return locale === "de" ? "Was tust du?" : "What do you do?";
 }
 
+/** Empty dialogue field with cursor between opening and closing quote. */
+export function emptyDialogueInput(locale: StoryContentLocale): {
+  text: string;
+  cursor: number;
+} {
+  if (locale === "de") {
+    return { text: "„\"", cursor: 1 };
+  }
+  return { text: '""', cursor: 1 };
+}
+
 /** Strip wrapping quotes the player may have typed for dialogue. */
 export function normalizeSteeringDialogueInput(raw: string): string {
   let t = raw.trim();
