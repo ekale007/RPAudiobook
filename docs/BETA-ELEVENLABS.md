@@ -75,9 +75,20 @@ Browser → Next.js API Routes → ElevenLabs / OpenRouter
 
 ## Kosten (3 User, leicht)
 
+**Aktueller Plan:** [Starter](https://elevenlabs.io/pricing) — **$5/mo**, **30.000 credits**/Monat (~30 min Standard-TTS), kommerzielle Nutzung, Instant Voice Cloning. Kein Pay-as-you-go-Overage auf Starter (Upgrade bei mehr Bedarf).
+
+**API-Preise fürs Verbrauchsprotokoll** ([pricing/api](https://elevenlabs.io/pricing/api)):
+
+| Modell-Tier | $ / 1k Zeichen | Typische Modelle in der App |
+|-------------|----------------|----------------------------|
+| Flash / Turbo | $0,05 | `eleven_flash_v2_5` |
+| Multilingual v2/v3 | $0,10 | `eleven_multilingual_v2`, `eleven_v3` |
+
+In `/admin` → Abrechnungskurse pflegen (USD→EUR + beide TTS-$/1k).
+
 | Posten | ~/Monat |
 |--------|---------|
-| ElevenLabs | 5–25 € |
+| ElevenLabs | 5–25 € (Starter-Grundgebühr + Credits) |
 | OpenRouter | 15–40 € |
 | Vercel + Supabase | 0–25 € |
 

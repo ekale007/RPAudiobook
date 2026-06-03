@@ -9,6 +9,9 @@ import { checkRateLimit } from "@/lib/server/rateLimit";
 import { requireUser } from "@/lib/server/requireUser";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 import { getTtsHourlyLimitForUser } from "@/lib/server/userTier";
+import { insertUsageEvent } from "@/lib/server/usageEvents";
+import { estimateTtsCostCents } from "@/lib/server/billingSettings";
+import { readElevenLabsUsageHeaders } from "@/lib/server/ttsUsage";
 import { isElevenV3Model } from "@/lib/tts/elevenLabsDelivery";
 import {
   coerceElevenLabsVoiceId,
@@ -200,6 +203,23 @@ export async function POST(req: Request) {
       },
     );
   }
+
+  const elevenHeaders = readElevenLabsUsageHeaders(upstream.headers);
+  const charCount =
+    elevenHeaders.characters > 0 ? elevenHeaders.characters : text.length;
+  const ttsCostCents = await estimateTtsCostCents(
+    supabase,
+    charCount,
+    usedModel,
+  );
+  void insertUsageEvent(supabase, {
+    kind: "tts",
+    label: "TTS ElevenLabs",
+    modelId: usedModel,
+    providerRef: elevenHeaders.requestId,
+    characters: charCount,
+    costCents: ttsCostCents,
+  });
 
   const audio = await upstream.arrayBuffer();
   return new NextResponse(audio, {

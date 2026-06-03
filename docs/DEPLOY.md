@@ -5,7 +5,17 @@ Checkliste für Beta-Deploy mit Server-LLM/TTS (ElevenLabs + OpenRouter).
 ## 1. Supabase (Prod)
 
 1. Projekt anlegen oder Prod-Instanz nutzen
-2. **SQL-Migrationen** der Reihe nach ausführen (`supabase/migrations/001` … `009`)
+2. **SQL-Migrationen** der Reihe nach ausführen (`supabase/migrations/001` … `011`)
+
+   | Datei | Inhalt |
+   |-------|--------|
+   | `009_user_profiles.sql` | Tabelle `user_profiles`, Tarife — **zuerst**, wenn `011` „relation does not exist“ meldet |
+   | `010_usage_events.sql` | Verbrauchsprotokoll |
+   | `011_profile_email.sql` | E-Mail-Spalte für Admin — **nur nach 009** |
+   | `012_beta_billing_settings.sql` | USD→EUR & TTS-Tarif (Admin-UI) |
+   | `013_eleven_tts_usd_rates.sql` | Eleven Flash/Standard $/1k (API-Preisliste) |
+
+   Bei `009` warnt Supabase **„destructive“** wegen `drop trigger if exists` — das ersetzt nur den Signup-Trigger, keine Tabellen werden gelöscht. Bestätigen und ausführen.
 3. **Auth → URL configuration**
    - Site URL: `https://<deine-domain>`
    - Redirect URLs: `https://<deine-domain>/auth/callback`, `http://localhost:3000/auth/callback` (Dev)
@@ -37,6 +47,10 @@ Checkliste für Beta-Deploy mit Server-LLM/TTS (ElevenLabs + OpenRouter).
 | `RATE_LIMIT_TTS_PER_HOUR` | nein | Beta: `200`–`400` |
 | `TTS_STORAGE_MAX_PER_USER` | nein | Cloud-MP3 für **beta**-Tier (Default `100`); Migration `008` |
 | `BETA_TIER_*` | nein | Free/Beta/Pro Limits — siehe [BETA-BILLING.md](./BETA-BILLING.md), Migration `009` |
+| `ADMIN_USER_IDS` | nein | Supabase-UUIDs für `/admin` |
+| `SUPABASE_SERVICE_ROLE_KEY` | nein | Nur Server — Admin-Nutzerliste & Tarif |
+| `BETA_TTS_CENTS_PER_1K_CHARS` | nein | TTS-Kostenschätzung pro Zeichen |
+| `BETA_USD_TO_EUR_RATE` | nein | OpenRouter-USD → EUR für Monatsbudget/Log (Default `0.92`) |
 | (Cloud-Speichern) | — | MP3 geht **direkt zu Supabase Storage**, nicht über Vercel (Body-Limit ~4.5 MB) |
 | `BETA_LLM_BUDGET_CENTS` | nein | Default `10000` (= 100 €) |
 

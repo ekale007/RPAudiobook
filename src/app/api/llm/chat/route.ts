@@ -162,6 +162,7 @@ export async function POST(req: Request) {
           body.stream,
           supabase,
           fallbackModel,
+          apiKey,
         );
       }
     }
@@ -172,7 +173,13 @@ export async function POST(req: Request) {
     );
   }
 
-  return forwardOpenRouterResponse(upstream, body.stream, supabase, model);
+  return forwardOpenRouterResponse(
+    upstream,
+    body.stream,
+    supabase,
+    model,
+    apiKey,
+  );
 }
 
 async function postOpenRouter(
@@ -191,9 +198,15 @@ async function forwardOpenRouterResponse(
   stream: boolean | undefined,
   supabase: Awaited<ReturnType<typeof createServerSupabaseFromRequest>>,
   modelId: string,
+  openRouterApiKey: string,
 ): Promise<Response> {
   if (stream && upstream.body) {
-    const tracked = createUsageTrackingStream(upstream.body, supabase, modelId);
+    const tracked = createUsageTrackingStream(
+      upstream.body,
+      supabase,
+      modelId,
+      openRouterApiKey,
+    );
     return new Response(tracked, {
       status: 200,
       headers: {

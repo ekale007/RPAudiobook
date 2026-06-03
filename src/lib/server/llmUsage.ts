@@ -3,8 +3,14 @@ import {
   getLlmModelById,
   resolveAllowedLlmModel,
 } from "@/lib/server/llmModels";
+import { parseOpenRouterUsageFull } from "@/lib/server/openRouterUsage";
 import type { UserTier } from "@/lib/server/userTier";
 import { fetchUserTierLimits } from "@/lib/server/userTier";
+import {
+  fetchBillingSettings,
+  openRouterUsdToEurCents,
+} from "@/lib/server/billingSettings";
+import { insertUsageEvent } from "@/lib/server/usageEvents";
 
 export type LlmUsageSnapshot = {
   periodMonth: string;
@@ -72,20 +78,46 @@ export function estimateLlmCostCents(
   return Math.max(1, Math.ceil(cost));
 }
 
+export type LlmChargeSource = "openrouter" | "catalog";
+
+/** Monatsbudget & Log: OpenRouter-`usage.cost` (USD), sonst Katalog aus BETA_LLM_MODELS. */
+export async function resolveLlmChargeCents(
+  supabase: SupabaseClient,
+  promptTokens: number,
+  completionTokens: number,
+  modelId: string | undefined,
+  providerCostUsd: number | null | undefined,
+): Promise<{ costCents: number; source: LlmChargeSource }> {
+  const billing = await fetchBillingSettings(supabase);
+  if (
+    providerCostUsd != null &&
+    Number.isFinite(providerCostUsd) &&
+    providerCostUsd > 0
+  ) {
+    return {
+      costCents: openRouterUsdToEurCents(
+        providerCostUsd,
+        billing.usdToEurRate,
+      ),
+      source: "openrouter",
+    };
+  }
+  return {
+    costCents: estimateLlmCostCents(promptTokens, completionTokens, modelId),
+    source: "catalog",
+  };
+}
+
 export function parseOpenRouterUsage(raw: unknown): {
   promptTokens: number;
   completionTokens: number;
 } | null {
-  if (!raw || typeof raw !== "object") return null;
-  const u = raw as {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
+  const full = parseOpenRouterUsageFull(raw);
+  if (!full) return null;
+  return {
+    promptTokens: full.promptTokens,
+    completionTokens: full.completionTokens,
   };
-  const promptTokens = u.prompt_tokens ?? 0;
-  const completionTokens = u.completion_tokens ?? 0;
-  if (promptTokens <= 0 && completionTokens <= 0) return null;
-  return { promptTokens, completionTokens };
 }
 
 export async function fetchMonthlyUsage(
@@ -119,16 +151,28 @@ export async function fetchMonthlyUsage(
   };
 }
 
+export type RecordLlmUsageOptions = {
+  label?: string;
+  providerRef?: string | null;
+  providerCostUsd?: number | null;
+  durationMs?: number;
+  storyId?: string | null;
+  status?: "ok" | "error";
+};
+
 export async function recordLlmUsage(
   supabase: SupabaseClient,
   promptTokens: number,
   completionTokens: number,
   modelId?: string,
+  options?: RecordLlmUsageOptions,
 ): Promise<void> {
-  const costCents = estimateLlmCostCents(
+  const { costCents } = await resolveLlmChargeCents(
+    supabase,
     promptTokens,
     completionTokens,
     modelId,
+    options?.providerCostUsd,
   );
   const { error } = await supabase.rpc("increment_llm_usage", {
     p_prompt_tokens: promptTokens,
@@ -136,6 +180,20 @@ export async function recordLlmUsage(
     p_cost_cents: costCents,
   });
   if (error) throw error;
+
+  await insertUsageEvent(supabase, {
+    kind: "llm",
+    status: options?.status ?? "ok",
+    label: options?.label ?? "LLM Chat",
+    modelId,
+    providerRef: options?.providerRef,
+    promptTokens,
+    completionTokens,
+    costCents,
+    providerCostUsd: options?.providerCostUsd ?? null,
+    durationMs: options?.durationMs,
+    storyId: options?.storyId,
+  });
 }
 
 export function formatCentsDe(cents: number): string {

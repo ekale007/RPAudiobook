@@ -1,4 +1,6 @@
 -- Beta tiers: free | beta | pro (limits resolved in app + optional overrides)
+-- Reihenfolge: nach 008, vor 010 und 011.
+-- Supabase warnt „destructive“ wegen `drop trigger` — ersetzt nur den Signup-Trigger, löscht keine Nutzerdaten.
 
 create table if not exists public.user_profiles (
   user_id uuid primary key references auth.users (id) on delete cascade,
@@ -19,7 +21,11 @@ create policy "user_profiles_select_own"
   on public.user_profiles for select
   using (auth.uid() = user_id);
 
--- Tier changes only via Supabase SQL / service role (beta testers).
+create policy "user_profiles_insert_own"
+  on public.user_profiles for insert
+  with check (auth.uid() = user_id);
+
+-- Tier/Overrides: Supabase SQL, service role, oder /admin
 
 -- New signups get a profile row (tier free)
 create or replace function public.handle_new_user_profile()

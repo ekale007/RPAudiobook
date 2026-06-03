@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { LlmUsagePanel } from "@/components/LlmUsagePanel";
+import { UsageLogPanel } from "@/components/UsageLogPanel";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { formatAuthError } from "@/lib/auth/errors";
@@ -30,6 +31,7 @@ export default function AccountPage() {
   const [data, setData] = useState<AccountPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const inviteOnly = isInviteOnlyBeta();
 
   const load = useCallback(async () => {
@@ -56,6 +58,9 @@ export default function AccountPage() {
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
     void load();
+    void authFetch("/api/admin/status")
+      .then((res) => setIsAdmin(res.ok))
+      .catch(() => setIsAdmin(false));
   }, [load]);
 
   const signOut = async () => {
@@ -118,6 +123,17 @@ export default function AccountPage() {
             </section>
 
             <LlmUsagePanel />
+
+            <UsageLogPanel />
+
+            {isAdmin ? (
+              <Link
+                href="/admin"
+                className="block rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-center text-sm font-medium text-accent"
+              >
+                Admin — Nutzer & Tarife
+              </Link>
+            ) : null}
 
             <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
               <h2 className="mb-3 font-medium text-accent">Sicherheit</h2>

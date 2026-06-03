@@ -122,7 +122,7 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
             ) : null}
           </h2>
           <p className="mt-0.5 text-xs text-zinc-500">
-            Geschätzte Kosten (OpenRouter). Stündliches Limit und Monatsbudget
+            LLM-Kosten aus OpenRouter wo möglich, sonst Katalog. Monatsbudget
             hängen an deinem Tarif — siehe Account.
           </p>
         </div>
