@@ -115,12 +115,12 @@ export async function recordUsageFromJsonResponse(
   supabase: SupabaseClient,
   json: unknown,
   modelId: string,
-): Promise<void> {
+): Promise<number> {
   const generationId = parseGenerationIdFromChatJson(json);
   const root = json as { usage?: unknown };
   const parsed = parseOpenRouterUsageFull(root.usage, generationId);
   if (parsed) {
-    await recordLlmUsage(
+    return recordLlmUsage(
       supabase,
       parsed.promptTokens,
       parsed.completionTokens,
@@ -131,10 +131,9 @@ export async function recordUsageFromJsonResponse(
         providerCostUsd: parsed.providerCostUsd,
       },
     );
-    return;
   }
   const fallback = fallbackUsageEstimate(modelId);
-  await recordLlmUsage(
+  return recordLlmUsage(
     supabase,
     fallback.promptTokens,
     fallback.completionTokens,

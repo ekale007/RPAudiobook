@@ -166,7 +166,7 @@ export async function recordLlmUsage(
   completionTokens: number,
   modelId?: string,
   options?: RecordLlmUsageOptions,
-): Promise<void> {
+): Promise<number> {
   const { costCents } = await resolveLlmChargeCents(
     supabase,
     promptTokens,
@@ -194,6 +194,7 @@ export async function recordLlmUsage(
     durationMs: options?.durationMs,
     storyId: options?.storyId,
   });
+  return costCents;
 }
 
 export function formatCentsDe(cents: number): string {
