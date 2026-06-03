@@ -17,6 +17,7 @@ import type { CharacterRow } from "@/lib/db/stories";
 import type { VoiceMap, StorySettings } from "@/lib/types";
 import { loadTtsSettings, ttsCacheVoiceKey } from "@/lib/storage/ttsSettings";
 import { ambienceIdsFromPlot, parseSfxTags } from "@/lib/audio/sfxCatalog";
+import { isPlotStateEmpty } from "@/lib/memory/plotState";
 import { isStoryDeliveryEnabled } from "@/lib/tts/resolveStoryDelivery";
 import {
   hasActiveAmbienceLoops,
@@ -56,7 +57,13 @@ import {
 import { unlockAudioForAutoplay } from "@/lib/tts/audioUnlock";
 import {
   configureMobileHtmlAudio,
+  getWebAudioPlaybackDuration,
+  getWebAudioPlaybackPosition,
+  isWebAudioTtsActive,
+  pauseWebAudioPlayback,
   playBlobViaWebAudio,
+  resumeWebAudioPlayback,
+  seekWebAudioPlayback,
   shouldUseWebAudioForTts,
   stopActiveTtsSource,
 } from "@/lib/tts/mobileAudioPlayback";
@@ -135,6 +142,7 @@ export const MessageAudioPlayer = forwardRef<
   const tickRef = useRef<number | null>(null);
   const playEndRef = useRef<(() => void) | null>(null);
   const blobRef = useRef<Blob | null>(null);
+  const webAudioActiveRef = useRef(false);
 
   const cleanupUrl = useCallback(() => {
     if (objectUrlRef.current) {
@@ -151,6 +159,13 @@ export const MessageAudioPlayer = forwardRef<
   }, []);
 
   const syncTimesFromAudio = useCallback(() => {
+    if (webAudioActiveRef.current && isWebAudioTtsActive()) {
+      const pos = getWebAudioPlaybackPosition();
+      const dur = getWebAudioPlaybackDuration();
+      setCurrentTime(pos);
+      if (dur > 0) setDuration(dur);
+      return;
+    }
     const audio = audioRef.current;
     if (!audio) return;
     setCurrentTime(audio.currentTime);
@@ -220,6 +235,7 @@ export const MessageAudioPlayer = forwardRef<
     setCurrentTime(0);
     setDuration(0);
     blobRef.current = null;
+    webAudioActiveRef.current = false;
     stopAllSfx();
   }, [turnId, text, rawContent, cleanupUrl]);
 
@@ -420,7 +436,8 @@ export const MessageAudioPlayer = forwardRef<
     const sfxSource = rawContent ?? text;
     return [
       ...parseSfxTags(sfxSource),
-      ...(isStoryDeliveryEnabled(storySettings)
+      ...(isStoryDeliveryEnabled(storySettings) &&
+      !isPlotStateEmpty(storySettings?.plotState)
         ? ambienceIdsFromPlot(storySettings?.plotState)
         : []),
     ].filter((id, i, arr) => arr.indexOf(id) === i);
@@ -435,6 +452,18 @@ export const MessageAudioPlayer = forwardRef<
     }
   };
 
+  const finishWebAudioPlayback = useCallback(() => {
+    webAudioActiveRef.current = false;
+    stopAllSfx();
+    setStatus("ready");
+    setCurrentTime(0);
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.playbackState = "none";
+    }
+    playEndRef.current?.();
+    playEndRef.current = null;
+  }, []);
+
   const startPlayback = async (
     audio: HTMLAudioElement,
     options?: { resumeAmbience?: boolean },
@@ -443,6 +472,7 @@ export const MessageAudioPlayer = forwardRef<
       unlockAudioForAutoplay();
       await runSfxBeforePlay(options);
       setAutoplayBlocked(false);
+      webAudioActiveRef.current = true;
       setStatus("playing");
       if ("mediaSession" in navigator) {
         navigator.mediaSession.playbackState = "playing";
@@ -451,15 +481,8 @@ export const MessageAudioPlayer = forwardRef<
         blobRef.current,
         playbackRate,
       );
-      stopAllSfx();
-      setStatus("ready");
-      setCurrentTime(0);
       if (durationSec > 0) setDuration(durationSec);
-      if ("mediaSession" in navigator) {
-        navigator.mediaSession.playbackState = "none";
-      }
-      playEndRef.current?.();
-      playEndRef.current = null;
+      finishWebAudioPlayback();
       return;
     }
 
@@ -498,7 +521,11 @@ export const MessageAudioPlayer = forwardRef<
   };
 
   const pause = () => {
-    audioRef.current?.pause();
+    if (webAudioActiveRef.current && isWebAudioTtsActive()) {
+      pauseWebAudioPlayback();
+    } else {
+      audioRef.current?.pause();
+    }
     pauseAllSfxLoops();
     setStatus("paused");
     syncTimesFromAudio();
@@ -508,6 +535,35 @@ export const MessageAudioPlayer = forwardRef<
   };
 
   const tryResumeOrPlay = async (audio: HTMLAudioElement | null) => {
+    if (
+      status === "paused" &&
+      webAudioActiveRef.current &&
+      isWebAudioTtsActive() &&
+      blobRef.current
+    ) {
+      try {
+        unlockAudioForAutoplay();
+        await runSfxBeforePlay({ resumeAmbience: true });
+        setAutoplayBlocked(false);
+        setStatus("playing");
+        if ("mediaSession" in navigator) {
+          navigator.mediaSession.playbackState = "playing";
+        }
+        resumeWebAudioPlayback();
+        syncTimesFromAudio();
+      } catch (error) {
+        if (isAutoplayBlockedError(error)) {
+          setStatus("ready");
+          setError(null);
+          setAutoplayBlocked(true);
+          return;
+        }
+        setAutoplayBlocked(false);
+        setStatus("error");
+        setError(error instanceof Error ? error.message : String(error));
+      }
+      return;
+    }
     if (!audio) {
       await play();
       return;
@@ -632,6 +688,7 @@ export const MessageAudioPlayer = forwardRef<
   const resetPlayback = () => {
     finishPlayWait();
     stopAllSfx();
+    webAudioActiveRef.current = false;
     stopActiveTtsSource();
     stopTick();
     audioRef.current?.pause();
@@ -669,9 +726,20 @@ export const MessageAudioPlayer = forwardRef<
   };
 
   const seekTo = (value: number) => {
+    const t = Math.min(duration, Math.max(0, value));
+    if (webAudioActiveRef.current && isWebAudioTtsActive()) {
+      seekWebAudioPlayback(t);
+      setCurrentTime(t);
+      if (status === "paused") {
+        setStatus("playing");
+        if ("mediaSession" in navigator) {
+          navigator.mediaSession.playbackState = "playing";
+        }
+      }
+      return;
+    }
     const audio = audioRef.current;
     if (!audio || !duration) return;
-    const t = Math.min(duration, Math.max(0, value));
     audio.currentTime = t;
     setCurrentTime(t);
   };

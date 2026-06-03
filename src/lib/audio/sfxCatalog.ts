@@ -99,6 +99,12 @@ export function parseSfxTags(text: string): string[] {
   return ids;
 }
 
+/** Whole-word match — avoids "rain" in "terrain", "regen" in "regeneration", etc. */
+export function hayHasAmbienceToken(hay: string, tokens: string[]): boolean {
+  const pad = ` ${hay.toLowerCase().replace(/\s+/g, " ")} `;
+  return tokens.some((t) => pad.includes(` ${t.toLowerCase()} `));
+}
+
 /** Ambient loops from plot location (no LLM). */
 export function ambienceIdsFromPlot(
   plot: StoryPlotState | null | undefined,
@@ -113,13 +119,63 @@ export function ambienceIdsFromPlot(
     .join(" ");
   if (!hay.trim()) return [];
   const ids: string[] = [];
-  if (/regen|rain|sturm|storm/i.test(hay) && SFX_CATALOG.rain) ids.push("rain");
-  if (/wind|sturm|storm/i.test(hay) && SFX_CATALOG.wind) ids.push("wind");
-  if (/stadt|city|markt|street|pier|harbor|harbour/i.test(hay) && SFX_CATALOG.city) {
+  if (
+    hayHasAmbienceToken(hay, [
+      "regen",
+      "rain",
+      "regenschauer",
+      "rainfall",
+      "sturm",
+      "storm",
+      "gewitter",
+    ]) &&
+    SFX_CATALOG.rain
+  ) {
+    ids.push("rain");
+  }
+  if (
+    hayHasAmbienceToken(hay, ["wind", "sturm", "storm", "orkan", "gale"]) &&
+    SFX_CATALOG.wind
+  ) {
+    ids.push("wind");
+  }
+  if (
+    hayHasAmbienceToken(hay, [
+      "stadt",
+      "city",
+      "markt",
+      "market",
+      "street",
+      "straße",
+      "strasse",
+      "pier",
+      "harbor",
+      "harbour",
+      "hafen",
+    ]) &&
+    SFX_CATALOG.city
+  ) {
     ids.push("city");
   }
-  if (/feuer|fire|flamme|brand/i.test(hay) && SFX_CATALOG.fire) ids.push("fire");
-  if (/gewitter|thunder/i.test(hay) && SFX_CATALOG.thunder) ids.push("thunder");
+  if (
+    hayHasAmbienceToken(hay, [
+      "feuer",
+      "fire",
+      "flamme",
+      "flame",
+      "brand",
+      "inferno",
+    ]) &&
+    SFX_CATALOG.fire
+  ) {
+    ids.push("fire");
+  }
+  if (
+    hayHasAmbienceToken(hay, ["gewitter", "thunder", "blitz", "lightning"]) &&
+    SFX_CATALOG.thunder
+  ) {
+    ids.push("thunder");
+  }
   return ids;
 }
 
