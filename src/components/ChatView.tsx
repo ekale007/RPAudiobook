@@ -12,6 +12,8 @@ import { StoryBeatPicker } from "@/components/StoryBeatPicker";
 import {
   buildDialogueSteeringPrompt,
   buildReactionSteeringPrompt,
+  formatSteeringDialogueUserTurn,
+  formatSteeringReactionUserTurn,
   normalizeSteeringDialogueInput,
   steeringInputPlaceholder,
   type QuickReactionId,
@@ -919,14 +921,44 @@ export function ChatView({
   const steeringMode = hasTts && !readOnly;
   const contentLocale = normalizeStoryContentLocale(storyLocale);
 
+  const appendSteeringUserTurn = async (
+    base: TurnRow[],
+    displayContent: string,
+  ): Promise<TurnRow[]> => {
+    const userIndex = nextTurnIndex(base);
+    const insertedUser = await appendTurn(
+      chapterId,
+      userIndex,
+      "user",
+      displayContent,
+      storyId,
+    );
+    const rows = [...base, insertedUser].sort(
+      (a, b) => a.index_in_chapter - b.index_in_chapter,
+    );
+    loadSeqRef.current++;
+    syncKnownTurns(rows);
+    setTurns(rows);
+    return rows;
+  };
+
   const sendSteering = async (
     continuationPrompt: string,
+    userTurnContent: string,
     opts?: { suppressTts?: boolean },
   ) => {
     if (generating || autoSession || readOnly || !turns.length) return;
     setBeatOptions(null);
     setError(null);
-    await runGeneration(turns, {
+    let history = turns;
+    try {
+      history = await appendSteeringUserTurn(turns, userTurnContent);
+    } catch (e) {
+      setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
+      await load();
+      return;
+    }
+    await runGeneration(history, {
       continuation: true,
       continuationPrompt,
       suppressTts: opts?.suppressTts,
@@ -935,8 +967,10 @@ export function ChatView({
 
   const sendQuickReaction = async (reaction: QuickReactionId) => {
     if (generating || autoSession || readOnly || !turns.length) return;
-    setInputExpanded(false);
-    await sendSteering(buildReactionSteeringPrompt(reaction, storyLocale));
+    await sendSteering(
+      buildReactionSteeringPrompt(reaction, storyLocale),
+      formatSteeringReactionUserTurn(reaction, storyLocale),
+    );
   };
 
   const sendMessage = async () => {
@@ -950,7 +984,10 @@ export function ChatView({
     if (steeringMode) {
       const line = normalizeSteeringDialogueInput(text);
       if (!line) return;
-      await sendSteering(buildDialogueSteeringPrompt(line, storyLocale));
+      await sendSteering(
+        buildDialogueSteeringPrompt(line, storyLocale),
+        formatSteeringDialogueUserTurn(line, storyLocale),
+      );
       return;
     }
 
@@ -1017,6 +1054,7 @@ export function ChatView({
         signal: beatsAbortRef.current.signal,
       });
       setBeatOptions(options);
+      setInputExpanded(true);
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
       setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
@@ -1025,6 +1063,12 @@ export function ChatView({
       setBeatsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (beatOptions?.length || beatsLoading) {
+      setInputExpanded(true);
+    }
+  }, [beatOptions, beatsLoading]);
 
   const playChosenBeat = async (beat: StoryBeatOption) => {
     if (generating || autoSession || readOnly) return;
@@ -1597,32 +1641,50 @@ export function ChatView({
         </MobileCollapsibleTools>
 
         {!readOnly ? (
-          <ChatSteeringBar
-            expanded={inputExpanded}
-            onToggleExpanded={() => setInputExpanded((v) => !v)}
-            input={input}
-            onInputChange={setInput}
-            onSend={() => void sendMessage()}
-            onQuickReaction={(id) => void sendQuickReaction(id)}
-            onEnsureExpanded={() => setInputExpanded(true)}
-            placeholder={steeringInputPlaceholder(steeringMode, contentLocale)}
-            disabled={autoSession || readOnly || turns.length === 0}
-            generating={generating}
-            onCancel={cancelWork}
-            locale={storyLocale}
-            steeringMode={steeringMode}
-          >
-            <StoryBeatPicker
-              disabled={generating || autoSession || turns.length === 0}
-              loading={beatsLoading}
-              options={beatOptions}
-              onRequestBeats={requestBeatSuggestions}
-              onSelectBeat={playChosenBeat}
-              onDismiss={requestBeatSuggestions}
-              onQuickContinue={quickContinue}
-              onAutoPlay={runMultiContinue}
-            />
-          </ChatSteeringBar>
+          <>
+            {beatOptions?.length || beatsLoading ? (
+              <div className="mb-2">
+                <StoryBeatPicker
+                  disabled={generating || autoSession || turns.length === 0}
+                  loading={beatsLoading}
+                  options={beatOptions}
+                  onRequestBeats={requestBeatSuggestions}
+                  onSelectBeat={playChosenBeat}
+                  onDismiss={requestBeatSuggestions}
+                  onQuickContinue={quickContinue}
+                  onAutoPlay={runMultiContinue}
+                />
+              </div>
+            ) : null}
+            <ChatSteeringBar
+              expanded={inputExpanded}
+              onToggleExpanded={() => setInputExpanded((v) => !v)}
+              input={input}
+              onInputChange={setInput}
+              onSend={() => void sendMessage()}
+              onQuickReaction={(id) => void sendQuickReaction(id)}
+              onEnsureExpanded={() => setInputExpanded(true)}
+              placeholder={steeringInputPlaceholder(steeringMode, contentLocale)}
+              disabled={autoSession || readOnly || turns.length === 0}
+              generating={generating}
+              onCancel={cancelWork}
+              locale={storyLocale}
+              steeringMode={steeringMode}
+            >
+              {!beatOptions?.length && !beatsLoading ? (
+                <StoryBeatPicker
+                  disabled={generating || autoSession || turns.length === 0}
+                  loading={beatsLoading}
+                  options={beatOptions}
+                  onRequestBeats={requestBeatSuggestions}
+                  onSelectBeat={playChosenBeat}
+                  onDismiss={requestBeatSuggestions}
+                  onQuickContinue={quickContinue}
+                  onAutoPlay={runMultiContinue}
+                />
+              ) : null}
+            </ChatSteeringBar>
+          </>
         ) : null}
       </div>
     </div>

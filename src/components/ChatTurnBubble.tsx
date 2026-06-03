@@ -16,6 +16,11 @@ import type { CharacterRow, TurnRow } from "@/lib/db/stories";
 import type { VoiceMap, StorySettings } from "@/lib/types";
 import { isCastVoiceActive, type VoiceEnabledSlugs } from "@/lib/tts/voiceActivation";
 import {
+  formatSteeringUserTurnContent,
+  isSteeringUserTurn,
+  stripSteeringTurnPrefix,
+} from "@/lib/chat/playerSteering";
+import {
   normalizeStoryContentLocale,
   PROTAGONIST_SPEAKER_SLUG,
 } from "@/lib/story/protagonist";
@@ -78,7 +83,11 @@ export function ChatTurnBubble({
   const [busy, setBusy] = useState(false);
   const [copiedRaw, setCopiedRaw] = useState(false);
   const contentLocale = normalizeStoryContentLocale(storyLocale);
-  const displayContent = stripSpeakerTags(turn.content);
+  const steeringTurn =
+    turn.role === "user" && isSteeringUserTurn(turn.content);
+  const displayContent = stripSpeakerTags(
+    steeringTurn ? stripSteeringTurnPrefix(turn.content) : turn.content,
+  );
   const markedSnippets = useMemo(
     () =>
       showDialogueMarkup &&
@@ -135,14 +144,19 @@ export function ChatTurnBubble({
 
   const saveEdit = async () => {
     const text = draft.trim();
-    if (!text || text === turn.content) {
+    const nextContent = steeringTurn
+      ? formatSteeringUserTurnContent(text)
+      : text;
+    if (!text || nextContent === turn.content) {
       setEditing(false);
-      setDraft(turn.content);
+      setDraft(
+        steeringTurn ? stripSteeringTurnPrefix(turn.content) : turn.content,
+      );
       return;
     }
     setBusy(true);
     try {
-      await onEdit(turn.id, text);
+      await onEdit(turn.id, nextContent);
       setEditing(false);
     } finally {
       setBusy(false);
@@ -239,6 +253,10 @@ export function ChatTurnBubble({
             ) : ttsQueued ? (
               <span className="ml-2 font-normal text-zinc-500">· in Warteschlange</span>
             ) : null}
+          </p>
+        ) : turn.role === "user" && steeringTurn ? (
+          <p className="mb-1 text-xs font-medium text-violet-300/90">
+            {contentLocale === "de" ? "Steuerung" : "Steering"}
           </p>
         ) : turn.role === "assistant" ? (
           <p className="mb-1 text-xs font-medium text-zinc-500">
@@ -338,7 +356,11 @@ export function ChatTurnBubble({
                   ariaLabel="Bearbeiten"
                   disabled={busy}
                   onClick={() => {
-                    setDraft(turn.content);
+                    setDraft(
+                      steeringTurn
+                        ? stripSteeringTurnPrefix(turn.content)
+                        : turn.content,
+                    );
                     setEditing(true);
                   }}
                 >

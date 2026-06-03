@@ -168,8 +168,8 @@ export function ChatSteeringBar({
         {steeringMode ? (
           <p className="text-center text-[10px] leading-snug text-zinc-600">
             {de
-              ? "Kurze Steuerung — keine eigene Chat-Blase (ideal beim Vorlesen)."
-              : "Light steering — no player bubble (best while listening)."}
+              ? "Steuerung erscheint als eigene Blase — bearbeiten oder „Ab hier löschen“ wie bei Dialog."
+              : "Steering appears as its own bubble — edit or rewind from there like dialogue."}
           </p>
         ) : null}
       </div>
