@@ -49,6 +49,7 @@ Regeln:
 - Deutsche Anführungszeichen: „…“
 - Gäste: \`<<speaker:guest:name>>\` (kleingeschrieben).
 - Nur Figuren, die **in der Szene anwesend** sind, dürfen sprechen.
+- **Kein** Quest-Menü, \`[QUEST-OPTION]\`, Interface-Text, HP/Stufen-Zeilen oder „Was tust du?“ — nur erzählte Szene.
 - Gültige Slugs: ${slugList.join(", ")}.
 
 Beispiel:
@@ -79,6 +80,7 @@ Rules:
 - Another character's quoted line uses **their** slug even if "you" appears nearby.
 - Guest speakers: \`<<speaker:guest:name>>\` (lowercase after guest:).
 - Only cast who are **physically present** may speak.
+- **No** quest menus, \`[QUEST-OPTION]\`, interface text, HP/level lines, or "What do you do?" — only lived-in scene prose.
 - Valid slugs: ${slugList.join(", ")}.
 
 Example:

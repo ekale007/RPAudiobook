@@ -13,6 +13,7 @@ import {
   formatSteeringDialogueUserTurn,
   formatSteeringReactionUserTurn,
   normalizeSteeringDialogueInput,
+  stripSteeringTurnPrefix,
   steeringInputPlaceholder,
   type QuickReactionId,
 } from "@/lib/chat/playerSteering";
@@ -712,9 +713,13 @@ export function ChatView({
     forceTtsEnqueue = false,
     skipTtsEnqueue = false,
     llmCostCents?: number,
+    steeringDisplay?: string | null,
   ) => {
     await truncateTurnsFrom(chapterId, startIndex, storyId);
-    const blocks = parseAssistantBlocks(full);
+    const blocks = parseAssistantBlocks(full, {
+      steeringDisplay,
+      storyLocale,
+    });
     const inserted = await appendTurn(
       chapterId,
       startIndex,
@@ -786,6 +791,8 @@ export function ChatView({
       background?: boolean;
       /** Erzähler macht weiter / N× — keine TTS-Warteschlange, Autoplay nicht an. */
       suppressTts?: boolean;
+      /** Last steering bubble text — repair protagonist line in reply. */
+      steeringDisplay?: string | null;
     } = {},
   ): Promise<boolean> => {
     const settings = loadOpenRouterSettings();
@@ -861,6 +868,7 @@ export function ChatView({
         opts.forceTts ?? false,
         opts.suppressTts ?? false,
         llmCostCents,
+        opts.steeringDisplay,
       );
     } catch (e) {
       setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
@@ -942,7 +950,7 @@ export function ChatView({
 
   const sendSteering = async (
     userTurnContent: string,
-    opts?: { suppressTts?: boolean },
+    opts?: { suppressTts?: boolean; steeringDisplay?: string },
   ) => {
     if (generating || autoSession || readOnly || !turns.length) return;
     setBeatOptions(null);
@@ -958,6 +966,9 @@ export function ChatView({
     await runGeneration(history, {
       continuation: true,
       suppressTts: opts?.suppressTts,
+      steeringDisplay:
+        (opts?.steeringDisplay ??
+          stripSteeringTurnPrefix(userTurnContent).trim()) || null,
     });
   };
 

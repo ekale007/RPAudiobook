@@ -1,5 +1,14 @@
 import { defaultContinuePrompt } from "@/lib/chat/storyBeatSuggestions";
-import type { StoryContentLocale } from "@/lib/story/protagonist";
+import {
+  parseSpeakerBlocks,
+  preprocessAssistantMarkup,
+  stripSpeakerTags,
+} from "@/lib/chat/parseSpeakerBlocks";
+import { stripGameMetaLeaks } from "@/lib/chat/sanitizeAssistantOutput";
+import {
+  PROTAGONIST_SPEAKER_SLUG,
+  type StoryContentLocale,
+} from "@/lib/story/protagonist";
 import type { ChatTurn } from "@/lib/types";
 import { normalizeStoryLocale } from "@/lib/tts/ttsLocaleRouting";
 
@@ -118,13 +127,15 @@ Der Spieler hat eine **Dialogzeile** vorgegeben. Sie MUSS in deiner Antwort vork
 **Pflicht-Satz des Protagonisten** (wörtlich oder leicht stilistisch geglättet — gleiche Bedeutung, keine andere Aussage):
 ${quoted}
 
-**Struktur (Pflicht):**
-1. \`<<speaker:narrator>>\` — 1–3 Sätze Brücke zur laufenden Szene.
-2. \`<<speaker:protagonist>>\` — Absatz, in dem ${player} **diesen Pflicht-Satz spricht** (deutsche Anführungszeichen „…").
-3. Optional weitere Sprecher und \`<<speaker:narrator>>\` bis zur natürlichen Pause.
+**Reihenfolge (strikt — Abweichung = Fehler):**
+1. \`<<speaker:narrator>>\` — **maximal 2 kurze Sätze** Brücke. Kein NPC spricht vor Schritt 2.
+2. \`<<speaker:protagonist>>\` — **sofort danach** spricht ${player} den Pflicht-Satz: ${quoted}
+   (nur dieser Satz als Zitat; optional ein Halbsatz davor wie „du fragst“.)
+3. **Erst danach** dürfen NPCs antworten (z.\u202fB. mit Cast-Slug) — ihre Antwort bezieht sich auf die Frage/Aussage.
 
 Erlaubt: leichte grammatische Glättung, wenn die Spielerzeile rau klingt.
-**Verboten:** die Zeile weglassen, nur paraphrasieren ohne Zitat, oder eine andere Aussage erfinden.
+**Verboten:** NPC beantwortet die Frage, bevor der Protagonist sie gestellt hat. Die Pflicht-Zeile nur im Erzähler-Fließtext ohne \`<<speaker:protagonist>>\`. Die Zeile später noch einmal unmarkiert wiederholen.
+**Verboten:** Quest-UI, \`[QUEST-OPTION]\`, Interface, „Was tust du?“ — nur lebendige Prosa und Dialog-Skript.
 
 Pflicht-Stil: Dialog-Skript mit \`<<speaker:…>>\`-Tags. Keine wörtliche Wiederholung früherer Absätze.`;
     }
@@ -135,13 +146,14 @@ The player supplied a **dialogue line**. It MUST appear in your reply.
 **Mandatory protagonist line** (verbatim or lightly polished — same meaning, not a different statement):
 ${quoted}
 
-**Required structure:**
-1. \`<<speaker:narrator>>\` — 1–3 sentences bridging the current scene.
-2. \`<<speaker:protagonist>>\` — paragraph where ${player} **speaks that mandatory line** in quotes.
-3. Optional other speakers and \`<<speaker:narrator>>\` until a natural pause.
+**Order (strict — deviation is wrong):**
+1. \`<<speaker:narrator>>\` — **at most 2 short sentences** of bridge. No NPC speaks before step 2.
+2. \`<<speaker:protagonist>>\` — **immediately after**, ${player} speaks the mandatory line: ${quoted}
+3. **Only then** may NPCs reply (with cast slugs) — their answer responds to what ${player} said.
 
 Allowed: light grammatical polish if the player's line is rough.
-**Forbidden:** omitting the line, summarizing without quoted speech, or inventing different dialogue.
+**Forbidden:** an NPC answers before the protagonist asks/says it. The mandatory line only in narrator prose without \`<<speaker:protagonist>>\`. Repeating the line later without the protagonist tag.
+**Forbidden:** quest UI, \`[QUEST-OPTION]\`, interfaces, "What do you do?" — only living prose and dialogue script.
 
 Required: dialogue script with \`<<speaker:…>>\` tags. Do not repeat earlier paragraphs verbatim.`;
   }
@@ -277,4 +289,84 @@ export function normalizeSteeringDialogueInput(raw: string): string {
     t = t.slice(1, -1).trim();
   }
   return t;
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function protagonistBlockContainsLine(text: string, line: string): boolean {
+  const needle = line.trim().toLowerCase();
+  if (!needle) return false;
+  for (const block of parseSpeakerBlocks(text)) {
+    if (block.speakerSlug !== PROTAGONIST_SPEAKER_SLUG) continue;
+    const body = stripSpeakerTags(block.content).toLowerCase();
+    if (body.includes(needle)) return true;
+  }
+  return false;
+}
+
+/** Drop orphan quote-only lines the model pasted outside speaker tags. */
+function removeOrphanDuplicateQuoteLines(
+  text: string,
+  line: string,
+  storyLocale?: string | null,
+): string {
+  const locale = normalizeStoryLocale(storyLocale);
+  const core = line.trim();
+  if (!core) return text;
+  const patterns = [
+    new RegExp(`^„\\s*${escapeRegex(core)}\\s*["”]?$`, "i"),
+    new RegExp(`^"\\s*${escapeRegex(core)}\\s*"$`, "i"),
+    new RegExp(`^'\\s*${escapeRegex(core)}\\s*'$`, "i"),
+  ];
+  if (locale === "de") {
+    patterns.push(
+      new RegExp(`^${escapeRegex(core)}\\s*\\??$`, "i"),
+    );
+  }
+  return text
+    .split("\n")
+    .filter((row) => {
+      const t = row.trim();
+      if (!t) return true;
+      return !patterns.some((re) => re.test(t));
+    })
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * Sanitize model output and ensure steering dialogue appears under <<speaker:protagonist>>.
+ */
+export function repairAssistantReplyForSteering(
+  raw: string,
+  steeringDisplay: string,
+  storyLocale?: string | null,
+): string {
+  let text = stripGameMetaLeaks(preprocessAssistantMarkup(raw));
+  if (classifySteeringDisplay(steeringDisplay) !== "dialogue") {
+    return text;
+  }
+
+  const line = normalizeSteeringDialogueInput(steeringDisplay);
+  if (!line) return text;
+
+  if (protagonistBlockContainsLine(text, line)) {
+    return removeOrphanDuplicateQuoteLines(text, line, storyLocale);
+  }
+
+  const locale = normalizeStoryLocale(storyLocale);
+  const quoted = locale === "de" ? `„${line}"` : `"${line}"`;
+  const injection =
+    locale === "de"
+      ? `<<speaker:narrator>>\nDu fässt die Situation einen Moment lang.\n\n<<speaker:protagonist>>\n${quoted}\n\n`
+      : `<<speaker:narrator>>\nYou take in the scene for a moment.\n\n<<speaker:protagonist>>\n${quoted}\n\n`;
+
+  return removeOrphanDuplicateQuoteLines(
+    injection + text,
+    line,
+    storyLocale,
+  );
 }

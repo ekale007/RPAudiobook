@@ -1,13 +1,17 @@
 import { buildChatMessages } from "@/lib/prompt/buildPrompt";
 import { ensureSpeakerScript } from "@/lib/chat/dialogueScript";
 import { preprocessAssistantMarkup } from "@/lib/chat/parseSpeakerBlocks";
+import { stripGameMetaLeaks } from "@/lib/chat/sanitizeAssistantOutput";
 import { completeOpenRouterWithUsage } from "@/lib/llm/openrouter";
 import { resolveChatModelSettings } from "@/lib/storage/openRouterSettings";
 import type { OpenRouterSettings } from "@/lib/types";
 import type { ChatTurn, LoreEntry, StorySettings, StoryCharacterCard } from "@/lib/types";
 import type { CharacterRow } from "@/lib/db/stories";
 import type { StoryPlotState } from "@/lib/memory/plotState";
-import { buildContinuationTurns } from "@/lib/chat/playerSteering";
+import {
+  buildContinuationTurns,
+  repairAssistantReplyForSteering,
+} from "@/lib/chat/playerSteering";
 import { defaultContinuePrompt } from "@/lib/chat/storyBeatSuggestions";
 
 export type GenerateReplyParams = {
@@ -80,11 +84,27 @@ export async function streamAssistantReply(
   });
 }
 
+export type ParseAssistantBlocksOpts = {
+  /** When set, enforce steering dialogue under <<speaker:protagonist>> and strip quest UI. */
+  steeringDisplay?: string | null;
+  storyLocale?: string | null;
+};
+
 /** Storyteller mode: one narrator turn per reply (content keeps script tags). */
-export function parseAssistantBlocks(full: string): Array<{
+export function parseAssistantBlocks(
+  full: string,
+  opts?: ParseAssistantBlocksOpts,
+): Array<{
   speakerSlug: string;
   content: string;
 }> {
-  const cleaned = ensureSpeakerScript(preprocessAssistantMarkup(full));
+  const body = opts?.steeringDisplay?.trim()
+    ? repairAssistantReplyForSteering(
+        full,
+        opts.steeringDisplay,
+        opts.storyLocale,
+      )
+    : stripGameMetaLeaks(preprocessAssistantMarkup(full));
+  const cleaned = ensureSpeakerScript(body);
   return [{ speakerSlug: "narrator", content: cleaned }];
 }
