@@ -10,8 +10,6 @@ import { MobileCollapsibleTools } from "@/components/MobileCollapsibleTools";
 import { ChatSteeringBar } from "@/components/ChatSteeringBar";
 import { StoryBeatPicker } from "@/components/StoryBeatPicker";
 import {
-  buildDialogueSteeringPrompt,
-  buildReactionSteeringPrompt,
   formatSteeringDialogueUserTurn,
   formatSteeringReactionUserTurn,
   normalizeSteeringDialogueInput,
@@ -943,7 +941,6 @@ export function ChatView({
   };
 
   const sendSteering = async (
-    continuationPrompt: string,
     userTurnContent: string,
     opts?: { suppressTts?: boolean },
   ) => {
@@ -960,17 +957,13 @@ export function ChatView({
     }
     await runGeneration(history, {
       continuation: true,
-      continuationPrompt,
       suppressTts: opts?.suppressTts,
     });
   };
 
   const sendQuickReaction = async (reaction: QuickReactionId) => {
     if (generating || autoSession || readOnly || !turns.length) return;
-    await sendSteering(
-      buildReactionSteeringPrompt(reaction, storyLocale),
-      formatSteeringReactionUserTurn(reaction, storyLocale),
-    );
+    await sendSteering(formatSteeringReactionUserTurn(reaction, storyLocale));
   };
 
   const sendMessage = async () => {
@@ -984,10 +977,7 @@ export function ChatView({
     if (steeringMode) {
       const line = normalizeSteeringDialogueInput(text);
       if (!line) return;
-      await sendSteering(
-        buildDialogueSteeringPrompt(line, storyLocale),
-        formatSteeringDialogueUserTurn(line, storyLocale),
-      );
+      await sendSteering(formatSteeringDialogueUserTurn(line, storyLocale));
       return;
     }
 

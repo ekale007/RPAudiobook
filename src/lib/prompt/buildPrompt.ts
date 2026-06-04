@@ -15,6 +15,10 @@ import { buildStoryMemorySections } from "@/lib/memory/storyMemory";
 import type { CharacterRow } from "@/lib/db/stories";
 import type { StoryPlotState } from "@/lib/memory/plotState";
 import type { StoryPin } from "@/lib/memory/storyPins";
+import {
+  isSteeringUserTurn,
+  stripSteeringTurnPrefix,
+} from "@/lib/chat/playerSteering";
 import { stripSpeakerTags } from "@/lib/chat/parseSpeakerBlocks";
 import { buildStorytellerScriptInstructions } from "@/lib/prompt/storytellerScript";
 import {
@@ -122,7 +126,14 @@ export function buildChatMessages(ctx: PromptContext): {
 
   for (const turn of recent) {
     if (turn.role === "system") continue;
-    const content = stripSpeakerTags(turn.content);
+    let content = stripSpeakerTags(turn.content);
+    if (turn.role === "user" && isSteeringUserTurn(content)) {
+      const display = stripSteeringTurnPrefix(content);
+      content =
+        locale === "de"
+          ? `[Spieler-Steuerung (bereits umgesetzt): ${display}]`
+          : `[Player steering (already applied): ${display}]`;
+    }
     messages.push({ role: turn.role, content });
   }
 

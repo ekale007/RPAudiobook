@@ -7,6 +7,7 @@ import type { OpenRouterSettings } from "@/lib/types";
 import type { ChatTurn, LoreEntry, StorySettings, StoryCharacterCard } from "@/lib/types";
 import type { CharacterRow } from "@/lib/db/stories";
 import type { StoryPlotState } from "@/lib/memory/plotState";
+import { buildContinuationTurns } from "@/lib/chat/playerSteering";
 import { defaultContinuePrompt } from "@/lib/chat/storyBeatSuggestions";
 
 export type GenerateReplyParams = {
@@ -43,14 +44,12 @@ export async function streamAssistantReply(
   params: GenerateReplyParams,
 ): Promise<AssistantReplyResult> {
   const history = params.continuation
-    ? [
-        ...params.turns,
-        {
-          role: "user" as const,
-          content:
-            params.continuationPrompt ?? defaultContinuePrompt(),
-        },
-      ]
+    ? buildContinuationTurns(
+        params.turns,
+        params.continuationPrompt ?? defaultContinuePrompt(),
+        params.storyLocale,
+        params.storySettings?.protagonist?.displayName ?? null,
+      )
     : params.turns;
 
   const promptCtx = {
