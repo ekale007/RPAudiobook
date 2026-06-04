@@ -14,6 +14,8 @@ import { normalizeStoryLocale } from "@/lib/tts/ttsLocaleRouting";
 
 export type QuickReactionId = "laugh" | "cry" | "smile";
 
+export type SteeringInputMode = "auto" | "say" | "act";
+
 /** Prefix on persisted user turns created from steering (stripped in UI). */
 export const STEERING_TURN_PREFIX = "↪ ";
 
@@ -66,6 +68,7 @@ const ALL_REACTION_LABELS = [
 
 export function classifySteeringDisplay(display: string): SteeringDisplayKind {
   const t = display.trim();
+  if (t.startsWith("⚡")) return "direction";
   if (ALL_REACTION_LABELS.includes(t)) return "reaction";
   if (
     /^[\u201e\u201c"]/.test(t) ||
@@ -158,15 +161,17 @@ Allowed: light grammatical polish if the player's line is rough.
 Required: dialogue script with \`<<speaker:…>>\` tags. Do not repeat earlier paragraphs verbatim.`;
   }
 
-  const action = display.trim();
+  const action = display.trim().replace(/^⚡\s*/, "");
   if (de) {
     return `## Aufgabe: Nächster Erzähler-Abschnitt (Pflicht)
 
-Der Spieler steuert die Handlung: **${action}**
+Der Spieler steuert eine **Handlung**: **${action}**
 
-Das MUSS in deiner Antwort umgesetzt werden (Prosa + ggf. Dialog):
-1. \`<<speaker:narrator>>\` — zeige, wie ${player} das tut oder beginnt; du darfst die Formulierung stilistisch geglätten, **nicht** die Absicht ändern.
-2. Optional Dialog mit \`<<speaker:protagonist>>\` / Cast und weiterer Erzähler-Prosa.
+Das MUSS in deiner Antwort **sichtbar** passieren — nicht nur erwähnt:
+1. \`<<speaker:narrator>>\` — zeige die Aktion des Protagonisten in der Szene (Bewegung, Sinne, Konsequenz in 2–5 Sätzen). Stilistisch glätten erlaubt, Absicht **nicht** ändern.
+2. Optional \`<<speaker:protagonist>>\` / Cast-Dialog und weiterer \`<<speaker:narrator>>\` bis zur Pause.
+
+**Verboten:** Die Aktion weglassen oder nur von anderen kommentieren lassen, ohne dass ${player} sie tut. Quest-UI, „Was tust du?“.
 
 Pflicht-Stil: Dialog-Skript mit \`<<speaker:…>>\`-Tags. Keine wörtliche Wiederholung früherer Absätze.`;
   }
@@ -234,17 +239,37 @@ export function formatSteeringDialogueUserTurn(
   return formatSteeringUserTurnContent(quoted);
 }
 
+export function formatSteeringActionUserTurn(
+  action: string,
+  storyLocale?: string | null,
+): string {
+  void storyLocale;
+  const t = action.trim().replace(/^⚡\s*/, "");
+  const label = t.startsWith("⚡") ? t : `⚡ ${t}`;
+  return formatSteeringUserTurnContent(label);
+}
+
 export function steeringInputPlaceholder(
   audiobookMode: boolean,
   locale: StoryContentLocale,
+  inputMode: SteeringInputMode = "auto",
 ): string {
-  if (audiobookMode) {
-    return locale === "de"
-      ? "Kurze Richtung oder Dialog …"
-      : "Short steer or dialogue …";
+  if (!audiobookMode) {
+    return locale === "de" ? "Was tust du?" : "What do you do?";
   }
-  return locale === "de" ? "Was tust du?" : "What do you do?";
+  if (inputMode === "say") {
+    return locale === "de" ? "Was sagst du? …" : "What do you say? …";
+  }
+  if (inputMode === "act") {
+    return locale === "de"
+      ? "Was tust du? z. B. zur Tür gehen …"
+      : "What do you do? e.g. walk to the door …";
+  }
+  return locale === "de"
+    ? 'Sagen (mit „…") oder Handlung …'
+    : "Say (in quotes) or describe an action …";
 }
+
 
 /** Empty dialogue field with cursor between opening and closing quote. */
 export function emptyDialogueInput(locale: StoryContentLocale): {
@@ -263,16 +288,19 @@ export function buildContinuationTurns(
   continuationPrompt?: string,
   storyLocale?: string | null,
   protagonistName?: string | null,
+  writerTaskOverride?: string | null,
 ): ChatTurn[] {
   const fallback = continuationPrompt ?? defaultContinuePrompt();
   const last = turns[turns.length - 1];
   if (last?.role === "user" && isSteeringUserTurn(last.content)) {
     const display = stripSteeringTurnPrefix(last.content).trim();
-    const merged = buildSteeringWriterTaskMessage(
-      display,
-      storyLocale,
-      protagonistName,
-    );
+    const merged =
+      writerTaskOverride?.trim() ||
+      buildSteeringWriterTaskMessage(
+        display,
+        storyLocale,
+        protagonistName,
+      );
     return [...turns.slice(0, -1), { role: "user", content: merged }];
   }
   return [...turns, { role: "user", content: fallback }];

@@ -10,13 +10,14 @@ import { MobileCollapsibleTools } from "@/components/MobileCollapsibleTools";
 import { ChatSteeringBar } from "@/components/ChatSteeringBar";
 import { StoryBeatPicker } from "@/components/StoryBeatPicker";
 import {
-  formatSteeringDialogueUserTurn,
+  formatSteeringUserTurnContent,
   formatSteeringReactionUserTurn,
-  normalizeSteeringDialogueInput,
-  stripSteeringTurnPrefix,
   steeringInputPlaceholder,
+  stripSteeringTurnPrefix,
   type QuickReactionId,
+  type SteeringInputMode,
 } from "@/lib/chat/playerSteering";
+import { convertPlayerSteeringInput } from "@/lib/chat/convertSteeringInput";
 import { normalizeStoryContentLocale } from "@/lib/story/protagonist";
 import {
   readTtsAutoplayPreference,
@@ -156,6 +157,8 @@ export function ChatView({
   const [turns, setTurns] = useState<TurnRow[]>([]);
   const [input, setInput] = useState("");
   const [inputExpanded, setInputExpanded] = useState(false);
+  const [steeringInputMode, setSteeringInputMode] =
+    useState<SteeringInputMode>("auto");
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loreCount, setLoreCount] = useState(0);
@@ -183,6 +186,7 @@ export function ChatView({
   );
   const [beatsLoading, setBeatsLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const steeringConvertActiveRef = useRef(false);
   const beatsAbortRef = useRef<AbortController | null>(null);
   const autoPlayRemainingRef = useRef(0);
   const autoChapterBusyRef = useRef(false);
@@ -713,11 +717,15 @@ export function ChatView({
     forceTtsEnqueue = false,
     skipTtsEnqueue = false,
     llmCostCents?: number,
-    steeringDisplay?: string | null,
+    steeringMeta?: {
+      display?: string | null;
+      dialogueLine?: string | null;
+    },
   ) => {
     await truncateTurnsFrom(chapterId, startIndex, storyId);
     const blocks = parseAssistantBlocks(full, {
-      steeringDisplay,
+      steeringDisplay: steeringMeta?.display,
+      steeringDialogueLine: steeringMeta?.dialogueLine,
       storyLocale,
     });
     const inserted = await appendTurn(
@@ -793,6 +801,8 @@ export function ChatView({
       suppressTts?: boolean;
       /** Last steering bubble text — repair protagonist line in reply. */
       steeringDisplay?: string | null;
+      steeringWriterTask?: string | null;
+      steeringDialogueLine?: string | null;
     } = {},
   ): Promise<boolean> => {
     const settings = loadOpenRouterSettings();
@@ -828,6 +838,7 @@ export function ChatView({
         allCast: opts.allCast ?? allCast,
         continuation: opts.continuation,
         continuationPrompt: opts.continuationPrompt,
+        steeringWriterTask: opts.steeringWriterTask,
         storyLocale,
         onLoreCount: setLoreCount,
         signal: abortRef.current.signal,
@@ -841,6 +852,7 @@ export function ChatView({
       abortRef.current = null;
       chatBusyRef.current = false;
       if (!opts.background) setGenerating(false);
+      steeringConvertActiveRef.current = false;
       return false;
     }
 
@@ -850,11 +862,13 @@ export function ChatView({
     if (aborted) {
       chatBusyRef.current = false;
       if (!opts.background) setGenerating(false);
+      steeringConvertActiveRef.current = false;
       return false;
     }
     if (!full.trim()) {
       chatBusyRef.current = false;
       if (!opts.background) setGenerating(false);
+      steeringConvertActiveRef.current = false;
       setError("Leere Antwort vom Modell — bitte erneut versuchen.");
       return false;
     }
@@ -868,7 +882,10 @@ export function ChatView({
         opts.forceTts ?? false,
         opts.suppressTts ?? false,
         llmCostCents,
-        opts.steeringDisplay,
+        {
+          display: opts.steeringDisplay,
+          dialogueLine: opts.steeringDialogueLine,
+        },
       );
     } catch (e) {
       setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
@@ -880,6 +897,7 @@ export function ChatView({
 
     chatBusyRef.current = false;
     if (!opts.background) setGenerating(false);
+    steeringConvertActiveRef.current = false;
     return true;
   };
 
@@ -950,7 +968,12 @@ export function ChatView({
 
   const sendSteering = async (
     userTurnContent: string,
-    opts?: { suppressTts?: boolean; steeringDisplay?: string },
+    opts?: {
+      suppressTts?: boolean;
+      steeringDisplay?: string;
+      steeringWriterTask?: string;
+      steeringDialogueLine?: string;
+    },
   ) => {
     if (generating || autoSession || readOnly || !turns.length) return;
     setBeatOptions(null);
@@ -960,6 +983,8 @@ export function ChatView({
       history = await appendSteeringUserTurn(turns, userTurnContent);
     } catch (e) {
       setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
+      setGenerating(false);
+      steeringConvertActiveRef.current = false;
       await load();
       return;
     }
@@ -969,6 +994,8 @@ export function ChatView({
       steeringDisplay:
         (opts?.steeringDisplay ??
           stripSteeringTurnPrefix(userTurnContent).trim()) || null,
+      steeringWriterTask: opts?.steeringWriterTask ?? null,
+      steeringDialogueLine: opts?.steeringDialogueLine ?? null,
     });
   };
 
@@ -986,9 +1013,40 @@ export function ChatView({
     setError(null);
 
     if (steeringMode) {
-      const line = normalizeSteeringDialogueInput(text);
-      if (!line) return;
-      await sendSteering(formatSteeringDialogueUserTurn(line, storyLocale));
+      const settings = loadOpenRouterSettings();
+      if (!settings) {
+        setError("OpenRouter API-Key fehlt — bitte unter Einstellungen hinterlegen.");
+        return;
+      }
+      setGenerating(true);
+      steeringConvertActiveRef.current = true;
+      abortRef.current = new AbortController();
+      try {
+        const converted = await convertPlayerSteeringInput({
+          rawInput: text,
+          inputMode: steeringInputMode,
+          settings: resolveChatModelSettings(settings),
+          promptCtx: promptCtx(),
+          storyLocale,
+          protagonistName: storySettings.protagonist?.displayName ?? null,
+          signal: abortRef.current.signal,
+        });
+        const bubble = formatSteeringUserTurnContent(converted.display);
+        await sendSteering(bubble, {
+          steeringDisplay: converted.display,
+          steeringWriterTask: converted.writerTask,
+          steeringDialogueLine: converted.dialogueLine,
+        });
+      } catch (e) {
+        if ((e as Error).name !== "AbortError") {
+          setError(
+            formatLlmLimitError(e instanceof Error ? e.message : String(e)),
+          );
+        }
+        setGenerating(false);
+        steeringConvertActiveRef.current = false;
+        abortRef.current = null;
+      }
       return;
     }
 
@@ -1549,7 +1607,11 @@ export function ChatView({
           {generating ? (
             <div className="scroll-mt-3 scroll-mb-3 px-1">
               <GeneratingIndicator
-                label="Erzähler schreibt …"
+                label={
+                  steeringConvertActiveRef.current
+                    ? "Steuerung einbauen …"
+                    : "Erzähler schreibt …"
+                }
                 onCancel={cancelWork}
               />
             </div>
@@ -1665,12 +1727,18 @@ export function ChatView({
               onSend={() => void sendMessage()}
               onQuickReaction={(id) => void sendQuickReaction(id)}
               onEnsureExpanded={() => setInputExpanded(true)}
-              placeholder={steeringInputPlaceholder(steeringMode, contentLocale)}
+              placeholder={steeringInputPlaceholder(
+                steeringMode,
+                contentLocale,
+                steeringInputMode,
+              )}
               disabled={autoSession || readOnly || turns.length === 0}
               generating={generating}
               onCancel={cancelWork}
               locale={storyLocale}
               steeringMode={steeringMode}
+              steeringInputMode={steeringInputMode}
+              onSteeringInputModeChange={setSteeringInputMode}
             >
               {!beatOptions?.length && !beatsLoading ? (
                 <StoryBeatPicker

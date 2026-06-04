@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 import {
   emptyDialogueInput,
   type QuickReactionId,
+  type SteeringInputMode,
 } from "@/lib/chat/playerSteering";
 import { normalizeStoryContentLocale } from "@/lib/story/protagonist";
 
@@ -33,6 +34,8 @@ export function ChatSteeringBar({
   children,
   locale,
   steeringMode = true,
+  steeringInputMode = "auto",
+  onSteeringInputModeChange,
 }: {
   expanded: boolean;
   onToggleExpanded: () => void;
@@ -50,6 +53,8 @@ export function ChatSteeringBar({
   locale?: string | null;
   /** When false (read-only chat), primary action is a normal Send. */
   steeringMode?: boolean;
+  steeringInputMode?: SteeringInputMode;
+  onSteeringInputModeChange?: (mode: SteeringInputMode) => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingDialogueCursor = useRef<number | null>(null);
@@ -68,10 +73,26 @@ export function ChatSteeringBar({
 
   const handleSay = () => {
     if (!expanded) onEnsureExpanded?.();
+    onSteeringInputModeChange?.("say");
     const { text, cursor } = emptyDialogueInput(contentLocale);
     pendingDialogueCursor.current = cursor;
     onInputChange(text);
   };
+
+  const handleAct = () => {
+    if (!expanded) onEnsureExpanded?.();
+    onSteeringInputModeChange?.("act");
+    if (/^„"?$/.test(input.trim()) || input.trim() === '""') {
+      onInputChange("");
+    }
+  };
+
+  const modeBtnClass = (mode: SteeringInputMode) =>
+    `flex items-center gap-1 rounded-xl border px-3 py-2 text-sm font-medium transition disabled:opacity-40 ${
+      steeringInputMode === mode
+        ? "border-accent/55 bg-accent/15 text-accent"
+        : "border-surface-border bg-surface-raised text-zinc-300 hover:border-accent/40"
+    }`;
 
   return (
     <div className="space-y-2">
@@ -120,11 +141,21 @@ export function ChatSteeringBar({
             type="button"
             disabled={disabled || generating}
             onClick={handleSay}
-            className="flex items-center gap-1 rounded-xl border border-accent/35 bg-accent/10 px-3 py-2 text-sm font-medium text-accent transition hover:border-accent/55 disabled:opacity-40"
-            title={de ? "Dialog in Anführungszeichen" : "Start dialogue in quotes"}
+            className={modeBtnClass("say")}
+            title={de ? "Gesprochene Zeile (Anführungszeichen)" : "Spoken line (quotes)"}
           >
             <span aria-hidden>💬</span>
             <span>{de ? "Sagen" : "Say"}</span>
+          </button>
+          <button
+            type="button"
+            disabled={disabled || generating}
+            onClick={handleAct}
+            className={modeBtnClass("act")}
+            title={de ? "Handlung beschreiben" : "Describe an action"}
+          >
+            <span aria-hidden>⚡</span>
+            <span>{de ? "Tun" : "Act"}</span>
           </button>
         </div>
 
@@ -168,8 +199,8 @@ export function ChatSteeringBar({
         {steeringMode ? (
           <p className="text-center text-[10px] leading-snug text-zinc-600">
             {de
-              ? "Steuerung erscheint als eigene Blase — bearbeiten oder „Ab hier löschen“ wie bei Dialog."
-              : "Steering appears as its own bubble — edit or rewind from there like dialogue."}
+              ? "Sagen, Tun oder Reaktion — wird per KI in die nächste Szene eingebunden (eigene Blase)."
+              : "Say, act, or react — converted into the next scene (own bubble)."}
           </p>
         ) : null}
       </div>

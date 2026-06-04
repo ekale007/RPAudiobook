@@ -8,6 +8,7 @@ import type { OpenRouterSettings } from "@/lib/types";
 import type { ChatTurn, LoreEntry, StorySettings, StoryCharacterCard } from "@/lib/types";
 import type { CharacterRow } from "@/lib/db/stories";
 import type { StoryPlotState } from "@/lib/memory/plotState";
+import { classifySteeringDisplay } from "@/lib/chat/playerSteering";
 import {
   buildContinuationTurns,
   repairAssistantReplyForSteering,
@@ -33,6 +34,8 @@ export type GenerateReplyParams = {
   continuation?: boolean;
   /** Overrides default “continue” prompt (e.g. chosen story beat). */
   continuationPrompt?: string;
+  /** From steering converter — full writer user message for the narrator LLM. */
+  steeringWriterTask?: string | null;
   onLoreCount?: (n: number) => void;
   storyLocale?: string | null;
   signal?: AbortSignal;
@@ -53,6 +56,7 @@ export async function streamAssistantReply(
         params.continuationPrompt ?? defaultContinuePrompt(),
         params.storyLocale,
         params.storySettings?.protagonist?.displayName ?? null,
+        params.steeringWriterTask,
       )
     : params.turns;
 
@@ -87,6 +91,7 @@ export async function streamAssistantReply(
 export type ParseAssistantBlocksOpts = {
   /** When set, enforce steering dialogue under <<speaker:protagonist>> and strip quest UI. */
   steeringDisplay?: string | null;
+  steeringDialogueLine?: string | null;
   storyLocale?: string | null;
 };
 
@@ -98,12 +103,14 @@ export function parseAssistantBlocks(
   speakerSlug: string;
   content: string;
 }> {
-  const body = opts?.steeringDisplay?.trim()
-    ? repairAssistantReplyForSteering(
-        full,
-        opts.steeringDisplay,
-        opts.storyLocale,
-      )
+  const repairDisplay =
+    opts?.steeringDialogueLine?.trim() ||
+    (opts?.steeringDisplay?.trim() &&
+    classifySteeringDisplay(opts.steeringDisplay) === "dialogue"
+      ? opts.steeringDisplay
+      : null);
+  const body = repairDisplay
+    ? repairAssistantReplyForSteering(full, repairDisplay, opts?.storyLocale)
     : stripGameMetaLeaks(preprocessAssistantMarkup(full));
   const cleaned = ensureSpeakerScript(body);
   return [{ speakerSlug: "narrator", content: cleaned }];
