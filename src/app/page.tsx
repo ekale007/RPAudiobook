@@ -135,15 +135,16 @@ export default function HomePage() {
       <main className="flex min-h-dvh flex-col">
         <AppHeader title="HörbuchKI" />
         <div className="flex flex-1 flex-col justify-center gap-6 p-6">
-          <p className="text-center text-zinc-300">
-            Sign in to save stories in Supabase. Your OpenRouter key stays on
-            this device only.
+          <p className="text-center text-sm leading-relaxed text-zinc-300">
+            Melde dich an, um Geschichten zu speichern und auf Handy oder PC
+            weiterzuhören. Chat, Stimmen und Verbrauch laufen über die
+            HörbuchKI-Beta — kein eigener API-Key nötig.
           </p>
           <Link
             href="/login"
             className="rounded-xl bg-accent py-3 text-center font-medium text-black"
           >
-            Sign in
+            Anmelden
           </Link>
         </div>
         <LegalFooter className="mt-auto" />

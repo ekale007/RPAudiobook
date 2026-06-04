@@ -293,7 +293,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <main className="flex min-h-dvh flex-col">
-      <AppHeader title="Sign in" backHref="/" />
+      <AppHeader title="Anmelden" backHref="/" />
       <Suspense
         fallback={<p className="p-6 text-center text-zinc-500">Loading…</p>}
       >
