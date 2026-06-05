@@ -217,7 +217,7 @@ export function ChatSteeringBar({
         {steeringMode ? (
           <p className="text-center text-[10px] leading-snug text-zinc-600">
             {de
-              ? "Handlung und „Dialog" beliebig kombinieren — 💬 setzt Anführungszeichen, ⚡ eine Handlung."
+              ? 'Handlung und „Dialog" beliebig kombinieren — 💬 setzt Anführungszeichen, ⚡ eine Handlung.'
               : 'Mix action and "dialogue" freely — 💬 inserts quotes, ⚡ an action beat.'}
           </p>
         ) : null}
