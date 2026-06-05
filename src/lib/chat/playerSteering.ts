@@ -243,9 +243,9 @@ export function buildDialogueSteeringPrompt(
   const trimmed = line.trim();
   const locale = normalizeStoryLocale(storyLocale);
   if (locale === "de") {
-    return `[Steuerung: Die Spieler-Nachricht direkt darüber ist die Dialogzeile. Der Protagonist sagt: „${trimmed}". Szene fließend fortsetzen — dieselbe Zeile unter <<speaker:protagonist>>; kein Szene-Reset. Natürliche Pause am Ende.]`;
+    return `[Steuerung: Die Spieler-Nachricht direkt darüber ist die Dialogzeile. Der Protagonist sagt: „${trimmed}". Szene fließend fortsetzen — einmal einweben oder unter <<speaker:protagonist>>; nicht als lose Zitatzeile am Anfang wiederholen. Kein Szene-Reset. Natürliche Pause am Ende.]`;
   }
-  return `[Steering: The player message directly above is the dialogue line. The protagonist says: "${trimmed}". Continue seamlessly — same line under <<speaker:protagonist>>; no scene reset. End at a natural pause.]`;
+  return `[Steering: The player message directly above is the dialogue line. The protagonist says: "${trimmed}". Continue seamlessly — weave once in prose or under <<speaker:protagonist>>; do not repeat it as a standalone quoted line at the top. No scene reset. End at a natural pause.]`;
 }
 
 export function buildActionSteeringPrompt(
@@ -279,9 +279,9 @@ export function buildMixedSteeringPrompt(
   });
 
   if (locale === "de") {
-    return `[Steuerung: Die Spieler-Nachricht direkt darüber kombiniert Handlung und Dialog in dieser Reihenfolge: ${parts.join("; ")}. Alles fließend in die laufende Szene einweben — jede Dialogzeile unter <<speaker:protagonist>>; kein Szene-Reset. Natürliche Pause am Ende.]`;
+    return `[Steuerung: Die Spieler-Nachricht direkt darüber kombiniert Handlung und Dialog in dieser Reihenfolge: ${parts.join("; ")}. Alles fließend einweben — Dialog einmal (<<speaker:protagonist>> oder Prosodie), nicht als lose Zitatzeilen am Anfang wiederholen. Kein Szene-Reset. Natürliche Pause am Ende.]`;
   }
-  return `[Steering: The player message directly above combines action and dialogue in this order: ${parts.join("; ")}. Weave everything into the live scene — each dialogue line under <<speaker:protagonist>>; no scene reset. End at a natural pause.]`;
+  return `[Steering: The player message directly above combines action and dialogue in this order: ${parts.join("; ")}. Weave everything into the live scene once — dialogue under <<speaker:protagonist>> or in prose, not as standalone quoted lines at the top. No scene reset. End at a natural pause.]`;
 }
 
 /** Light continuation hint appended after the steering bubble (keeps flow; bubble stays in history). */
@@ -440,6 +440,57 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function normalizeForQuoteCompare(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u201A\u2032`´']/g, "'")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function stripOuterQuotes(line: string): string {
+  let t = line.trim();
+  if (
+    (t.startsWith('"') && t.endsWith('"')) ||
+    (t.startsWith("„") && /[\u201C\u201D"]$/.test(t)) ||
+    (t.startsWith("'") && t.endsWith("'"))
+  ) {
+    t = t.slice(1, -1).trim();
+  }
+  return t;
+}
+
+function quoteOverlapRatio(a: string, b: string): number {
+  const wordsB = b.split(" ").filter((w) => w.length > 2);
+  if (!wordsB.length) return 0;
+  const setA = new Set(a.split(" ").filter(Boolean));
+  const hit = wordsB.filter((w) => setA.has(w)).length;
+  return hit / wordsB.length;
+}
+
+function steeringQuoteMatchesLine(
+  line: string,
+  steeringCore: string,
+): boolean {
+  const core = normalizeForQuoteCompare(steeringCore);
+  if (!core) return false;
+  const candidate = normalizeForQuoteCompare(stripOuterQuotes(line));
+  if (!candidate) return false;
+  if (candidate === core) return true;
+  if (candidate.includes(core) || core.includes(candidate)) return true;
+  return quoteOverlapRatio(candidate, core) >= 0.82;
+}
+
+function dialogueAlreadyWoven(text: string, line: string): boolean {
+  if (protagonistBlockContainsLine(text, line)) return true;
+  const core = normalizeForQuoteCompare(line);
+  if (core.length < 12) return false;
+  const body = normalizeForQuoteCompare(stripSpeakerTags(text));
+  if (body.includes(core)) return true;
+  return quoteOverlapRatio(body, core) >= 0.72;
+}
+
 function protagonistBlockContainsLine(text: string, line: string): boolean {
   const needle = line.trim().toLowerCase();
   if (!needle) return false;
@@ -457,25 +508,23 @@ function removeOrphanDuplicateQuoteLines(
   line: string,
   storyLocale?: string | null,
 ): string {
-  const locale = normalizeStoryLocale(storyLocale);
+  void storyLocale;
   const core = line.trim();
   if (!core) return text;
   const patterns = [
     new RegExp(`^„\\s*${escapeRegex(core)}\\s*["”]?$`, "i"),
     new RegExp(`^"\\s*${escapeRegex(core)}\\s*"$`, "i"),
     new RegExp(`^'\\s*${escapeRegex(core)}\\s*'$`, "i"),
+    new RegExp(`^${escapeRegex(core)}\\s*\\??$`, "i"),
   ];
-  if (locale === "de") {
-    patterns.push(
-      new RegExp(`^${escapeRegex(core)}\\s*\\??$`, "i"),
-    );
-  }
   return text
     .split("\n")
     .filter((row) => {
       const t = row.trim();
       if (!t) return true;
-      return !patterns.some((re) => re.test(t));
+      if (patterns.some((re) => re.test(t))) return false;
+      if (steeringQuoteMatchesLine(t, core)) return false;
+      return true;
     })
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
@@ -511,7 +560,11 @@ export function repairAssistantReplyForSteering(
     text = removeOrphanDuplicateQuoteLines(text, line, storyLocale);
   }
 
-  const missing = lines.filter((line) => !protagonistBlockContainsLine(text, line));
+  const missing = lines.filter(
+    (line) =>
+      !dialogueAlreadyWoven(text, line) &&
+      !protagonistBlockContainsLine(text, line),
+  );
   if (!missing.length) return text;
 
   const quoted = missing

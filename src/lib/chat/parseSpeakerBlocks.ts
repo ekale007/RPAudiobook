@@ -6,8 +6,17 @@ export type SpeakerBlock = {
 /** Slug inside <<speaker:slug>> — supports guest:zarek, npc:mother, naya-vellen */
 const SPEAKER_SLUG = "[a-z0-9][a-z0-9_:-]*";
 const SPEAKER_TAG = new RegExp(`<<\\s*speaker\\s*:\\s*(${SPEAKER_SLUG})\\s*>>`, "gi");
+/** Model sometimes emits a single angle bracket — treat like a real tag. */
+const MALFORMED_SPEAKER_TAG = new RegExp(
+  `<\\s*speaker\\s*:\\s*(${SPEAKER_SLUG})\\s*>`,
+  "gi",
+);
 const SPEAKER_TAG_LINE = new RegExp(
   `^\\s*<<\\s*speaker\\s*:\\s*(${SPEAKER_SLUG})\\s*>>\\s*$`,
+  "i",
+);
+const MALFORMED_SPEAKER_TAG_LINE = new RegExp(
+  `^\\s*<\\s*speaker\\s*:\\s*(${SPEAKER_SLUG})\\s*>\\s*$`,
   "i",
 );
 
@@ -21,18 +30,27 @@ function normalizeTagSlug(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
+/** Fix `<speaker:slug>` → `<<speaker:slug>>` before parse/strip. */
+export function normalizeMalformedSpeakerTags(text: string): string {
+  return text.replace(
+    MALFORMED_SPEAKER_TAG,
+    (_m, slug: string) => `<<speaker:${normalizeTagSlug(slug)}>>`,
+  );
+}
+
 /** Lowercase slugs inside tags; keeps guest:name / npc:mother intact. */
 export function normalizeSpeakerTags(text: string): string {
-  return text.replace(
+  return normalizeMalformedSpeakerTags(text).replace(
     new RegExp(`<<\\s*speaker\\s*:\\s*(${SPEAKER_SLUG})\\s*>>`, "gi"),
     (_m, slug: string) => `<<speaker:${normalizeTagSlug(slug)}>>`,
   );
 }
 
-/** Remove all <<speaker:…>> markers from visible / TTS text. */
+/** Remove all speaker markers from visible / TTS text. */
 export function stripSpeakerTags(text: string): string {
   return text
     .replace(SPEAKER_TAG, "")
+    .replace(MALFORMED_SPEAKER_TAG, "")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -53,12 +71,12 @@ export function collapseConsecutiveSpeakerTags(text: string): string {
   let lastTagLine: string | null = null;
 
   for (const line of lines) {
-    const m = line.match(SPEAKER_TAG_LINE);
+    const m = line.match(SPEAKER_TAG_LINE) ?? line.match(MALFORMED_SPEAKER_TAG_LINE);
     if (m) {
-      const normalized = line.trim().toLowerCase();
+      const normalized = `<<speaker:${normalizeTagSlug(m[1])}>>`;
       if (normalized === lastTagLine) continue;
       lastTagLine = normalized;
-      merged.push(line.trim());
+      merged.push(normalized);
       continue;
     }
     lastTagLine = null;
