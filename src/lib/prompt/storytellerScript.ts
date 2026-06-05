@@ -50,6 +50,7 @@ Regeln:
 - Gäste: \`<<speaker:guest:name>>\` (kleingeschrieben).
 - Nur Figuren, die **in der Szene anwesend** sind, dürfen sprechen.
 - **Kein** Quest-Menü, \`[QUEST-OPTION]\`, Interface-Text, HP/Stufen-Zeilen oder „Was tust du?“ — nur erzählte Szene.
+- **Fortsetzung:** Jede Antwort schließt nahtlos an den letzten Erzähler-Abschnitt an — keine Wiederholung von Szene-Setting, Positionen oder bereits genannten Bildern.
 - Gültige Slugs: ${slugList.join(", ")}.
 
 Beispiel:
@@ -81,6 +82,7 @@ Rules:
 - Guest speakers: \`<<speaker:guest:name>>\` (lowercase after guest:).
 - Only cast who are **physically present** may speak.
 - **No** quest menus, \`[QUEST-OPTION]\`, interface text, HP/level lines, or "What do you do?" — only lived-in scene prose.
+- **Continuation:** Each reply continues seamlessly from the last narrator beat — no repeating scene setup, positions, or imagery already established.
 - Valid slugs: ${slugList.join(", ")}.
 
 Example:

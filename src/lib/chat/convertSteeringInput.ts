@@ -50,7 +50,8 @@ Gib NUR gültiges JSON (kein Markdown):
 Regeln:
 - Bleib strikt bei der Spieler-Absicht; nichts erfinden, was der Spieler nicht meint.
 - writerTask muss so konkret sein, dass der Erzähler die Steuerung **sichtbar** in der Szene umsetzt — nicht nur andeuten.
-- Keine Wiederholung langer Passagen aus dem Kontext.`;
+- Keine Wiederholung langer Passagen aus dem Kontext.
+- writerTask muss **nahtlos** an den letzten Erzähler-Abschnitt anschließen: keine Szene von vorn, kein erneutes Nennen von Position/Haltung/Atmosphäre, die schon etabliert ist.`;
 
 const CONVERT_PROMPT_EN = `You convert a short player steering input into a precise author brief for the **next** narrator segment (dialogue script with \`<<speaker:…>>\` tags).
 
@@ -69,7 +70,7 @@ Return ONLY valid JSON:
   "kind": "dialogue" | "action",
   "display": "Short steering bubble label. dialogue: quoted line. action: starts with ⚡ and summarizes the action.",
   "dialogueLine": "only for dialogue: spoken line without quotes",
-  "writerTask": "Full English brief with ## Task, required structure, forbidden list. dialogue: brief narrator then protagonist with mandatory quote. action: narrator shows the action vividly, then optional dialogue. No quest UI."
+  "writerTask": "Full English brief with ## Task, required structure, forbidden list. dialogue: brief narrator then protagonist with mandatory quote. action: narrator shows the action vividly, then optional dialogue. No quest UI. Must continue seamlessly from the last narrator beat — no scene re-establishment."
 }`;
 
 function convertUserPrompt(

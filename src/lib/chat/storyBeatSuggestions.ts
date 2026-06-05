@@ -42,7 +42,7 @@ function beatsUserPrompt(locale: "de" | "en"): string {
 }
 
 const DEFAULT_CONTINUE =
-  "[Continue the story from here. Write the next moments in scene. Do not repeat prior text. End at a natural pause for the player.]";
+  "[Continue the story from the **last line** of the previous narrator beat. Write only the **next** moments — seamless, no scene reset. Do not repeat positions, poses, atmosphere, or facts already stated. End at a natural pause for the player.]";
 
 export function defaultContinuePrompt(): string {
   return DEFAULT_CONTINUE;
