@@ -34,8 +34,6 @@ export type GenerateReplyParams = {
   continuation?: boolean;
   /** Overrides default “continue” prompt (e.g. chosen story beat). */
   continuationPrompt?: string;
-  /** From steering converter — full writer user message for the narrator LLM. */
-  steeringWriterTask?: string | null;
   onLoreCount?: (n: number) => void;
   storyLocale?: string | null;
   signal?: AbortSignal;
@@ -55,8 +53,6 @@ export async function streamAssistantReply(
         params.turns,
         params.continuationPrompt ?? defaultContinuePrompt(),
         params.storyLocale,
-        params.storySettings?.protagonist?.displayName ?? null,
-        params.steeringWriterTask,
       )
     : params.turns;
 

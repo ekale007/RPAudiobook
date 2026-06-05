@@ -1,15 +1,13 @@
 import { buildChatMessages } from "@/lib/prompt/buildPrompt";
 import type { PromptContext } from "@/lib/prompt/buildPrompt";
 import {
-  buildSteeringWriterTaskMessage,
+  buildSteeringContinuationPrompt,
   classifySteeringDisplay,
   formatSteeringActionUserTurn,
   formatSteeringDialogueUserTurn,
-  formatSteeringUserTurnContent,
   normalizeSteeringDialogueInput,
   stripSteeringTurnPrefix,
   STEERING_TURN_PREFIX,
-  type SteeringDisplayKind,
   type SteeringInputMode,
 } from "@/lib/chat/playerSteering";
 import { completeOpenRouter } from "@/lib/llm/openrouter";
@@ -112,14 +110,7 @@ function fallbackConverted(
       kind: "dialogue",
       display,
       dialogueLine: line,
-      writerTask: buildSteeringWriterTaskMessage(
-        formatSteeringDialogueUserTurn(line, storyLocale).replace(
-          STEERING_TURN_PREFIX,
-          "",
-        ),
-        storyLocale,
-        protagonistName,
-      ),
+      writerTask: buildSteeringContinuationPrompt(display, storyLocale),
     };
   }
 
@@ -130,11 +121,7 @@ function fallbackConverted(
   return {
     kind: "action",
     display,
-    writerTask: buildSteeringWriterTaskMessage(
-      display,
-      storyLocale,
-      protagonistName,
-    ),
+    writerTask: buildSteeringContinuationPrompt(display, storyLocale),
   };
 }
 

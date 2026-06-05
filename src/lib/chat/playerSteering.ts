@@ -1,4 +1,4 @@
-import { appendSeamlessContinuationHint } from "@/lib/chat/continuationSeam";
+import { appendLightContinuationHint } from "@/lib/chat/continuationSeam";
 import { defaultContinuePrompt } from "@/lib/chat/storyBeatSuggestions";
 import {
   parseSpeakerBlocks,
@@ -81,124 +81,57 @@ export function classifySteeringDisplay(display: string): SteeringDisplayKind {
   return "direction";
 }
 
-/**
- * Single user message for the LLM when the last stored turn is a steering bubble.
- * Merges player intent into one mandatory writer task (DB still keeps the steering turn for UI).
- */
-export function buildSteeringWriterTaskMessage(
-  display: string,
-  storyLocale?: string | null,
-  protagonistName?: string | null,
-): string {
-  const locale = normalizeStoryLocale(storyLocale);
-  const de = locale === "de";
-  const player =
-    protagonistName?.trim() || (de ? "der Protagonist (du)" : "the protagonist (you)");
-  const kind = classifySteeringDisplay(display);
+const REACTION_IDS: QuickReactionId[] = ["laugh", "cry", "smile"];
 
-  if (kind === "reaction") {
-    const beat = display.trim();
-    if (de) {
-      return `## Aufgabe: Nächster Erzähler-Abschnitt (Pflicht)
-
-Der Spieler hat soeben gesteuert: **${beat}**
-
-Das MUSS in deiner Antwort sichtbar werden — nicht nur andeuten:
-1. \`<<speaker:narrator>>\` — kurze Brücke; zeige die Reaktion von ${player} klar in der Szene.
-2. Optional andere Sprecher / weiterer \`<<speaker:narrator>>\` bis zur natürlichen Pause.
-
-Pflicht-Stil: Dialog-Skript mit \`<<speaker:…>>\`-Tags. Keine wörtliche Wiederholung früherer Absätze.`;
-    }
-    return `## Task: Next narrator segment (required)
-
-The player just steered: **${beat}**
-
-You MUST show this in your reply — do not only hint at it:
-1. \`<<speaker:narrator>>\` — brief bridge; make ${player}'s reaction clear in the scene.
-2. Optional other speakers / more \`<<speaker:narrator>>\` until a natural pause.
-
-Required: dialogue script with \`<<speaker:…>>\` tags. Do not repeat earlier paragraphs verbatim.`;
+function reactionIdFromDisplay(display: string): QuickReactionId | null {
+  const t = display.trim();
+  for (const id of REACTION_IDS) {
+    if (t === REACTION_LABELS_DE[id] || t === REACTION_LABELS_EN[id]) return id;
   }
-
-  if (kind === "dialogue") {
-    const line = normalizeSteeringDialogueInput(display);
-    const quoted = de ? `„${line}"` : `"${line}"`;
-    if (de) {
-      return `## Aufgabe: Nächster Erzähler-Abschnitt (Pflicht)
-
-Der Spieler hat eine **Dialogzeile** vorgegeben. Sie MUSS in deiner Antwort vorkommen.
-
-**Pflicht-Satz des Protagonisten** (wörtlich oder leicht stilistisch geglättet — gleiche Bedeutung, keine andere Aussage):
-${quoted}
-
-**Reihenfolge (strikt — Abweichung = Fehler):**
-1. \`<<speaker:narrator>>\` — **maximal 1 kurzer Satz** Brücke (kein Szene-Reset). Kein NPC spricht vor Schritt 2.
-2. \`<<speaker:protagonist>>\` — **sofort danach** spricht ${player} den Pflicht-Satz: ${quoted}
-   (nur dieser Satz als Zitat; optional ein Halbsatz davor wie „du fragst“.)
-3. **Erst danach** dürfen NPCs antworten (z.\u202fB. mit Cast-Slug) — ihre Antwort bezieht sich auf die Frage/Aussage.
-
-Erlaubt: leichte grammatische Glättung, wenn die Spielerzeile rau klingt.
-**Verboten:** NPC beantwortet die Frage, bevor der Protagonist sie gestellt hat. Die Pflicht-Zeile nur im Erzähler-Fließtext ohne \`<<speaker:protagonist>>\`. Die Zeile später noch einmal unmarkiert wiederholen.
-**Verboten:** Quest-UI, \`[QUEST-OPTION]\`, Interface, „Was tust du?“ — nur lebendige Prosa und Dialog-Skript.
-
-Pflicht-Stil: Dialog-Skript mit \`<<speaker:…>>\`-Tags. Keine wörtliche Wiederholung früherer Absätze.`;
-    }
-    return `## Task: Next narrator segment (required)
-
-The player supplied a **dialogue line**. It MUST appear in your reply.
-
-**Mandatory protagonist line** (verbatim or lightly polished — same meaning, not a different statement):
-${quoted}
-
-**Order (strict — deviation is wrong):**
-1. \`<<speaker:narrator>>\` — **at most 1 short sentence** of bridge (no scene reset). No NPC speaks before step 2.
-2. \`<<speaker:protagonist>>\` — **immediately after**, ${player} speaks the mandatory line: ${quoted}
-3. **Only then** may NPCs reply (with cast slugs) — their answer responds to what ${player} said.
-
-Allowed: light grammatical polish if the player's line is rough.
-**Forbidden:** an NPC answers before the protagonist asks/says it. The mandatory line only in narrator prose without \`<<speaker:protagonist>>\`. Repeating the line later without the protagonist tag.
-**Forbidden:** quest UI, \`[QUEST-OPTION]\`, interfaces, "What do you do?" — only living prose and dialogue script.
-
-Required: dialogue script with \`<<speaker:…>>\` tags. Do not repeat earlier paragraphs verbatim.`;
-  }
-
-  const action = display.trim().replace(/^⚡\s*/, "");
-  if (de) {
-    return `## Aufgabe: Nächster Erzähler-Abschnitt (Pflicht)
-
-Der Spieler steuert eine **Handlung**: **${action}**
-
-Das MUSS in deiner Antwort **sichtbar** passieren — nicht nur erwähnt:
-1. \`<<speaker:narrator>>\` — **sofort** die Handlung zeigen (Bewegung, Wirkung, Konsequenz). Kein erneutes Szene-Setting. Optional **max. 1** Übergangssatz, dann die Tat.
-2. Optional \`<<speaker:protagonist>>\` / Cast-Dialog und weiterer \`<<speaker:narrator>>\` bis zur Pause.
-
-**Verboten:** Szene von vorn beschreiben (wer wo steht, wie sie aussieht, was schon im letzten Abschnitt stand). Die Aktion weglassen. Quest-UI, „Was tust du?“.
-
-Pflicht-Stil: Dialog-Skript mit \`<<speaker:…>>\`-Tags. Nahtloser Anschluss — keine Wiederholung früherer Absätze.`;
-  }
-  return `## Task: Next narrator segment (required)
-
-The player steers the action: **${action}**
-
-You MUST realize this in your reply (prose and dialogue as needed):
-1. \`<<speaker:narrator>>\` — **immediately** show the action (motion, effect, consequence). No scene re-establishment. Optional **at most 1** bridge sentence, then the deed.
-2. Optional dialogue with \`<<speaker:protagonist>>\` / cast and more narrator prose.
-
-Forbidden: re-describing the scene setup already in the last paragraph. Required: seamless continuation; dialogue script with \`<<speaker:…>>\` tags.`;
+  return null;
 }
 
-/** @deprecated Merged into buildSteeringWriterTaskMessage via buildContinuationTurns */
 export function buildDialogueSteeringPrompt(
   line: string,
   storyLocale?: string | null,
 ): string {
-  return buildSteeringWriterTaskMessage(
-    formatSteeringDialogueUserTurn(line, storyLocale).replace(
-      STEERING_TURN_PREFIX,
-      "",
-    ),
-    storyLocale,
-  );
+  const trimmed = line.trim();
+  const locale = normalizeStoryLocale(storyLocale);
+  if (locale === "de") {
+    return `[Steuerung: Die Spieler-Nachricht direkt darüber ist die Dialogzeile. Der Protagonist sagt: „${trimmed}". Szene fließend fortsetzen — dieselbe Zeile unter <<speaker:protagonist>>; kein Szene-Reset. Natürliche Pause am Ende.]`;
+  }
+  return `[Steering: The player message directly above is the dialogue line. The protagonist says: "${trimmed}". Continue seamlessly — same line under <<speaker:protagonist>>; no scene reset. End at a natural pause.]`;
+}
+
+export function buildActionSteeringPrompt(
+  action: string,
+  storyLocale?: string | null,
+): string {
+  const trimmed = action.trim().replace(/^⚡\s*/, "");
+  const locale = normalizeStoryLocale(storyLocale);
+  if (locale === "de") {
+    return `[Steuerung: Die Spieler-Nachricht direkt darüber ist die Handlung — ${trimmed}. In die laufende Szene einweben und geschehen lassen; fließend vom letzten Beat, nichts wiederholen. Natürliche Pause am Ende.]`;
+  }
+  return `[Steering: The player message directly above is the action — ${trimmed}. Weave it into the live scene; flow from the last beat, don't repeat prior text. End at a natural pause.]`;
+}
+
+/** Light continuation hint appended after the steering bubble (keeps flow; bubble stays in history). */
+export function buildSteeringContinuationPrompt(
+  display: string,
+  storyLocale?: string | null,
+): string {
+  const kind = classifySteeringDisplay(display);
+  if (kind === "reaction") {
+    const id = reactionIdFromDisplay(display);
+    if (id) return buildReactionSteeringPrompt(id, storyLocale);
+  }
+  if (kind === "dialogue") {
+    return buildDialogueSteeringPrompt(
+      normalizeSteeringDialogueInput(display),
+      storyLocale,
+    );
+  }
+  return buildActionSteeringPrompt(display, storyLocale);
 }
 
 export function isSteeringUserTurn(content: string): boolean {
@@ -283,37 +216,26 @@ export function emptyDialogueInput(locale: StoryContentLocale): {
   return { text: '""', cursor: 1 };
 }
 
-/** Build turn list for a continuation request (steering → one strong writer user message). */
+/** Build turn list for a continuation request (steering bubble stays; light hint appended). */
 export function buildContinuationTurns(
   turns: ChatTurn[],
   continuationPrompt?: string,
   storyLocale?: string | null,
-  protagonistName?: string | null,
-  writerTaskOverride?: string | null,
 ): ChatTurn[] {
   const fallback = continuationPrompt ?? defaultContinuePrompt();
   const last = turns[turns.length - 1];
   if (last?.role === "user" && isSteeringUserTurn(last.content)) {
     const display = stripSteeringTurnPrefix(last.content).trim();
-    const base =
-      writerTaskOverride?.trim() ||
-      buildSteeringWriterTaskMessage(
-        display,
-        storyLocale,
-        protagonistName,
-      );
-    const merged = appendSeamlessContinuationHint(
-      base,
-      turns.slice(0, -1),
-      storyLocale,
-    );
-    return [...turns.slice(0, -1), { role: "user", content: merged }];
+    const prompt =
+      continuationPrompt?.trim() ||
+      buildSteeringContinuationPrompt(display, storyLocale);
+    return [...turns, { role: "user", content: prompt }];
   }
   return [
     ...turns,
     {
       role: "user",
-      content: appendSeamlessContinuationHint(fallback, turns, storyLocale),
+      content: appendLightContinuationHint(fallback, turns, storyLocale),
     },
   ];
 }

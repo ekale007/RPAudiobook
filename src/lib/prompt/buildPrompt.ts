@@ -124,15 +124,25 @@ export function buildChatMessages(ctx: PromptContext): {
     content: string;
   }> = [{ role: "system", content: systemParts.join("\n\n") }];
 
-  for (const turn of recent) {
+  for (let i = 0; i < recent.length; i++) {
+    const turn = recent[i];
     if (turn.role === "system") continue;
     let content = stripSpeakerTags(turn.content);
     if (turn.role === "user" && isSteeringUserTurn(content)) {
       const display = stripSteeringTurnPrefix(content);
-      content =
-        locale === "de"
-          ? `[Spieler-Steuerung (bereits umgesetzt): ${display}]`
-          : `[Player steering (already applied): ${display}]`;
+      const resolved =
+        recent.slice(i + 1).some((t) => t.role === "assistant");
+      if (resolved) {
+        content =
+          locale === "de"
+            ? `[Spieler-Steuerung (bereits umgesetzt): ${display}]`
+            : `[Player steering (already applied): ${display}]`;
+      } else {
+        content =
+          locale === "de"
+            ? `[Spieler steuert: ${display}]`
+            : `[Player steers: ${display}]`;
+      }
     }
     messages.push({ role: turn.role, content });
   }

@@ -10,14 +10,16 @@ import { MobileCollapsibleTools } from "@/components/MobileCollapsibleTools";
 import { ChatSteeringBar } from "@/components/ChatSteeringBar";
 import { StoryBeatPicker } from "@/components/StoryBeatPicker";
 import {
-  formatSteeringUserTurnContent,
+  classifySteeringDisplay,
+  formatSteeringActionUserTurn,
+  formatSteeringDialogueUserTurn,
   formatSteeringReactionUserTurn,
+  normalizeSteeringDialogueInput,
   steeringInputPlaceholder,
   stripSteeringTurnPrefix,
   type QuickReactionId,
   type SteeringInputMode,
 } from "@/lib/chat/playerSteering";
-import { convertPlayerSteeringInput } from "@/lib/chat/convertSteeringInput";
 import { normalizeStoryContentLocale } from "@/lib/story/protagonist";
 import {
   readTtsAutoplayPreference,
@@ -186,7 +188,6 @@ export function ChatView({
   );
   const [beatsLoading, setBeatsLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
-  const steeringConvertActiveRef = useRef(false);
   const beatsAbortRef = useRef<AbortController | null>(null);
   const autoPlayRemainingRef = useRef(0);
   const autoChapterBusyRef = useRef(false);
@@ -801,7 +802,6 @@ export function ChatView({
       suppressTts?: boolean;
       /** Last steering bubble text — repair protagonist line in reply. */
       steeringDisplay?: string | null;
-      steeringWriterTask?: string | null;
       steeringDialogueLine?: string | null;
     } = {},
   ): Promise<boolean> => {
@@ -838,7 +838,6 @@ export function ChatView({
         allCast: opts.allCast ?? allCast,
         continuation: opts.continuation,
         continuationPrompt: opts.continuationPrompt,
-        steeringWriterTask: opts.steeringWriterTask,
         storyLocale,
         onLoreCount: setLoreCount,
         signal: abortRef.current.signal,
@@ -852,7 +851,6 @@ export function ChatView({
       abortRef.current = null;
       chatBusyRef.current = false;
       if (!opts.background) setGenerating(false);
-      steeringConvertActiveRef.current = false;
       return false;
     }
 
@@ -862,13 +860,11 @@ export function ChatView({
     if (aborted) {
       chatBusyRef.current = false;
       if (!opts.background) setGenerating(false);
-      steeringConvertActiveRef.current = false;
       return false;
     }
     if (!full.trim()) {
       chatBusyRef.current = false;
       if (!opts.background) setGenerating(false);
-      steeringConvertActiveRef.current = false;
       setError("Leere Antwort vom Modell — bitte erneut versuchen.");
       return false;
     }
@@ -897,7 +893,6 @@ export function ChatView({
 
     chatBusyRef.current = false;
     if (!opts.background) setGenerating(false);
-    steeringConvertActiveRef.current = false;
     return true;
   };
 
@@ -971,7 +966,6 @@ export function ChatView({
     opts?: {
       suppressTts?: boolean;
       steeringDisplay?: string;
-      steeringWriterTask?: string;
       steeringDialogueLine?: string;
     },
   ) => {
@@ -984,7 +978,6 @@ export function ChatView({
     } catch (e) {
       setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
       setGenerating(false);
-      steeringConvertActiveRef.current = false;
       await load();
       return;
     }
@@ -994,7 +987,6 @@ export function ChatView({
       steeringDisplay:
         (opts?.steeringDisplay ??
           stripSteeringTurnPrefix(userTurnContent).trim()) || null,
-      steeringWriterTask: opts?.steeringWriterTask ?? null,
       steeringDialogueLine: opts?.steeringDialogueLine ?? null,
     });
   };
@@ -1013,40 +1005,30 @@ export function ChatView({
     setError(null);
 
     if (steeringMode) {
-      const settings = loadOpenRouterSettings();
-      if (!settings) {
-        setError("OpenRouter API-Key fehlt — bitte unter Einstellungen hinterlegen.");
-        return;
+      let bubble: string;
+      let steeringDisplay: string;
+      let steeringDialogueLine: string | undefined;
+
+      if (steeringInputMode === "say") {
+        const line = normalizeSteeringDialogueInput(text);
+        if (!line) return;
+        bubble = formatSteeringDialogueUserTurn(line, storyLocale);
+        steeringDisplay = stripSteeringTurnPrefix(bubble);
+        steeringDialogueLine = line;
+      } else if (steeringInputMode === "act") {
+        bubble = formatSteeringActionUserTurn(text, storyLocale);
+        steeringDisplay = stripSteeringTurnPrefix(bubble);
+      } else if (classifySteeringDisplay(text) === "dialogue") {
+        const line = normalizeSteeringDialogueInput(text);
+        bubble = formatSteeringDialogueUserTurn(line, storyLocale);
+        steeringDisplay = stripSteeringTurnPrefix(bubble);
+        steeringDialogueLine = line;
+      } else {
+        bubble = formatSteeringActionUserTurn(text, storyLocale);
+        steeringDisplay = stripSteeringTurnPrefix(bubble);
       }
-      setGenerating(true);
-      steeringConvertActiveRef.current = true;
-      abortRef.current = new AbortController();
-      try {
-        const converted = await convertPlayerSteeringInput({
-          rawInput: text,
-          inputMode: steeringInputMode,
-          settings: resolveChatModelSettings(settings),
-          promptCtx: promptCtx(),
-          storyLocale,
-          protagonistName: storySettings.protagonist?.displayName ?? null,
-          signal: abortRef.current.signal,
-        });
-        const bubble = formatSteeringUserTurnContent(converted.display);
-        await sendSteering(bubble, {
-          steeringDisplay: converted.display,
-          steeringWriterTask: converted.writerTask,
-          steeringDialogueLine: converted.dialogueLine,
-        });
-      } catch (e) {
-        if ((e as Error).name !== "AbortError") {
-          setError(
-            formatLlmLimitError(e instanceof Error ? e.message : String(e)),
-          );
-        }
-        setGenerating(false);
-        steeringConvertActiveRef.current = false;
-        abortRef.current = null;
-      }
+
+      await sendSteering(bubble, { steeringDisplay, steeringDialogueLine });
       return;
     }
 
@@ -1607,11 +1589,7 @@ export function ChatView({
           {generating ? (
             <div className="scroll-mt-3 scroll-mb-3 px-1">
               <GeneratingIndicator
-                label={
-                  steeringConvertActiveRef.current
-                    ? "Steuerung einbauen …"
-                    : "Erzähler schreibt …"
-                }
+                label="Erzähler schreibt …"
                 onCancel={cancelWork}
               />
             </div>
