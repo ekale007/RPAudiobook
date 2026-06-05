@@ -12,6 +12,35 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 
+# Windows PowerShell 5.1 has no -SkipHttpErrorCheck (PS 7+ only).
+function Get-HttpStatusCode {
+  param(
+    [string]$Uri,
+    [hashtable]$Headers,
+    [string]$Method = "Get",
+    [string]$Body = $null
+  )
+  try {
+    $params = @{
+      Uri             = $Uri
+      Method          = $Method
+      Headers         = $Headers
+      UseBasicParsing = $true
+    }
+    if ($Body) {
+      $params.Body = $Body
+      $params.ContentType = "application/json"
+    }
+    $resp = Invoke-WebRequest @params
+    return [int]$resp.StatusCode
+  } catch {
+    if ($_.Exception.Response) {
+      return [int]$_.Exception.Response.StatusCode
+    }
+    throw
+  }
+}
+
 function Read-DotEnvKey([string]$path, [string]$key) {
   if (-not (Test-Path $path)) { return "" }
   foreach ($line in Get-Content $path) {
@@ -56,9 +85,9 @@ Write-Host "Ping retries: $PingRetries x ${PingDelaySec}s ..."
 $ready = $false
 for ($i = 1; $i -le $PingRetries; $i++) {
   try {
-    $ping = Invoke-WebRequest -Uri "$base/ping" -Method Get -Headers $authHeaders -SkipHttpErrorCheck
-    Write-Host "  [$i] /ping -> $($ping.StatusCode)"
-    if ($ping.StatusCode -eq 200) {
+    $code = Get-HttpStatusCode -Uri "$base/ping" -Headers $authHeaders -Method Get
+    Write-Host "  [$i] /ping -> $code"
+    if ($code -eq 200) {
       $ready = $true
       break
     }
@@ -92,6 +121,6 @@ $body = @{
 Write-Host ""
 Write-Host "Speak: $base/speak (voice=$Voice) ..."
 $outFile = Join-Path $env:TEMP "runpod-qwen-$(Get-Date -Format 'yyyyMMdd-HHmmss').wav"
-Invoke-WebRequest -Uri "$base/speak" -Method Post -Headers $speakHeaders -Body $body -OutFile $outFile
+Invoke-WebRequest -Uri "$base/speak" -Method Post -Headers $speakHeaders -Body $body -OutFile $outFile -UseBasicParsing
 Write-Host "OK - saved: $outFile"
 Start-Process $outFile
