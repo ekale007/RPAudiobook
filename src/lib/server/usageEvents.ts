@@ -95,3 +95,45 @@ export function formatProviderUsd(usd: number | null): string | null {
     maximumFractionDigits: 6,
   }).format(usd);
 }
+
+export type MonthlyTtsUsageSnapshot = {
+  periodMonth: string;
+  requestCount: number;
+  characters: number;
+  costCents: number;
+};
+
+function monthBoundsUtc(periodMonth: string): { start: string; end: string } {
+  const [y, m] = periodMonth.split("-").map(Number);
+  return {
+    start: new Date(Date.UTC(y, m - 1, 1)).toISOString(),
+    end: new Date(Date.UTC(y, m, 1)).toISOString(),
+  };
+}
+
+/** Sum TTS rows from usage_events for the calendar month (UTC). */
+export async function fetchMonthlyTtsUsage(
+  supabase: SupabaseClient,
+  periodMonth: string = new Date().toISOString().slice(0, 7),
+): Promise<MonthlyTtsUsageSnapshot> {
+  const { start, end } = monthBoundsUtc(periodMonth);
+  const { data, error } = await supabase
+    .from("usage_events")
+    .select("cost_cents, characters")
+    .eq("kind", "tts")
+    .gte("created_at", start)
+    .lt("created_at", end);
+
+  if (error) throw error;
+
+  let requestCount = 0;
+  let characters = 0;
+  let costCents = 0;
+  for (const row of data ?? []) {
+    requestCount += 1;
+    characters += Number(row.characters ?? 0);
+    costCents += Number(row.cost_cents ?? 0);
+  }
+
+  return { periodMonth, requestCount, characters, costCents };
+}

@@ -384,10 +384,21 @@ export default function SettingsPage() {
               <h2 className="mb-1 font-medium text-accent">Sprachausgabe (TTS)</h2>
               <p className="mb-3 text-xs text-zinc-500">
                 <strong>ElevenLabs</strong> = Premium-Cloud.{" "}
-                <strong>Qwen Cloud</strong> = DashScope (~$10/M Zeichen, instruct).{" "}
-                <strong>Qwen lokal</strong> = dein PC (
-                <code className="text-zinc-400">npm run tts:qwen</code>
-                ). Cast-Stimmen pro Story unter Figuren-Stimmen.
+                <strong>Qwen Cloud</strong> = Alibaba DashScope (eigener{" "}
+                <code className="text-zinc-400">DASHSCOPE_API_KEY</code>, nicht
+                RunPod).{" "}
+                <strong>
+                  {serverQwenTts ? "Qwen RunPod" : "Qwen lokal"}
+                </strong>{" "}
+                = {serverQwenTts ? (
+                  <>dein RunPod-Endpoint über <code className="text-zinc-400">QWEN_TTS_URL</code></>
+                ) : (
+                  <>
+                    dein PC (
+                    <code className="text-zinc-400">npm run tts:qwen</code>)
+                  </>
+                )}
+                . Cast-Stimmen pro Story unter Figuren-Stimmen.
               </p>
 
               <div className="mb-3 flex flex-wrap gap-2">
@@ -395,7 +406,10 @@ export default function SettingsPage() {
                   [
                     { id: "elevenlabs" as const, label: "ElevenLabs" },
                     { id: "qwen-cloud" as const, label: "Qwen Cloud" },
-                    { id: "qwen" as const, label: "Qwen lokal" },
+                    {
+                      id: "qwen" as const,
+                      label: serverQwenTts ? "Qwen RunPod" : "Qwen lokal",
+                    },
                   ] as const
                 ).map(({ id, label }) => (
                   <button
