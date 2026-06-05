@@ -1,6 +1,19 @@
-# Qwen3-TTS on RunPod (GPU Pod)
+# Qwen3-TTS on RunPod
 
-FastAPI server — same API as local `npm run tts:qwen` (`/health`, `/speak`, `/voices`).
+FastAPI server — same API as local `npm run tts:qwen` (`/health`, `/speak`, `/voices`, `/ping`).
+
+## Pod vs. Serverless
+
+| | **Serverless (empfohlen)** | **GPU Pod (legacy)** |
+|--|---------------------------|----------------------|
+| Kosten | Nur bei Requests | $/h auch im Leerlauf |
+| URL | `https://<ID>.api.runpod.ai` | `https://<pod>-8000.proxy.runpod.net` |
+| Auth | `RUNPOD_API_KEY` + `QWEN_TTS_API_KEY` | nur `QWEN_TTS_API_KEY` |
+| Setup | [RUNPOD-SERVERLESS-QWEN.md](./RUNPOD-SERVERLESS-QWEN.md) | unten |
+
+---
+
+## GPU Pod (legacy)
 
 ## 1. Build & push (optional — or build on RunPod)
 

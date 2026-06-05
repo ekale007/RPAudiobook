@@ -3,6 +3,8 @@ import {
   getQwenTtsApiKey,
   getQwenTtsUrl,
   getRateLimitTtsPerHour,
+  getRunPodApiKey,
+  isRunPodServerlessQwenUrl,
   isServerQwenTtsConfigured,
 } from "@/lib/server/env";
 import { checkRateLimit } from "@/lib/server/rateLimit";
@@ -72,24 +74,69 @@ export async function POST(req: Request) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  const apiKey = getQwenTtsApiKey();
-  if (apiKey) {
-    headers["X-API-Key"] = apiKey;
+  const qwenKey = getQwenTtsApiKey();
+  if (qwenKey) {
+    headers["X-API-Key"] = qwenKey;
+  }
+  const runPodKey = getRunPodApiKey();
+  if (isRunPodServerlessQwenUrl(baseUrl)) {
+    if (!runPodKey) {
+      return NextResponse.json(
+        {
+          error:
+            "RunPod Serverless URL set but RUNPOD_API_KEY missing on the server.",
+        },
+        { status: 503 },
+      );
+    }
+    headers.Authorization = `Bearer ${runPodKey}`;
   }
 
   const base = baseUrl.replace(/\/$/, "");
-  let upstream: Response;
-  try {
-    upstream = await fetch(`${base}/speak`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ text, voice, language, instruct }),
-      signal: AbortSignal.timeout(180_000),
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+  const payload = JSON.stringify({ text, voice, language, instruct });
+  const speakUrl = `${base}/speak`;
+  const maxAttempts = isRunPodServerlessQwenUrl(baseUrl) ? 3 : 1;
+  let upstream: Response | null = null;
+  let lastErr = "";
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      upstream = await fetch(speakUrl, {
+        method: "POST",
+        headers,
+        body: payload,
+        signal: AbortSignal.timeout(330_000),
+      });
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e);
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 8_000));
+        continue;
+      }
+      return NextResponse.json(
+        { error: `Cannot reach Qwen TTS at ${base} (${lastErr})` },
+        { status: 503 },
+      );
+    }
+
+    if (
+      upstream.status === 502 ||
+      upstream.status === 503 ||
+      upstream.status === 504
+    ) {
+      lastErr = await upstream.text();
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 10_000));
+        continue;
+      }
+    } else {
+      break;
+    }
+  }
+
+  if (!upstream) {
     return NextResponse.json(
-      { error: `Cannot reach Qwen TTS at ${base} (${msg})` },
+      { error: `Cannot reach Qwen TTS at ${base}` },
       { status: 503 },
     );
   }

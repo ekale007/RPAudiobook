@@ -1,4 +1,6 @@
-# Canonical copy lives at /Dockerfile (repo root) for RunPod GitHub builds.
+# HörbuchKI Qwen3-TTS for RunPod Serverless (Load Balancer).
+# Build context: repository root (docker build -f Dockerfile .)
+# Keep in sync with runpod/Dockerfile
 # syntax=docker/dockerfile:1
 FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
 

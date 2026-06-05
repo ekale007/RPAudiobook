@@ -1,0 +1,12 @@
+.git
+.github
+.next
+node_modules
+.venv
+.venv-kokoro
+.venv-qwen
+samples
+*.md
+docs
+.env*
+!.env.example

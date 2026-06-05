@@ -26,8 +26,10 @@ import numpy as np
 import soundfile as sf
 import torch
 import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Header
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
+import threading
 from pydantic import BaseModel, Field
 from typing import Annotated
 import os
@@ -35,7 +37,31 @@ import os
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger("qwen-tts")
 
-app = FastAPI(title="HörbuchKI Qwen3-TTS")
+def _background_preload() -> None:
+    global _loading, _load_error
+    _loading = True
+    _load_error = None
+    try:
+        get_model()
+    except Exception as e:
+        _load_error = str(e)
+        log.exception("background preload failed")
+    finally:
+        _loading = False
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    if os.environ.get("QWEN_PRELOAD", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+    ):
+        threading.Thread(target=_background_preload, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="HörbuchKI Qwen3-TTS", lifespan=lifespan)
 
 DEFAULT_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"
 
@@ -69,6 +95,8 @@ SPEAKER_ALIASES = {
 _model: Any = None
 _device: str = "cpu"
 _model_id: str = DEFAULT_MODEL
+_loading: bool = False
+_load_error: str | None = None
 
 
 class SpeakBody(BaseModel):
@@ -154,6 +182,19 @@ def synthesize(
     return buf.getvalue()
 
 
+@app.get("/ping")
+async def ping():
+    """RunPod Serverless load balancer health (204 = initializing, 200 = ready)."""
+    if _model is not None:
+        return JSONResponse({"status": "healthy", "engine": "qwen3-tts"}, status_code=200)
+    if _load_error:
+        return JSONResponse(
+            {"status": "unhealthy", "error": _load_error},
+            status_code=503,
+        )
+    return JSONResponse({"status": "initializing"}, status_code=204)
+
+
 @app.get("/health")
 async def health():
     cuda = torch.cuda.is_available()
@@ -195,8 +236,9 @@ async def speak(
 def main():
     global _device, _model_id
     parser = argparse.ArgumentParser(description="HörbuchKI Qwen3-TTS server")
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=5125)
+    default_port = int(os.environ.get("PORT", os.environ.get("QWEN_PORT", "5125")))
+    parser.add_argument("--host", default=os.environ.get("QWEN_HOST", "127.0.0.1"))
+    parser.add_argument("--port", type=int, default=default_port)
     parser.add_argument(
         "--model",
         default=DEFAULT_MODEL,
@@ -225,7 +267,10 @@ def main():
 
     log.info("Qwen TTS on http://%s:%s (device=%s)", args.host, args.port, _device)
     if args.preload:
-        get_model()
+        _background_preload()
+        if _load_error:
+            log.error("Preload failed: %s", _load_error)
+            sys.exit(1)
 
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 

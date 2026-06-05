@@ -41,6 +41,17 @@ export function getQwenTtsApiKey(): string | null {
   return key || null;
 }
 
+/** RunPod API key — required for Serverless Load Balancer gateway auth. */
+export function getRunPodApiKey(): string | null {
+  const key = process.env.RUNPOD_API_KEY?.trim();
+  return key || null;
+}
+
+export function isRunPodServerlessQwenUrl(url: string): boolean {
+  return /\.api\.runpod\.ai\/?$/i.test(url.replace(/\/$/, "")) ||
+    url.includes(".api.runpod.ai");
+}
+
 export function isServerQwenTtsConfigured(): boolean {
   return Boolean(getQwenTtsUrl());
 }
