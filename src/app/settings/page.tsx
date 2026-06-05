@@ -513,15 +513,29 @@ export default function SettingsPage() {
               ) : (
                 <>
                   <p className="mb-2 text-xs text-zinc-500">
-                    Server:{" "}
-                    <code className="text-accent">{localUrl}</code> — vor ▶{" "}
-                    <code className="text-accent">npm run tts:qwen</code>{" "}
-                    starten.
+                    {serverQwenTts ? (
+                      <>
+                        RunPod Serverless aktiv — TTS läuft über{" "}
+                        <code className="text-accent">/api/tts/qwen</code>{" "}
+                        (kein lokaler{" "}
+                        <code className="text-zinc-400">npm run tts:qwen</code>
+                        ).
+                      </>
+                    ) : (
+                      <>
+                        Server:{" "}
+                        <code className="text-accent">{localUrl}</code> — vor
+                        ▶{" "}
+                        <code className="text-accent">npm run tts:qwen</code>{" "}
+                        starten.
+                      </>
+                    )}
                   </p>
                   <QwenVoicePicker
                     serverUrl={localUrl}
                     value={localVoice}
                     onChange={setLocalVoice}
+                    serverProxy={serverQwenTts}
                   />
                   <Link
                     href="/dev/qwen-voices"
@@ -751,6 +765,7 @@ export default function SettingsPage() {
                   serverUrl={localUrl}
                   value={localVoice}
                   onChange={setLocalVoice}
+                  serverProxy={serverQwenTts}
                 />
               ) : localEngine === "kokoro" ? (
                 <KokoroVoicePicker
