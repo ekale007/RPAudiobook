@@ -37,15 +37,28 @@ import os
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger("qwen-tts")
 
+def _ensure_hf_token() -> bool:
+    apply_repo_env()
+    if hf_token_configured():
+        return True
+    log.error(
+        "HF_TOKEN missing — set Hugging Face read token on RunPod endpoint env "
+        "(Settings -> Environment Variables). Required for model download."
+    )
+    return False
+
+
 def _background_preload() -> None:
     global _loading, _load_error
     _loading = True
     _load_error = None
     try:
+        if not _ensure_hf_token():
+            raise RuntimeError("HF_TOKEN not configured on server")
         get_model()
     except Exception as e:
         _load_error = str(e)
-        log.exception("background preload failed")
+        log.exception("background preload failed: %s", e)
     finally:
         _loading = False
 
@@ -187,9 +200,15 @@ async def ping():
     """RunPod Serverless load balancer health (204 = initializing, 200 = ready)."""
     if _model is not None:
         return JSONResponse({"status": "healthy", "engine": "qwen3-tts"}, status_code=200)
+    if _loading:
+        return JSONResponse({"status": "initializing", "loading": True}, status_code=204)
     if _load_error:
         return JSONResponse(
-            {"status": "unhealthy", "error": _load_error},
+            {
+                "status": "unhealthy",
+                "error": _load_error,
+                "hf_token": hf_token_configured(),
+            },
             status_code=503,
         )
     return JSONResponse({"status": "initializing"}, status_code=204)
@@ -207,6 +226,8 @@ async def health():
         "device": _device,
         "gpu": name,
         "model_loaded": _model is not None,
+        "loading": _loading,
+        "load_error": _load_error,
         "hf_token": hf_token_configured(),
         "speakers": QWEN_SPEAKERS,
     }
@@ -258,12 +279,7 @@ def main():
     else:
         _device = "cuda:0" if args.device == "cuda" else "cpu"
 
-    if apply_repo_env():
-        log.info("Hugging Face token loaded (HF_TOKEN).")
-    else:
-        log.warning(
-            "No HF_TOKEN — model download may rate-limit. Add HF_TOKEN to .env.local"
-        )
+    _ensure_hf_token()
 
     log.info("Qwen TTS on http://%s:%s (device=%s)", args.host, args.port, _device)
     if args.preload:

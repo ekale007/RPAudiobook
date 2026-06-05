@@ -13,7 +13,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 
 # Windows PowerShell 5.1 has no -SkipHttpErrorCheck (PS 7+ only).
-function Get-HttpStatusCode {
+function Invoke-HttpProbe {
   param(
     [string]$Uri,
     [hashtable]$Headers,
@@ -32,10 +32,19 @@ function Get-HttpStatusCode {
       $params.ContentType = "application/json"
     }
     $resp = Invoke-WebRequest @params
-    return [int]$resp.StatusCode
+    return @{
+      StatusCode = [int]$resp.StatusCode
+      Body       = $resp.Content
+    }
   } catch {
     if ($_.Exception.Response) {
-      return [int]$_.Exception.Response.StatusCode
+      $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+      $errBody = $reader.ReadToEnd()
+      $reader.Close()
+      return @{
+        StatusCode = [int]$_.Exception.Response.StatusCode
+        Body       = $errBody
+      }
     }
     throw
   }
@@ -80,16 +89,32 @@ $authHeaders = @{
 }
 
 Write-Host "Base: $base"
+
+try {
+  $h = Invoke-HttpProbe -Uri "$base/health" -Headers $authHeaders -Method Get
+  Write-Host "Health snapshot: $($h.StatusCode)"
+  if ($h.Body) { Write-Host $h.Body }
+} catch {
+  Write-Host "Health nicht erreichbar: $($_.Exception.Message)"
+}
+
 Write-Host "Ping retries: $PingRetries x ${PingDelaySec}s ..."
 
 $ready = $false
 for ($i = 1; $i -le $PingRetries; $i++) {
   try {
-    $code = Get-HttpStatusCode -Uri "$base/ping" -Headers $authHeaders -Method Get
-    Write-Host "  [$i] /ping -> $code"
-    if ($code -eq 200) {
+    $r = Invoke-HttpProbe -Uri "$base/ping" -Headers $authHeaders -Method Get
+    $snippet = ""
+    if ($r.Body -and $r.Body.Length -gt 0) {
+      $snippet = " " + ($r.Body -replace "\s+", " ").Substring(0, [Math]::Min(120, $r.Body.Length))
+    }
+    Write-Host "  [$i] /ping -> $($r.StatusCode)$snippet"
+    if ($r.StatusCode -eq 200) {
       $ready = $true
       break
+    }
+    if ($r.StatusCode -eq 503 -and $r.Body -match "HF_TOKEN") {
+      Write-Host "  HINWEIS: HF_TOKEN auf RunPod Endpoint setzen, dann Worker neu starten." -ForegroundColor Yellow
     }
   } catch {
     Write-Host "  [$i] /ping error: $($_.Exception.Message)"

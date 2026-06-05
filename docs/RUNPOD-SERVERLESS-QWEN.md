@@ -73,7 +73,7 @@ docker build --platform linux/amd64 -f Dockerfile -t hoerbuchki-qwen-tts:test .
 
 | Variable | Pflicht | Beispiel |
 |----------|---------|----------|
-| `HF_TOKEN` | ja | Hugging Face Read-Token |
+| `HF_TOKEN` | **ja** | Hugging Face Read-Token — **muss** auf RunPod stehen (nicht nur `.env.local`) |
 | `QWEN_API_KEY` | ja (prod) | Zufallsstring — gleich wie `QWEN_TTS_API_KEY` auf Vercel |
 | `QWEN_MODEL` | nein | `Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice` |
 | `QWEN_DEVICE` | nein | `cuda` |
@@ -156,7 +156,9 @@ Die App-Proxy-Route wartet bis **5 Min** und macht bei 502/503 bis zu 3 Retries.
 | `401` von RunPod | `RUNPOD_API_KEY` auf Vercel prüfen |
 | `401` von Qwen | `QWEN_TTS_API_KEY` = `QWEN_API_KEY` auf Endpoint |
 | `QB API not allowed` | Endpoint-Typ muss **Load Balancer** sein |
-| `/ping` bleibt 204 | Logs im Worker-Tab; `HF_TOKEN`? GPU OOM? |
+| `/ping` 503 im Worker-Log | Worker-Logs: `background preload failed` — fast immer **`HF_TOKEN` fehlt** auf RunPod |
+| `/ping` 400 vom Probe | RunPod-Gateway wenn kein gesunder Worker; Worker-Logs prüfen (503 = unhealthy) |
+| `/ping` bleibt 204 | Modell lädt noch (1–3 Min) — warten |
 | Timeout 330 s | Modell zu groß → `QWEN_MODEL` 0.6B |
 
 ## 8. Agent / lokale API-Nutzung
