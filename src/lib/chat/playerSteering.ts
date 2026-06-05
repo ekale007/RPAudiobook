@@ -60,24 +60,169 @@ export function buildReactionSteeringPrompt(
     : REACTION_PROMPTS_EN[reaction];
 }
 
-export type SteeringDisplayKind = "dialogue" | "reaction" | "direction";
+export type SteeringDisplayKind =
+  | "dialogue"
+  | "reaction"
+  | "direction"
+  | "mixed";
+
+export type SteeringSegment =
+  | { kind: "dialogue"; text: string }
+  | { kind: "action"; text: string };
+
+export type ParsedSteeringInput = {
+  segments: SteeringSegment[];
+  display: string;
+  dialogueLines: string[];
+};
 
 const ALL_REACTION_LABELS = [
   ...Object.values(REACTION_LABELS_DE),
   ...Object.values(REACTION_LABELS_EN),
 ];
 
+type QuoteSpan = { start: number; end: number; inner: string };
+
+function quotePatternsForLocale(locale: StoryContentLocale): RegExp[] {
+  if (locale === "de") {
+    return [
+      /„([^„\n]{1,260}?)[\u201C\u201D"]/g,
+      /[""]([^"""\n]{1,260})["""]/g,
+    ];
+  }
+  return [
+    /"([^"\n]{1,260})"/g,
+    /'([^'\n]{1,260})'/g,
+    /„([^„\n]{1,260}?)[\u201C\u201D"]/g,
+  ];
+}
+
+function findQuotedSpans(
+  text: string,
+  locale: StoryContentLocale,
+): QuoteSpan[] {
+  const spans: QuoteSpan[] = [];
+  for (const re of quotePatternsForLocale(locale)) {
+    re.lastIndex = 0;
+    for (const m of text.matchAll(re)) {
+      if (m.index == null) continue;
+      const inner = (m[1] ?? "").trim();
+      if (!inner) continue;
+      spans.push({
+        start: m.index,
+        end: m.index + m[0].length,
+        inner,
+      });
+    }
+  }
+  spans.sort((a, b) => a.start - b.start || b.end - a.end);
+  const out: QuoteSpan[] = [];
+  let cursor = 0;
+  for (const s of spans) {
+    if (s.start < cursor) continue;
+    out.push(s);
+    cursor = s.end;
+  }
+  return out;
+}
+
+function normalizeActionSegment(raw: string): string {
+  return raw.trim().replace(/^⚡\s*/, "").replace(/\s+/g, " ").trim();
+}
+
+function splitSteeringSegments(
+  text: string,
+  locale: StoryContentLocale,
+): SteeringSegment[] {
+  const spans = findQuotedSpans(text, locale);
+  if (!spans.length) return [];
+
+  const segments: SteeringSegment[] = [];
+  let cursor = 0;
+  for (const span of spans) {
+    const prose = normalizeActionSegment(text.slice(cursor, span.start));
+    if (prose) segments.push({ kind: "action", text: prose });
+    segments.push({ kind: "dialogue", text: span.inner });
+    cursor = span.end;
+  }
+  const tail = normalizeActionSegment(text.slice(cursor));
+  if (tail) segments.push({ kind: "action", text: tail });
+  return segments;
+}
+
+function formatSegmentForDisplay(
+  segment: SteeringSegment,
+  locale: StoryContentLocale,
+): string {
+  if (segment.kind === "dialogue") {
+    return locale === "de"
+      ? `„${segment.text}"`
+      : `"${segment.text}"`;
+  }
+  return `⚡ ${segment.text}`;
+}
+
+export function formatSteeringDisplayFromSegments(
+  segments: SteeringSegment[],
+  locale: StoryContentLocale,
+): string {
+  return segments.map((s) => formatSegmentForDisplay(s, locale)).join(" · ");
+}
+
+/** Parse free-form steering: action + dialogue in any order (quotes = spoken line). */
+export function parseSteeringInput(
+  raw: string,
+  mode: SteeringInputMode = "auto",
+  storyLocale?: string | null,
+): ParsedSteeringInput | null {
+  const text = raw.trim();
+  if (!text) return null;
+
+  const locale = normalizeStoryLocale(storyLocale) as StoryContentLocale;
+  let segments = splitSteeringSegments(text, locale);
+
+  if (!segments.length) {
+    if (mode === "say") {
+      const line = normalizeSteeringDialogueInput(text);
+      if (!line) return null;
+      segments = [{ kind: "dialogue", text: line }];
+    } else {
+      const action = normalizeActionSegment(text);
+      if (!action) return null;
+      segments = [{ kind: "action", text: action }];
+    }
+  }
+
+  const display = formatSteeringDisplayFromSegments(segments, locale);
+  const dialogueLines = segments
+    .filter((s): s is SteeringSegment & { kind: "dialogue" } => s.kind === "dialogue")
+    .map((s) => s.text);
+
+  return { segments, display, dialogueLines };
+}
+
 export function classifySteeringDisplay(display: string): SteeringDisplayKind {
   const t = display.trim();
-  if (t.startsWith("⚡")) return "direction";
   if (ALL_REACTION_LABELS.includes(t)) return "reaction";
-  if (
-    /^[\u201e\u201c"]/.test(t) ||
-    (t.startsWith('"') && t.endsWith('"')) ||
-    (t.startsWith("„") && /[\u201c\u201d"]$/.test(t))
-  ) {
-    return "dialogue";
+
+  const locale: StoryContentLocale = /„/.test(t) ? "de" : "en";
+  const segments = splitSteeringSegments(t, locale);
+  if (!segments.length) {
+    if (t.startsWith("⚡")) return "direction";
+    if (
+      /^[\u201e\u201c"]/.test(t) ||
+      (t.startsWith('"') && t.endsWith('"')) ||
+      (t.startsWith("„") && /[\u201c\u201d"]$/.test(t))
+    ) {
+      return "dialogue";
+    }
+    return "direction";
   }
+
+  const hasDialogue = segments.some((s) => s.kind === "dialogue");
+  const hasAction = segments.some((s) => s.kind === "action");
+  if (hasDialogue && hasAction) return "mixed";
+  if (hasDialogue) return "dialogue";
   return "direction";
 }
 
@@ -115,6 +260,30 @@ export function buildActionSteeringPrompt(
   return `[Steering: The player message directly above is the action — ${trimmed}. Weave it into the live scene; flow from the last beat, don't repeat prior text. End at a natural pause.]`;
 }
 
+export function buildMixedSteeringPrompt(
+  segments: SteeringSegment[],
+  storyLocale?: string | null,
+): string {
+  const locale = normalizeStoryLocale(storyLocale);
+  const parts = segments.map((seg, i) => {
+    const n = i + 1;
+    if (seg.kind === "dialogue") {
+      const q = locale === "de" ? `„${seg.text}"` : `"${seg.text}"`;
+      return locale === "de"
+        ? `(${n}) Dialog: ${q}`
+        : `(${n}) dialogue: ${q}`;
+    }
+    return locale === "de"
+      ? `(${n}) Handlung: ${seg.text}`
+      : `(${n}) action: ${seg.text}`;
+  });
+
+  if (locale === "de") {
+    return `[Steuerung: Die Spieler-Nachricht direkt darüber kombiniert Handlung und Dialog in dieser Reihenfolge: ${parts.join("; ")}. Alles fließend in die laufende Szene einweben — jede Dialogzeile unter <<speaker:protagonist>>; kein Szene-Reset. Natürliche Pause am Ende.]`;
+  }
+  return `[Steering: The player message directly above combines action and dialogue in this order: ${parts.join("; ")}. Weave everything into the live scene — each dialogue line under <<speaker:protagonist>>; no scene reset. End at a natural pause.]`;
+}
+
 /** Light continuation hint appended after the steering bubble (keeps flow; bubble stays in history). */
 export function buildSteeringContinuationPrompt(
   display: string,
@@ -125,6 +294,20 @@ export function buildSteeringContinuationPrompt(
     const id = reactionIdFromDisplay(display);
     if (id) return buildReactionSteeringPrompt(id, storyLocale);
   }
+
+  const locale = normalizeStoryLocale(storyLocale) as StoryContentLocale;
+  const parsed = parseSteeringInput(display, "auto", locale);
+  if (parsed && parsed.segments.length > 1) {
+    return buildMixedSteeringPrompt(parsed.segments, storyLocale);
+  }
+  if (parsed?.segments.length === 1) {
+    const seg = parsed.segments[0];
+    if (seg.kind === "dialogue") {
+      return buildDialogueSteeringPrompt(seg.text, storyLocale);
+    }
+    return buildActionSteeringPrompt(seg.text, storyLocale);
+  }
+
   if (kind === "dialogue") {
     return buildDialogueSteeringPrompt(
       normalizeSteeringDialogueInput(display),
@@ -200,8 +383,8 @@ export function steeringInputPlaceholder(
       : "What do you do? e.g. walk to the door …";
   }
   return locale === "de"
-    ? 'Sagen (mit „…") oder Handlung …'
-    : "Say (in quotes) or describe an action …";
+    ? 'Handlung und „Dialog" beliebig mischen — 💬/⚡ fügen Anführungszeichen oder ⚡ ein'
+    : 'Mix action and "dialogue" freely — 💬/⚡ insert quotes or ⚡';
 }
 
 
@@ -306,29 +489,34 @@ export function repairAssistantReplyForSteering(
   raw: string,
   steeringDisplay: string,
   storyLocale?: string | null,
+  dialogueLines?: string[] | null,
 ): string {
   let text = stripGameMetaLeaks(preprocessAssistantMarkup(raw));
-  if (classifySteeringDisplay(steeringDisplay) !== "dialogue") {
-    return text;
-  }
-
-  const line = normalizeSteeringDialogueInput(steeringDisplay);
-  if (!line) return text;
-
-  if (protagonistBlockContainsLine(text, line)) {
-    return removeOrphanDuplicateQuoteLines(text, line, storyLocale);
-  }
-
   const locale = normalizeStoryLocale(storyLocale);
-  const quoted = locale === "de" ? `„${line}"` : `"${line}"`;
-  const injection =
-    locale === "de"
-      ? `<<speaker:protagonist>>\n${quoted}\n\n`
-      : `<<speaker:protagonist>>\n${quoted}\n\n`;
 
-  return removeOrphanDuplicateQuoteLines(
-    injection + text,
-    line,
-    storyLocale,
-  );
+  const lines =
+    dialogueLines?.map((l) => l.trim()).filter(Boolean) ??
+    parseSteeringInput(steeringDisplay, "auto", locale)?.dialogueLines ??
+    [];
+
+  if (!lines.length) {
+    const kind = classifySteeringDisplay(steeringDisplay);
+    if (kind !== "dialogue") return text;
+    const single = normalizeSteeringDialogueInput(steeringDisplay);
+    if (!single) return text;
+    lines.push(single);
+  }
+
+  for (const line of lines) {
+    text = removeOrphanDuplicateQuoteLines(text, line, storyLocale);
+  }
+
+  const missing = lines.filter((line) => !protagonistBlockContainsLine(text, line));
+  if (!missing.length) return text;
+
+  const quoted = missing
+    .map((line) => (locale === "de" ? `„${line}"` : `"${line}"`))
+    .join("\n");
+  const injection = `<<speaker:protagonist>>\n${quoted}\n\n`;
+  return injection + text;
 }

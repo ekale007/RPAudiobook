@@ -10,11 +10,9 @@ import { MobileCollapsibleTools } from "@/components/MobileCollapsibleTools";
 import { ChatSteeringBar } from "@/components/ChatSteeringBar";
 import { StoryBeatPicker } from "@/components/StoryBeatPicker";
 import {
-  classifySteeringDisplay,
-  formatSteeringActionUserTurn,
-  formatSteeringDialogueUserTurn,
   formatSteeringReactionUserTurn,
-  normalizeSteeringDialogueInput,
+  formatSteeringUserTurnContent,
+  parseSteeringInput,
   steeringInputPlaceholder,
   stripSteeringTurnPrefix,
   type QuickReactionId,
@@ -721,12 +719,14 @@ export function ChatView({
     steeringMeta?: {
       display?: string | null;
       dialogueLine?: string | null;
+      dialogueLines?: string[] | null;
     },
   ) => {
     await truncateTurnsFrom(chapterId, startIndex, storyId);
     const blocks = parseAssistantBlocks(full, {
       steeringDisplay: steeringMeta?.display,
       steeringDialogueLine: steeringMeta?.dialogueLine,
+      steeringDialogueLines: steeringMeta?.dialogueLines,
       storyLocale,
     });
     const inserted = await appendTurn(
@@ -803,6 +803,7 @@ export function ChatView({
       /** Last steering bubble text — repair protagonist line in reply. */
       steeringDisplay?: string | null;
       steeringDialogueLine?: string | null;
+      steeringDialogueLines?: string[] | null;
     } = {},
   ): Promise<boolean> => {
     const settings = loadOpenRouterSettings();
@@ -881,6 +882,7 @@ export function ChatView({
         {
           display: opts.steeringDisplay,
           dialogueLine: opts.steeringDialogueLine,
+          dialogueLines: opts.steeringDialogueLines,
         },
       );
     } catch (e) {
@@ -967,6 +969,7 @@ export function ChatView({
       suppressTts?: boolean;
       steeringDisplay?: string;
       steeringDialogueLine?: string;
+      steeringDialogueLines?: string[];
     },
   ) => {
     if (generating || autoSession || readOnly || !turns.length) return;
@@ -988,6 +991,7 @@ export function ChatView({
         (opts?.steeringDisplay ??
           stripSteeringTurnPrefix(userTurnContent).trim()) || null,
       steeringDialogueLine: opts?.steeringDialogueLine ?? null,
+      steeringDialogueLines: opts?.steeringDialogueLines ?? null,
     });
   };
 
@@ -1005,30 +1009,15 @@ export function ChatView({
     setError(null);
 
     if (steeringMode) {
-      let bubble: string;
-      let steeringDisplay: string;
-      let steeringDialogueLine: string | undefined;
-
-      if (steeringInputMode === "say") {
-        const line = normalizeSteeringDialogueInput(text);
-        if (!line) return;
-        bubble = formatSteeringDialogueUserTurn(line, storyLocale);
-        steeringDisplay = stripSteeringTurnPrefix(bubble);
-        steeringDialogueLine = line;
-      } else if (steeringInputMode === "act") {
-        bubble = formatSteeringActionUserTurn(text, storyLocale);
-        steeringDisplay = stripSteeringTurnPrefix(bubble);
-      } else if (classifySteeringDisplay(text) === "dialogue") {
-        const line = normalizeSteeringDialogueInput(text);
-        bubble = formatSteeringDialogueUserTurn(line, storyLocale);
-        steeringDisplay = stripSteeringTurnPrefix(bubble);
-        steeringDialogueLine = line;
-      } else {
-        bubble = formatSteeringActionUserTurn(text, storyLocale);
-        steeringDisplay = stripSteeringTurnPrefix(bubble);
-      }
-
-      await sendSteering(bubble, { steeringDisplay, steeringDialogueLine });
+      const parsed = parseSteeringInput(text, steeringInputMode, storyLocale);
+      if (!parsed) return;
+      const bubble = formatSteeringUserTurnContent(parsed.display);
+      await sendSteering(bubble, {
+        steeringDisplay: parsed.display,
+        steeringDialogueLine: parsed.dialogueLines[0],
+        steeringDialogueLines: parsed.dialogueLines,
+      });
+      setSteeringInputMode("auto");
       return;
     }
 

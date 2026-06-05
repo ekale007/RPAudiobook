@@ -1,10 +1,9 @@
 "use client";
 
 import { useLayoutEffect, useRef, type ReactNode } from "react";
-import {
-  emptyDialogueInput,
-  type QuickReactionId,
-  type SteeringInputMode,
+import type {
+  QuickReactionId,
+  SteeringInputMode,
 } from "@/lib/chat/playerSteering";
 import { normalizeStoryContentLocale } from "@/lib/story/protagonist";
 
@@ -71,20 +70,39 @@ export function ChatSteeringBar({
     el.setSelectionRange(pos, pos);
   }, [input]);
 
+  const insertAtCursor = (snippet: string, cursorAfter: number) => {
+    const el = textareaRef.current;
+    if (!el) {
+      onInputChange(input ? `${input}${snippet}` : snippet);
+      pendingDialogueCursor.current = (input?.length ?? 0) + cursorAfter;
+      return;
+    }
+    const start = el.selectionStart ?? input.length;
+    const end = el.selectionEnd ?? input.length;
+    const next = input.slice(0, start) + snippet + input.slice(end);
+    pendingDialogueCursor.current = start + cursorAfter;
+    onInputChange(next);
+  };
+
   const handleSay = () => {
     if (!expanded) onEnsureExpanded?.();
     onSteeringInputModeChange?.("say");
-    const { text, cursor } = emptyDialogueInput(contentLocale);
-    pendingDialogueCursor.current = cursor;
-    onInputChange(text);
+    const open = de ? "„" : '"';
+    const close = de ? '"' : '"';
+    insertAtCursor(`${open}${close}`, open.length);
   };
 
   const handleAct = () => {
     if (!expanded) onEnsureExpanded?.();
     onSteeringInputModeChange?.("act");
-    if (/^„"?$/.test(input.trim()) || input.trim() === '""') {
-      onInputChange("");
+    const prefix = "⚡ ";
+    const el = textareaRef.current;
+    const atStart = !el || el.selectionStart === 0;
+    if (atStart && !input.trimStart().startsWith("⚡")) {
+      insertAtCursor(prefix, prefix.length);
+      return;
     }
+    insertAtCursor(prefix, prefix.length);
   };
 
   const modeBtnClass = (mode: SteeringInputMode) =>
@@ -199,8 +217,8 @@ export function ChatSteeringBar({
         {steeringMode ? (
           <p className="text-center text-[10px] leading-snug text-zinc-600">
             {de
-              ? "Sagen, Tun oder Reaktion — wird per KI in die nächste Szene eingebunden (eigene Blase)."
-              : "Say, act, or react — converted into the next scene (own bubble)."}
+              ? "Handlung und „Dialog" beliebig kombinieren — 💬 setzt Anführungszeichen, ⚡ eine Handlung."
+              : 'Mix action and "dialogue" freely — 💬 inserts quotes, ⚡ an action beat.'}
           </p>
         ) : null}
       </div>

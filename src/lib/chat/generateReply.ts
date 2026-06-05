@@ -88,6 +88,7 @@ export type ParseAssistantBlocksOpts = {
   /** When set, enforce steering dialogue under <<speaker:protagonist>> and strip quest UI. */
   steeringDisplay?: string | null;
   steeringDialogueLine?: string | null;
+  steeringDialogueLines?: string[] | null;
   storyLocale?: string | null;
 };
 
@@ -99,14 +100,24 @@ export function parseAssistantBlocks(
   speakerSlug: string;
   content: string;
 }> {
-  const repairDisplay =
-    opts?.steeringDialogueLine?.trim() ||
+  const dialogueLines =
+    opts?.steeringDialogueLines?.map((l) => l.trim()).filter(Boolean) ??
+    (opts?.steeringDialogueLine?.trim()
+      ? [opts.steeringDialogueLine.trim()]
+      : []);
+
+  const needsRepair =
+    dialogueLines.length > 0 ||
     (opts?.steeringDisplay?.trim() &&
-    classifySteeringDisplay(opts.steeringDisplay) === "dialogue"
-      ? opts.steeringDisplay
-      : null);
-  const body = repairDisplay
-    ? repairAssistantReplyForSteering(full, repairDisplay, opts?.storyLocale)
+      classifySteeringDisplay(opts.steeringDisplay) === "dialogue");
+
+  const body = needsRepair
+    ? repairAssistantReplyForSteering(
+        full,
+        opts?.steeringDisplay?.trim() ?? dialogueLines[0] ?? "",
+        opts?.storyLocale,
+        dialogueLines.length ? dialogueLines : null,
+      )
     : stripGameMetaLeaks(preprocessAssistantMarkup(full));
   const cleaned = ensureSpeakerScript(body);
   return [{ speakerSlug: "narrator", content: cleaned }];

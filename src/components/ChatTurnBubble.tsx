@@ -256,17 +256,22 @@ export function ChatTurnBubble({
           </p>
         ) : turn.role === "user" && steeringTurn ? (
           <p className="mb-1 text-xs font-medium text-violet-300/90">
-            {displayContent.trim().startsWith("⚡")
+            {displayContent.includes("⚡") &&
+            (displayContent.includes("„") || displayContent.includes('"'))
               ? contentLocale === "de"
-                ? "Steuerung · Handlung"
-                : "Steering · action"
-              : displayContent.includes("„") || displayContent.includes('"')
+                ? "Steuerung · Handlung + Dialog"
+                : "Steering · action + dialogue"
+              : displayContent.trim().startsWith("⚡")
                 ? contentLocale === "de"
-                  ? "Steuerung · Dialog"
-                  : "Steering · dialogue"
-                : contentLocale === "de"
-                  ? "Steuerung"
-                  : "Steering"}
+                  ? "Steuerung · Handlung"
+                  : "Steering · action"
+                : displayContent.includes("„") || displayContent.includes('"')
+                  ? contentLocale === "de"
+                    ? "Steuerung · Dialog"
+                    : "Steering · dialogue"
+                  : contentLocale === "de"
+                    ? "Steuerung"
+                    : "Steering"}
           </p>
         ) : turn.role === "assistant" ? (
           <p className="mb-1 text-xs font-medium text-zinc-500">
