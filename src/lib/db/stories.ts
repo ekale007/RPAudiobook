@@ -21,6 +21,32 @@ import {
 import { getLibraryTemplateId } from "@/lib/story/storyOrigin";
 import { defaultElevenVoiceMap } from "@/lib/tts/elevenLabsVoices";
 import { normalizeStoryLocale } from "@/lib/tts/ttsLocaleRouting";
+import {
+  applyLocalCharacterMemoryUpdates,
+  appendLocalAssistantBlocks,
+  appendLocalTurn,
+  createLocalNextChapter,
+  createLocalStoryFromSeedPack,
+  deleteLocalStory,
+  getLocalStoryBundle,
+  getLocalTurns,
+  isLocalEntityId,
+  isLocalStoryId,
+  listLocalStories,
+  setLocalStoryArchived,
+  shouldStoreStoryLocally,
+  touchLocalStoryUpdated,
+  updateLocalBandSummary,
+  updateLocalChapterSummaries,
+  updateLocalChapterTitle,
+  updateLocalStoryLocale,
+  updateLocalStorySettings,
+  updateLocalStoryTitle,
+  createLocalCastCharacter,
+  listLocalLorebooksForStory,
+  updateLocalCharacterCard,
+  updateLocalStoryLorebook,
+} from "@/lib/db/localStories";
 
 export interface StoryRow {
   id: string;
@@ -73,22 +99,27 @@ export function parseStorySettings(raw: unknown): StorySettings {
 }
 
 export async function listStories(includeArchived = false): Promise<StoryRow[]> {
+  const local = await listLocalStories(includeArchived);
   const supabase = createClient();
   const { data, error } = await supabase
     .from("stories")
     .select("id, title, locale, settings, cover_storage_path")
     .order("updated_at", { ascending: false });
   if (error) throw error;
-  const rows = (data ?? []) as StoryRow[];
-  return includeArchived
-    ? rows
-    : rows.filter((r) => !isStoryArchived(r.settings));
+  const cloud = (includeArchived
+    ? (data ?? [])
+    : (data ?? []).filter((r) => !isStoryArchived(r.settings))) as StoryRow[];
+  return [...local, ...cloud];
 }
 
 export async function setStoryArchived(
   storyId: string,
   archived: boolean,
 ): Promise<void> {
+  if (isLocalStoryId(storyId)) {
+    await setLocalStoryArchived(storyId, archived);
+    return;
+  }
   const supabase = createClient();
   const { data: row, error: fetchErr } = await supabase
     .from("stories")
@@ -111,6 +142,10 @@ export async function setStoryArchived(
 }
 
 export async function deleteStory(storyId: string): Promise<void> {
+  if (isLocalStoryId(storyId)) {
+    await deleteLocalStory(storyId);
+    return;
+  }
   const supabase = createClient();
   const { error } = await supabase.from("stories").delete().eq("id", storyId);
   if (error) throw error;
@@ -120,6 +155,10 @@ export async function updateStoryLocale(
   storyId: string,
   locale: "de" | "en",
 ): Promise<void> {
+  if (isLocalStoryId(storyId)) {
+    await updateLocalStoryLocale(storyId, locale);
+    return;
+  }
   const supabase = createClient();
   const { error } = await supabase
     .from("stories")
@@ -134,6 +173,10 @@ export async function updateStoryTitle(
 ): Promise<void> {
   const trimmed = title.trim();
   if (!trimmed) throw new Error("Story title cannot be empty");
+  if (isLocalStoryId(storyId)) {
+    await updateLocalStoryTitle(storyId, trimmed);
+    return;
+  }
   const supabase = createClient();
   const { error } = await supabase
     .from("stories")
@@ -159,6 +202,9 @@ export interface CreateStoryFromPackOptions {
 export async function createStoryFromSeedPack(
   opts: CreateStoryFromPackOptions,
 ): Promise<{ storyId: string; chapterId: string }> {
+  if (shouldStoreStoryLocally(opts.storyOrigin)) {
+    return createLocalStoryFromSeedPack(opts);
+  }
   const supabase = createClient();
   const {
     userId,
@@ -379,6 +425,9 @@ export async function updateStorySettings(
   storyId: string,
   patch: Partial<StorySettings>,
 ): Promise<StorySettings> {
+  if (isLocalStoryId(storyId)) {
+    return updateLocalStorySettings(storyId, patch);
+  }
   const supabase = createClient();
   const { data: row, error: fetchErr } = await supabase
     .from("stories")
@@ -400,6 +449,10 @@ export async function updateStorySettings(
 }
 
 export async function touchStoryUpdated(storyId: string): Promise<void> {
+  if (isLocalStoryId(storyId)) {
+    await touchLocalStoryUpdated(storyId);
+    return;
+  }
   const supabase = createClient();
   await supabase
     .from("stories")
@@ -407,7 +460,7 @@ export async function touchStoryUpdated(storyId: string): Promise<void> {
     .eq("id", storyId);
 }
 
-function mapCharacterRow(c: Record<string, unknown>): CharacterRow {
+export function mapCharacterRow(c: Record<string, unknown>): CharacterRow {
   return {
     id: c.id as string,
     slug: c.slug as string,
@@ -433,6 +486,10 @@ export async function getStoryOverview(storyId: string) {
 }
 
 export async function listCharacters(storyId: string): Promise<CharacterRow[]> {
+  if (isLocalStoryId(storyId)) {
+    const { listLocalCharacters } = await import("@/lib/db/localStories");
+    return listLocalCharacters(storyId);
+  }
   const supabase = createClient();
   const { data, error } = await supabase
     .from("characters")
@@ -451,6 +508,14 @@ export async function applyCharacterMemoryUpdates(
   updates: CharacterMemoryUpdate[],
   chapterId?: string,
 ): Promise<CharacterRow[]> {
+  if (isLocalStoryId(storyId)) {
+    return applyLocalCharacterMemoryUpdates(
+      storyId,
+      userId,
+      updates,
+      chapterId,
+    );
+  }
   const supabase = createClient();
   const existing = await listCharacters(storyId);
 
@@ -514,6 +579,9 @@ export async function createCastCharacter(
     first_seen_chapter_id?: string | null;
   },
 ): Promise<CharacterRow> {
+  if (isLocalStoryId(storyId)) {
+    return createLocalCastCharacter(storyId, userId, payload);
+  }
   const supabase = createClient();
   const slug = payload.slug.trim().toLowerCase().replace(/_/g, "-");
   const name = payload.name.trim() || "Figur";
@@ -579,6 +647,10 @@ export async function updateStoryLorebook(
   storyId: string,
   book: StoryLorebook,
 ): Promise<void> {
+  if (isLocalStoryId(storyId)) {
+    await updateLocalStoryLorebook(lorebookId, storyId, book);
+    return;
+  }
   const supabase = createClient();
   const { error } = await supabase
     .from("lorebooks")
@@ -596,6 +668,10 @@ export async function updateCharacterCard(
   storyId: string,
   card: StoryCharacterCard,
 ): Promise<void> {
+  if (isLocalStoryId(storyId)) {
+    await updateLocalCharacterCard(characterId, storyId, card);
+    return;
+  }
   const supabase = createClient();
   const name = card.name?.trim() || "Character";
   const { error } = await supabase
@@ -608,6 +684,9 @@ export async function updateCharacterCard(
 }
 
 export async function listLorebooksForStory(storyId: string) {
+  if (isLocalStoryId(storyId)) {
+    return listLocalLorebooksForStory(storyId);
+  }
   const supabase = createClient();
   const { data: links, error: lErr } = await supabase
     .from("story_lorebooks")
@@ -628,6 +707,9 @@ export async function getStoryBundle(
   storyId: string,
   preferredChapterId?: string,
 ) {
+  if (isLocalStoryId(storyId)) {
+    return getLocalStoryBundle(storyId, preferredChapterId);
+  }
   const supabase = createClient();
 
   const { data: story, error: sErr } = await supabase
@@ -711,6 +793,9 @@ export async function getStoryBundle(
 }
 
 export async function getTurns(chapterId: string): Promise<TurnRow[]> {
+  if (isLocalEntityId(chapterId)) {
+    return getLocalTurns(chapterId);
+  }
   const supabase = createClient();
   const { data, error } = await supabase
     .from("turns")
@@ -730,6 +815,17 @@ export async function appendTurn(
   speakerSlug?: string | null,
   costs?: { llmCostCents?: number; ttsCostCents?: number },
 ): Promise<TurnRow> {
+  if (isLocalEntityId(chapterId)) {
+    return appendLocalTurn(
+      chapterId,
+      index,
+      role,
+      content,
+      storyId,
+      speakerSlug,
+      costs,
+    );
+  }
   const supabase = createClient();
   const row: Record<string, unknown> = {
     chapter_id: chapterId,
@@ -781,6 +877,10 @@ export async function updateChapterSummaries(
     closed_at?: string;
   },
 ): Promise<void> {
+  if (isLocalEntityId(chapterId)) {
+    await updateLocalChapterSummaries(chapterId, patch);
+    return;
+  }
   const supabase = createClient();
   const { error } = await supabase
     .from("chapters")
@@ -793,6 +893,10 @@ export async function updateChapterTitle(
   chapterId: string,
   title: string,
 ): Promise<void> {
+  if (isLocalEntityId(chapterId)) {
+    await updateLocalChapterTitle(chapterId, title);
+    return;
+  }
   const supabase = createClient();
   const { error } = await supabase
     .from("chapters")
@@ -824,6 +928,9 @@ export async function createNextChapter(
   title: string,
   phaseHint?: string,
 ): Promise<ChapterRow> {
+  if (isLocalEntityId(bandId)) {
+    return createLocalNextChapter(bandId, index, title, phaseHint);
+  }
   const supabase = createClient();
   const { data, error } = await supabase
     .from("chapters")
@@ -922,6 +1029,10 @@ export async function updateBandSummary(
   bandId: string,
   summary: string,
 ): Promise<void> {
+  if (isLocalEntityId(bandId)) {
+    await updateLocalBandSummary(bandId, summary);
+    return;
+  }
   const supabase = createClient();
   const { error } = await supabase
     .from("bands")

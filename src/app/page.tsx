@@ -157,12 +157,20 @@ export default function HomePage() {
       <AppHeader
         title="HörbuchKI"
         centerSlot={
-          <Link
-            href="/story/new"
-            className="whitespace-nowrap rounded-full bg-accent px-3 py-1.5 text-[11px] font-semibold text-black shadow-sm sm:px-4 sm:text-xs"
-          >
-            + Neue Story
-          </Link>
+          <div className="flex items-center gap-1.5">
+            <Link
+              href="/story/import"
+              className="whitespace-nowrap rounded-full border border-surface-border px-2.5 py-1.5 text-[10px] font-medium text-zinc-300 sm:px-3 sm:text-[11px]"
+            >
+              EPUB
+            </Link>
+            <Link
+              href="/story/new"
+              className="whitespace-nowrap rounded-full bg-accent px-3 py-1.5 text-[11px] font-semibold text-black shadow-sm sm:px-4 sm:text-xs"
+            >
+              + Neue Story
+            </Link>
+          </div>
         }
       />
       <div className="flex flex-1 flex-col overflow-y-auto px-3 pb-8 pt-3 sm:px-4">

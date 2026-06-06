@@ -335,7 +335,8 @@ export default function NewStoryEditorPage() {
       <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-4 pb-10">
         <p className="text-sm text-zinc-400">
           Schrittweise per KI bauen oder alles auf einmal — jedes Feld hat einen
-          🎲-Randomizer für einen neuen Vorschlag.
+          🎲-Randomizer. Die fertige Story wird nur auf diesem Gerät gespeichert
+          (nicht in der Cloud).
         </p>
 
         <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
@@ -519,11 +520,16 @@ export default function NewStoryEditorPage() {
 
         <section className="rounded-xl border border-surface-border p-4 text-center">
           <p className="mb-2 text-xs text-zinc-500">
-            Oder aus der Bibliothek importieren
+            Oder EPUB / Bibliothek
           </p>
-          <Link href="/" className="text-sm text-accent underline">
-            Zur Startseite → When Dawn Breaks &amp; mehr
-          </Link>
+          <div className="flex flex-col gap-2">
+            <Link href="/story/import" className="text-sm text-accent underline">
+              Aus EPUB importieren →
+            </Link>
+            <Link href="/" className="text-sm text-zinc-500 underline">
+              Zur Startseite → Bibliothek
+            </Link>
+          </div>
         </section>
 
         {message ? (

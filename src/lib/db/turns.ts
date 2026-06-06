@@ -1,5 +1,11 @@
 import { createClient } from "@/lib/supabase/client";
 import {
+  isLocalEntityId,
+  patchLocalTurnCosts,
+  truncateLocalTurnsFrom,
+  updateLocalTurnContent,
+} from "@/lib/db/localStories";
+import {
   getTurns,
   touchStoryUpdated,
   type TurnRow,
@@ -31,6 +37,10 @@ export async function patchTurnCosts(
   patch: { llmCostCents?: number; ttsCostCents?: number },
   storyId?: string,
 ): Promise<void> {
+  if (isLocalEntityId(turnId)) {
+    await patchLocalTurnCosts(turnId, patch, storyId);
+    return;
+  }
   const supabase = createClient();
   const row: Record<string, number> = {};
   if (patch.llmCostCents != null && patch.llmCostCents >= 0) {
@@ -50,6 +60,10 @@ export async function updateTurnContent(
   content: string,
   storyId?: string,
 ): Promise<void> {
+  if (isLocalEntityId(turnId)) {
+    await updateLocalTurnContent(turnId, content, storyId);
+    return;
+  }
   const supabase = createClient();
   const { data: row } = await supabase
     .from("turns")
@@ -75,6 +89,9 @@ export async function truncateTurnsFrom(
   fromIndex: number,
   storyId?: string,
 ): Promise<TurnRow[]> {
+  if (isLocalEntityId(chapterId)) {
+    return truncateLocalTurnsFrom(chapterId, fromIndex, storyId);
+  }
   const supabase = createClient();
   const all = await getTurns(chapterId);
   const victims = all.filter((t) => t.index_in_chapter >= fromIndex);

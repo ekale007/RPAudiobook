@@ -4,11 +4,15 @@ import {
 } from "@/lib/story/libraryTemplates";
 import type { StoryCharacterCard } from "@/lib/types";
 
-export type StoryOrigin = "personal" | "library" | "editor";
+export type StoryOrigin = "personal" | "library" | "editor" | "epub";
 
 export function getStoryOrigin(settings: unknown): StoryOrigin {
   const o = (settings ?? {}) as { storyOrigin?: unknown };
-  if (o.storyOrigin === "library" || o.storyOrigin === "editor") {
+  if (
+    o.storyOrigin === "library" ||
+    o.storyOrigin === "editor" ||
+    o.storyOrigin === "epub"
+  ) {
     return o.storyOrigin;
   }
   return "personal";
@@ -25,6 +29,10 @@ export function storyOriginLabel(origin: StoryOrigin): string {
       return "Bibliothek";
     case "editor":
       return "Editor";
+    case "epub":
+      return "EPUB · lokal";
+    case "editor":
+      return "Editor · lokal";
     default:
       return "Eigene";
   }

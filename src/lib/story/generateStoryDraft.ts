@@ -172,31 +172,7 @@ export function draftToSeedPack(draft: StoryDraft): StorySeedPack {
   };
 }
 
-export async function generateStoryDraft(
-  settings: OpenRouterSettings,
-  input: StoryDraftInput,
-  signal?: AbortSignal,
-): Promise<StoryDraft> {
-  const lang =
-    input.locale === "de"
-      ? "German (de). Write character cards and lore in German unless the concept is explicitly English."
-      : "English (en). Write character cards and lore in English.";
-
-  const userBrief = [
-    `Concept: ${input.concept.trim()}`,
-    input.genre?.trim() ? `Genre: ${input.genre.trim()}` : null,
-    input.tone?.trim() ? `Tone: ${input.tone.trim()}` : null,
-    `Language: ${lang}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const raw = await completeOpenRouter(
-    settings,
-    [
-      {
-        role: "system",
-        content: `You are a story bible designer for an interactive audiobook RPG app (character cards + lorebook JSON).
+const STORY_DRAFT_SYSTEM_PROMPT = `You are a story bible designer for an interactive audiobook RPG app (character cards + lorebook JSON).
 
 Design ONE cohesive story package:
 - Exactly 1 narrator character (role narrator) with rich system_prompt, first_mes opening scene (800-1500 words for narrator), second-person if appropriate.
@@ -205,8 +181,29 @@ Design ONE cohesive story package:
 - Slugs: lowercase kebab-case, narrator slug must be "narrator".
 - No duplicate slugs. Avoid generic slugs like hidden-community unless it is a real speaking NPC.
 
-Output JSON only matching the schema.`,
-      },
+Output JSON only matching the schema.`;
+
+export function storyDraftLangLine(locale: "de" | "en"): string {
+  return locale === "de"
+    ? "German (de). Write character cards and lore in German unless the concept is explicitly English."
+    : "English (en). Write character cards and lore in English.";
+}
+
+export async function generateStoryDraftFromBrief(
+  settings: OpenRouterSettings,
+  locale: "de" | "en",
+  userBrief: string,
+  systemExtra?: string,
+  signal?: AbortSignal,
+): Promise<StoryDraft> {
+  const system = systemExtra
+    ? `${STORY_DRAFT_SYSTEM_PROMPT}\n\n${systemExtra}`
+    : STORY_DRAFT_SYSTEM_PROMPT;
+
+  const raw = await completeOpenRouter(
+    settings,
+    [
+      { role: "system", content: system },
       { role: "user", content: userBrief },
     ],
     {
@@ -224,5 +221,28 @@ Output JSON only matching the schema.`,
     },
   );
 
-  return parseStoryDraftJson(raw, input.locale);
+  return parseStoryDraftJson(raw, locale);
+}
+
+export async function generateStoryDraft(
+  settings: OpenRouterSettings,
+  input: StoryDraftInput,
+  signal?: AbortSignal,
+): Promise<StoryDraft> {
+  const userBrief = [
+    `Concept: ${input.concept.trim()}`,
+    input.genre?.trim() ? `Genre: ${input.genre.trim()}` : null,
+    input.tone?.trim() ? `Tone: ${input.tone.trim()}` : null,
+    `Language: ${storyDraftLangLine(input.locale)}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return generateStoryDraftFromBrief(
+    settings,
+    input.locale,
+    userBrief,
+    undefined,
+    signal,
+  );
 }
