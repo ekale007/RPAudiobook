@@ -8,6 +8,7 @@ import {
   CHAPTER_INTRO_OPTIONS,
   getLastAssistantTurn,
   getTrailingAssistantTurns,
+  polishChapterIntroText,
   previewText,
   resolveChapterIntro,
   type ChapterIntroMode,
@@ -47,6 +48,8 @@ export default function ChapterManagePage() {
   >(null);
   const [introMode, setIntroMode] = useState<ChapterIntroMode>("ai_bridge");
   const [customIntro, setCustomIntro] = useState("");
+  const [storyLocale, setStoryLocale] = useState<"de" | "en">("de");
+  const [introAiBusy, setIntroAiBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -62,6 +65,7 @@ export default function ChapterManagePage() {
           setActiveChapterId(b.activeChapter.id);
           setChapterTitle(b.activeChapter.title);
           setBandId(b.band.id as string);
+          setStoryLocale(b.story.locale === "en" ? "en" : "de");
           const idx =
             Math.max(...b.chapters.map((c) => c.index_in_band), 0) + 1;
           setNextIndex(idx);
@@ -88,6 +92,36 @@ export default function ChapterManagePage() {
         : null,
     };
   }, [priorTurns]);
+
+  const polishCustomIntro = async () => {
+    if (!customIntro.trim()) {
+      setStatus("Zuerst einen Entwurf eingeben — die KI optimiert deinen Text.");
+      return;
+    }
+    const settings = loadOpenRouterSettings();
+    if (!settings) {
+      setStatus("OpenRouter-Key in Settings eintragen (für KI-Optimierung).");
+      return;
+    }
+    const last = getLastAssistantTurn(priorTurns);
+    setIntroAiBusy(true);
+    setStatus(null);
+    try {
+      const polished = await polishChapterIntroText(settings, {
+        text: customIntro,
+        locale: storyLocale,
+        previousChapterTitle: chapterTitle.trim() || undefined,
+        nextChapterTitle: nextTitle.trim() || undefined,
+        lastSceneExcerpt: last?.content ?? null,
+      });
+      setCustomIntro(polished);
+      setStatus("Eröffnung optimiert — bei Bedarf anpassen und Kapitel schließen.");
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIntroAiBusy(false);
+    }
+  };
 
   const closeChapter = async () => {
     if (!activeChapterId || !bandId) return;
@@ -258,16 +292,31 @@ export default function ChapterManagePage() {
         </fieldset>
 
         {introMode === "custom" ? (
-          <>
-            <label className="text-xs text-zinc-500">Eigene Eröffnung</label>
+          <label className="block text-xs text-zinc-500">
+            <span className="mb-1 flex items-center justify-between gap-2">
+              <span>Eigene Eröffnung</span>
+              <button
+                type="button"
+                disabled={busy || introAiBusy || !customIntro.trim()}
+                onClick={() => void polishCustomIntro()}
+                title="KI: Entwurf stilistisch optimieren (Inhalt bleibt erhalten)"
+                className="shrink-0 rounded-md border border-violet-800/60 bg-violet-950/40 px-2 py-0.5 text-[10px] font-medium text-violet-200 disabled:opacity-40"
+              >
+                {introAiBusy ? "…" : "🎲 KI"}
+              </button>
+            </span>
             <textarea
               value={customIntro}
               onChange={(e) => setCustomIntro(e.target.value)}
               rows={5}
               placeholder="Erzähler-Text für den Start des neuen Kapitels …"
-              className="rounded-xl border border-surface-border bg-surface-raised px-3 py-2 text-base"
+              disabled={busy || introAiBusy}
+              className="w-full rounded-xl border border-surface-border bg-surface-raised px-3 py-2 text-base disabled:opacity-60"
             />
-          </>
+            <span className="mt-1 block text-[10px] text-zinc-600">
+              Entwurf eingeben, dann 🎲 KI — wie bei Story erstellen.
+            </span>
+          </label>
         ) : null}
 
         <button

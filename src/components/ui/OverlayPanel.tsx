@@ -9,6 +9,7 @@ export function OverlayPanel({
   children,
   wide,
   blocking = false,
+  hideClose = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -17,6 +18,7 @@ export function OverlayPanel({
   wide?: boolean;
   /** When true, backdrop click and Escape do not close. */
   blocking?: boolean;
+  hideClose?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -61,14 +63,18 @@ export function OverlayPanel({
           <h2 id="overlay-title" className="text-sm font-medium text-zinc-100">
             {title}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-2 py-1 text-lg leading-none text-zinc-500 hover:bg-surface-raised hover:text-zinc-300"
-            aria-label="Schließen"
-          >
-            ×
-          </button>
+          {hideClose ? (
+            <span className="w-7" aria-hidden />
+          ) : (
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg px-2 py-1 text-lg leading-none text-zinc-500 hover:bg-surface-raised hover:text-zinc-300"
+              aria-label="Schließen"
+            >
+              ×
+            </button>
+          )}
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
           {children}

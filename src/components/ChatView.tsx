@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  AutoChapterOverlay,
+  type AutoChapterOverlayPhase,
+} from "@/components/AutoChapterOverlay";
 import { GeneratingIndicator } from "@/components/GeneratingIndicator";
 import { BubbleNavArrows } from "@/components/BubbleNavArrows";
 import { ChatTurnBubble } from "@/components/ChatTurnBubble";
@@ -189,6 +194,15 @@ export function ChatView({
   const beatsAbortRef = useRef<AbortController | null>(null);
   const autoPlayRemainingRef = useRef(0);
   const autoChapterBusyRef = useRef(false);
+  const autoChapterDeferredRef = useRef<string | null>(null);
+  const autoChapterPhaseRef = useRef<AutoChapterOverlayPhase | null>(null);
+  const router = useRouter();
+  const [autoChapterPhase, setAutoChapterPhase] =
+    useState<AutoChapterOverlayPhase | null>(null);
+  const [autoChapterStatus, setAutoChapterStatus] = useState<string | null>(
+    null,
+  );
+  const [autoChapterRows, setAutoChapterRows] = useState<TurnRow[]>([]);
   const autoSessionRef = useRef(false);
   const autoSessionStopRef = useRef(false);
   const drivePausedRef = useRef(false);
@@ -201,6 +215,22 @@ export function ChatView({
   useEffect(() => {
     autoSessionRef.current = autoSession;
   }, [autoSession]);
+
+  useEffect(() => {
+    autoChapterPhaseRef.current = autoChapterPhase;
+  }, [autoChapterPhase]);
+
+  useEffect(() => {
+    setAutoChapterPhase(null);
+    setAutoChapterStatus(null);
+    setAutoChapterRows([]);
+    if (
+      autoChapterDeferredRef.current &&
+      autoChapterDeferredRef.current !== chapterId
+    ) {
+      autoChapterDeferredRef.current = null;
+    }
+  }, [chapterId]);
   const memorySyncRef = useRef(false);
   const initialPlotSyncDone = useRef(false);
   const knownTurnIdsRef = useRef<Set<string>>(new Set());
@@ -623,14 +653,17 @@ export function ChatView({
     }
   };
 
-  const maybeAutoCreateChapter = useCallback(
+  const executeAutoChapterClose = useCallback(
     async (rows: TurnRow[]) => {
-      if (readOnly || autoChapterBusyRef.current) return false;
-      if (!shouldAutoCreateNextChapter(rows)) return false;
-
       const settings = loadOpenRouterSettings();
-      if (!settings) return false;
+      if (!settings) {
+        setError("OpenRouter-Key in Settings eintragen (für Kapitelübergang).");
+        setAutoChapterPhase(null);
+        return false;
+      }
+
       autoChapterBusyRef.current = true;
+      setAutoChapterPhase("running");
       setGenerating(true);
       setError(null);
 
@@ -643,6 +676,7 @@ export function ChatView({
           await updateChapterTitle(chapterId, currentTitle);
         }
 
+        setAutoChapterStatus("Plot-Stand wird gesichert …");
         const plot = await finalizeChapterPlotState({
           settings,
           storyId,
@@ -662,6 +696,7 @@ export function ChatView({
           speakerSlug: t.speaker_slug,
         }));
 
+        setAutoChapterStatus("Kapitel wird zusammengefasst …");
         const summary = await summarizeChapter(settings, chatTurns, currentTitle);
         await updateChapterSummaries(chapterId, {
           chapter_summary: summary,
@@ -673,6 +708,7 @@ export function ChatView({
           Math.max(...bundle.chapters.map((c) => c.index_in_band), 0) + 1;
         const nextTitle = `Chapter ${nextIndex}`;
 
+        setAutoChapterStatus("Eröffnung wird geschrieben …");
         const intro = await resolveChapterIntro("ai_bridge", {
           settings,
           priorTurns: rows,
@@ -682,6 +718,7 @@ export function ChatView({
           phaseHint: nextPhaseHint ?? null,
         });
 
+        setAutoChapterStatus("Nächstes Kapitel wird gestartet …");
         const newChapter = await createNextChapter(
           bundle.band.id as string,
           nextIndex,
@@ -700,14 +737,54 @@ export function ChatView({
         return true;
       } catch (e) {
         console.warn("Auto chapter creation failed:", e);
+        setError(
+          e instanceof Error ? e.message : "Kapitelübergang fehlgeschlagen.",
+        );
+        setAutoChapterPhase(null);
         return false;
       } finally {
         autoChapterBusyRef.current = false;
         setGenerating(false);
+        setAutoChapterStatus(null);
       }
     },
-    [readOnly, storyId, chapterId, chapterTitle, chapter.title, chapter.phase_hint, phaseHint, plotState],
+    [
+      storyId,
+      chapterId,
+      chapterTitle,
+      chapter.title,
+      chapter.phase_hint,
+      phaseHint,
+      plotState,
+    ],
   );
+
+  const maybeAutoCreateChapter = useCallback(
+    async (rows: TurnRow[]) => {
+      if (readOnly || autoChapterBusyRef.current) return false;
+      if (!shouldAutoCreateNextChapter(rows)) return false;
+      if (autoChapterDeferredRef.current === chapterId) return false;
+      if (autoChapterPhaseRef.current) return false;
+
+      setAutoChapterRows(rows);
+      setAutoChapterPhase("prompt");
+      return false;
+    },
+    [readOnly, chapterId],
+  );
+
+  const dismissAutoChapterPrompt = useCallback(() => {
+    autoChapterDeferredRef.current = chapterId;
+    setAutoChapterPhase(null);
+    setAutoChapterRows([]);
+  }, [chapterId]);
+
+  const openManualChapterTransition = useCallback(() => {
+    autoChapterDeferredRef.current = chapterId;
+    setAutoChapterPhase(null);
+    setAutoChapterRows([]);
+    router.push(`/story/${storyId}/chapter`);
+  }, [chapterId, router, storyId]);
 
   const persistAssistantReply = async (
     full: string,
@@ -1441,6 +1518,22 @@ export function ChatView({
         }
       : {};
 
+    if (autoChapterPhase === "running") {
+      return {
+        label: autoChapterStatus ?? "Kapitelübergang …",
+        onCancel: undefined,
+        onPause: undefined,
+        pauseLabel: undefined,
+      };
+    }
+    if (autoChapterPhase === "prompt") {
+      return {
+        label: "Kapitelübergang — Entscheidung offen",
+        onCancel: undefined,
+        onPause: undefined,
+        pauseLabel: undefined,
+      };
+    }
     if (generating) {
       return {
         label:
@@ -1498,9 +1591,12 @@ export function ChatView({
     pauseDriveMode,
     resumeDriveMode,
     stopTtsAutoplay,
+    autoChapterPhase,
+    autoChapterStatus,
   ]);
 
   const chapterLabel = chapterTitle ?? chapter.title;
+  const chapterTransitionOpen = autoChapterPhase != null;
 
   return (
     <div
@@ -1575,7 +1671,7 @@ export function ChatView({
             </div>
           ))}
 
-          {generating ? (
+          {generating && autoChapterPhase !== "running" ? (
             <div className="scroll-mt-3 scroll-mb-3 px-1">
               <GeneratingIndicator
                 label="Erzähler schreibt …"
@@ -1623,7 +1719,7 @@ export function ChatView({
             {hasTts ? (
               <TtsAutoplayToggle
                 enabled={ttsAutoplay}
-                disabled={generating || autoSession}
+                disabled={generating || autoSession || chapterTransitionOpen}
                 queueActive={ttsQueueActive}
                 onChange={(next) => {
                   setTtsAutoplay(next);
@@ -1664,7 +1760,9 @@ export function ChatView({
           </div>
           {!readOnly ? (
             <AutoPlayControls
-              disabled={generating || autoSession || turns.length === 0}
+              disabled={
+                generating || autoSession || chapterTransitionOpen || turns.length === 0
+              }
               onDriveStart={hasTts ? runDriveMode : undefined}
             />
           ) : null}
@@ -1675,7 +1773,9 @@ export function ChatView({
             {beatOptions?.length || beatsLoading ? (
               <div className="mb-2">
                 <StoryBeatPicker
-                  disabled={generating || autoSession || turns.length === 0}
+                  disabled={
+                    generating || autoSession || chapterTransitionOpen || turns.length === 0
+                  }
                   loading={beatsLoading}
                   options={beatOptions}
                   onRequestBeats={requestBeatSuggestions}
@@ -1699,8 +1799,10 @@ export function ChatView({
                 contentLocale,
                 steeringInputMode,
               )}
-              disabled={autoSession || readOnly || turns.length === 0}
-              generating={generating}
+              disabled={
+                autoSession || readOnly || chapterTransitionOpen || turns.length === 0
+              }
+              generating={generating && autoChapterPhase !== "running"}
               onCancel={cancelWork}
               locale={storyLocale}
               steeringMode={steeringMode}
@@ -1709,7 +1811,9 @@ export function ChatView({
             >
               {!beatOptions?.length && !beatsLoading ? (
                 <StoryBeatPicker
-                  disabled={generating || autoSession || turns.length === 0}
+                  disabled={
+                    generating || autoSession || chapterTransitionOpen || turns.length === 0
+                  }
                   loading={beatsLoading}
                   options={beatOptions}
                   onRequestBeats={requestBeatSuggestions}
@@ -1723,6 +1827,18 @@ export function ChatView({
           </>
         ) : null}
       </div>
+
+      {autoChapterPhase ? (
+        <AutoChapterOverlay
+          open
+          phase={autoChapterPhase}
+          rows={autoChapterRows}
+          status={autoChapterStatus}
+          onAutoContinue={() => void executeAutoChapterClose(autoChapterRows)}
+          onManualTransition={openManualChapterTransition}
+          onDismiss={dismissAutoChapterPrompt}
+        />
+      ) : null}
     </div>
   );
 }

@@ -107,6 +107,75 @@ export async function generateChapterBridgeIntro(
   });
 }
 
+/** Polish a user-written chapter opening (keeps intent, improves prose). */
+export async function polishChapterIntroText(
+  settings: OpenRouterSettings,
+  opts: {
+    text: string;
+    locale?: "de" | "en";
+    previousChapterTitle?: string;
+    nextChapterTitle?: string;
+    lastSceneExcerpt?: string | null;
+  },
+  signal?: AbortSignal,
+): Promise<string> {
+  const draft = opts.text.trim();
+  if (!draft) return "";
+
+  const locale = opts.locale ?? "de";
+  const lang =
+    locale === "de"
+      ? "Write in German unless the draft is clearly English."
+      : "Write in English unless the draft is clearly German.";
+
+  const raw = await completeOpenRouter(
+    settings,
+    [
+      {
+        role: "system",
+        content: `You polish opening narrator text for interactive fiction (second person "You").
+${lang}
+Keep the user's scene, facts, and intent. Improve flow, imagery, and pacing.
+2-4 short paragraphs. End at a pause inviting the player to act or speak. No bullet lists.
+Return JSON: {"value":"..."}`,
+      },
+      {
+        role: "user",
+        content: [
+          opts.previousChapterTitle
+            ? `Previous chapter: ${opts.previousChapterTitle}`
+            : null,
+          opts.nextChapterTitle
+            ? `New chapter: ${opts.nextChapterTitle}`
+            : null,
+          opts.lastSceneExcerpt
+            ? `Last moment (tone reference):\n${opts.lastSceneExcerpt.slice(0, 1200)}`
+            : null,
+          `User draft:\n${draft}`,
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
+      },
+    ],
+    {
+      maxTokens: 900,
+      temperature: 0.65,
+      signal,
+      responseFormat: { type: "json_object" },
+    },
+  );
+
+  try {
+    const parsed = JSON.parse(raw) as { value?: string };
+    if (typeof parsed.value === "string" && parsed.value.trim()) {
+      return parsed.value.trim();
+    }
+  } catch {
+    /* */
+  }
+  return raw.trim();
+}
+
 export type ResolvedChapterIntro = {
   turns: Array<{ content: string; speakerSlug?: string | null }>;
 };
