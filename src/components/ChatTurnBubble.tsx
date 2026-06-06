@@ -10,7 +10,7 @@ import {
   formatScriptAttributionDebug,
 } from "@/lib/chat/dialogueScript";
 import { useDialogueAttribution } from "@/lib/chat/useDialogueAttribution";
-import { stripSpeakerTags } from "@/lib/chat/parseSpeakerBlocks";
+import { preprocessAssistantMarkup, stripSpeakerTags } from "@/lib/chat/parseSpeakerBlocks";
 import { prepareTextForTts } from "@/lib/tts/prepareTtsText";
 import type { CharacterRow, TurnRow } from "@/lib/db/stories";
 import type { VoiceMap, StorySettings } from "@/lib/types";
@@ -86,7 +86,9 @@ export function ChatTurnBubble({
   const steeringTurn =
     turn.role === "user" && isSteeringUserTurn(turn.content);
   const displayContent = stripSpeakerTags(
-    steeringTurn ? stripSteeringTurnPrefix(turn.content) : turn.content,
+    preprocessAssistantMarkup(
+      steeringTurn ? stripSteeringTurnPrefix(turn.content) : turn.content,
+    ),
   );
   const markedSnippets = useMemo(
     () =>
