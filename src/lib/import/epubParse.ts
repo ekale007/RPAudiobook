@@ -253,7 +253,95 @@ export async function parseEpubFile(file: File): Promise<ParsedEpub> {
   };
 }
 
-/** Build a bounded excerpt for LLM analysis from selected chapter onward. */
+export type EpubAnalysisRegion = {
+  label: string;
+  chapterIndex: number;
+  charBudget: number;
+};
+
+/** Which chapters/regions feed the story-bible LLM call. */
+export function planEpubAnalysisRegions(
+  parsed: ParsedEpub,
+  startChapterIndex: number,
+): EpubAnalysisRegion[] {
+  const n = parsed.chapters.length;
+  const start = Math.max(0, Math.min(startChapterIndex, n - 1));
+  const used = new Set<number>();
+  const regions: EpubAnalysisRegion[] = [];
+
+  const add = (label: string, idx: number, budget: number) => {
+    if (idx < 0 || idx >= n || used.has(idx)) return;
+    used.add(idx);
+    regions.push({ label, chapterIndex: idx, charBudget: budget });
+  };
+
+  add("Buchanfang", 0, 10_000);
+  if (start > 1) add("Vor dem Einstieg", 1, 6_000);
+  if (start > 2) add("Aufbau vor Spielstart", start - 1, 6_000);
+
+  add("Spielstart", start, 24_000);
+  if (start + 1 < n) add("Direkt nach Spielstart", start + 1, 12_000);
+  if (start + 2 < n && start + 2 < n - 2) {
+    add("Frühe Handlung", start + 2, 8_000);
+  }
+
+  if (n >= 5) {
+    const mid = Math.min(
+      n - 1,
+      Math.max(start + 3, Math.floor(n * 0.42)),
+    );
+    add("Buchmitte (Welt & Konflikt)", mid, 14_000);
+  }
+  if (n >= 8) {
+    const late = Math.min(n - 1, Math.floor(n * 0.78));
+    if (late > start + 2) {
+      add("Später im Buch (Ton, keine vollen Spoiler)", late, 8_000);
+    }
+  }
+
+  return regions;
+}
+
+/** Multi-region excerpt: Anfang, Einstieg, Mitte, später — für Lore & Cast. */
+export function buildEpubAnalysisExcerpt(
+  parsed: ParsedEpub,
+  opts?: { startChapterIndex?: number; maxChars?: number },
+): string {
+  const maxChars = opts?.maxChars ?? 72_000;
+  const start = Math.max(
+    0,
+    Math.min(opts?.startChapterIndex ?? 0, parsed.chapters.length - 1),
+  );
+  const regions = planEpubAnalysisRegions(parsed, start);
+  const totalBudget = regions.reduce((s, r) => s + r.charBudget, 0);
+  const scale = totalBudget > maxChars ? maxChars / totalBudget : 1;
+
+  const parts: string[] = [];
+  let used = 0;
+
+  for (const region of regions) {
+    const budget = Math.floor(region.charBudget * scale);
+    if (used >= maxChars || budget < 400) continue;
+    const ch = parsed.chapters[region.chapterIndex];
+    if (!ch) continue;
+    const remaining = maxChars - used;
+    const effective = Math.min(budget, remaining - 100);
+    if (effective < 300) break;
+
+    const header = `[${region.label}] === ${ch.title} (Kap. ${ch.index + 1}/${parsed.chapters.length}) ===`;
+    const body =
+      ch.text.length <= effective
+        ? ch.text
+        : `${ch.text.slice(0, effective)}…`;
+    const block = `${header}\n${body}`;
+    parts.push(block);
+    used += block.length + 2;
+  }
+
+  return parts.join("\n\n");
+}
+
+/** Linear excerpt from one chapter onward (short previews). */
 export function buildEpubExcerpt(
   parsed: ParsedEpub,
   opts?: { startChapterIndex?: number; maxChars?: number },

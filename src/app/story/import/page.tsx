@@ -15,12 +15,14 @@ import {
   buildEpubExcerpt,
   guessEpubLocale,
   parseEpubFile,
+  planEpubAnalysisRegions,
   type ParsedEpub,
 } from "@/lib/import/epubParse";
 import {
   generateStoryDraftFromEpub,
   type EpubAdaptationMode,
   type EpubImportInterview,
+  type EpubPacing,
 } from "@/lib/import/epubToDraft";
 import {
   draftToSeedPack,
@@ -66,8 +68,15 @@ export default function EpubImportPage() {
   const [protagonistDescription, setProtagonistDescription] = useState("");
   const [adaptation, setAdaptation] = useState<EpubAdaptationMode>("inspired");
   const [startChapterIndex, setStartChapterIndex] = useState(0);
+  const [genre, setGenre] = useState("");
   const [tone, setTone] = useState("");
+  const [pacing, setPacing] = useState<EpubPacing>("balanced");
+  const [playGoals, setPlayGoals] = useState("");
   const [castNotes, setCastNotes] = useState("");
+  const [antagonistNotes, setAntagonistNotes] = useState("");
+  const [worldFocus, setWorldFocus] = useState("");
+  const [scopeNotes, setScopeNotes] = useState("");
+  const [avoidSpoilers, setAvoidSpoilers] = useState("");
   const [extraNotes, setExtraNotes] = useState("");
 
   const [draft, setDraft] = useState<StoryDraft | null>(null);
@@ -99,11 +108,16 @@ export default function EpubImportPage() {
     [parsed, locale, draft],
   );
 
+  const analysisPlan = useMemo(() => {
+    if (!parsed) return [];
+    return planEpubAnalysisRegions(parsed, startChapterIndex);
+  }, [parsed, startChapterIndex]);
+
   const excerptPreview = useMemo(() => {
     if (!parsed) return "";
     return buildEpubExcerpt(parsed, {
       startChapterIndex,
-      maxChars: 600,
+      maxChars: 400,
     });
   }, [parsed, startChapterIndex]);
 
@@ -121,8 +135,15 @@ export default function EpubImportPage() {
       setParsed(result);
       setLocale(guessEpubLocale(result));
       setStartChapterIndex(0);
+      setGenre("");
       setTone("");
+      setPacing("balanced");
+      setPlayGoals("");
       setCastNotes("");
+      setAntagonistNotes("");
+      setWorldFocus("");
+      setScopeNotes("");
+      setAvoidSpoilers("");
       setProtagonistName("");
       setProtagonistDescription("");
       setDraft(null);
@@ -151,13 +172,22 @@ export default function EpubImportPage() {
       protagonistDescription,
       adaptation,
       startChapterIndex,
+      genre,
       tone,
+      pacing,
+      playGoals,
       castNotes,
+      antagonistNotes,
+      worldFocus,
+      scopeNotes,
+      avoidSpoilers,
       extraNotes: extraNotes.trim() || undefined,
     };
 
     setStep("generating");
-    setGenStatus("Welt, Figuren und Eröffnung werden entworfen …");
+    setGenStatus(
+      "Mehrere Buchabschnitte werden ausgewertet — Welt, Figuren, Eröffnung …",
+    );
     setError(null);
     setMessage(null);
 
@@ -331,11 +361,34 @@ export default function EpubImportPage() {
               </select>
             </label>
 
+            {analysisPlan.length ? (
+              <div className="rounded-lg border border-surface-border bg-surface px-3 py-2">
+                <p className="text-[10px] font-medium text-zinc-400">
+                  KI liest mehrere Abschnitte (lokal, bis ~72k Zeichen)
+                </p>
+                <ul className="mt-1 space-y-0.5 text-[11px] text-zinc-500">
+                  {analysisPlan.map((r) => {
+                    const ch = parsed.chapters[r.chapterIndex];
+                    return (
+                      <li key={`${r.label}-${r.chapterIndex}`}>
+                        {r.label}: Kap. {r.chapterIndex + 1} — {ch?.title}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
+
             {excerptPreview ? (
               <p className="rounded-lg border border-surface-border bg-surface px-3 py-2 text-[11px] italic leading-relaxed text-zinc-600">
-                {`„${excerptPreview.slice(0, 280)}${excerptPreview.length > 280 ? "…" : ""}"`}
+                {`Spielstart-Vorschau: „${excerptPreview.slice(0, 220)}${excerptPreview.length > 220 ? "…" : ""}"`}
               </p>
             ) : null}
+
+            <p className="text-[10px] text-zinc-600">
+              Nimm dir Zeit beim Interview — je klarer deine Antworten, desto
+              besser passen Lore, Cast und Eröffnung zum Buch.
+            </p>
 
             <fieldset className="space-y-2">
               <legend className="mb-1 text-xs font-medium text-zinc-400">
@@ -376,43 +429,123 @@ export default function EpubImportPage() {
             </label>
 
             <label className="text-xs text-zinc-500">
-              Protagonist &amp; Perspektive (optional)
+              Was willst du in dieser Story erleben?
+              <textarea
+                value={playGoals}
+                onChange={(e) => setPlayGoals(e.target.value)}
+                rows={2}
+                placeholder="z. B. Intrige am Hof, langsame Enthüllung, Beziehung zu X …"
+                className="mt-1 w-full rounded-xl border border-surface-border bg-surface px-3 py-2 text-base"
+              />
+            </label>
+
+            <label className="text-xs text-zinc-500">
+              Protagonist &amp; Perspektive
               <textarea
                 value={protagonistDescription}
                 onChange={(e) => setProtagonistDescription(e.target.value)}
                 rows={2}
-                placeholder="Wen spielst du, was willst du erleben?"
+                placeholder="Wer bist du im Buch, welche Rolle, welche Schwächen/Stärken?"
                 className="mt-1 w-full rounded-xl border border-surface-border bg-surface px-3 py-2 text-base"
               />
             </label>
+
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-xs text-zinc-500">
+                Genre
+                <input
+                  value={genre}
+                  onChange={(e) => setGenre(e.target.value)}
+                  placeholder="Fantasy, Krimi …"
+                  className="mt-1 w-full rounded-xl border border-surface-border bg-surface px-3 py-2 text-base"
+                />
+              </label>
+              <label className="text-xs text-zinc-500">
+                Tempo
+                <select
+                  value={pacing}
+                  onChange={(e) => setPacing(e.target.value as EpubPacing)}
+                  className="mt-1 w-full rounded-xl border border-surface-border bg-surface px-3 py-2 text-base"
+                >
+                  <option value="slow">Langsam &amp; atmosphärisch</option>
+                  <option value="balanced">Ausgewogen</option>
+                  <option value="fast">Schnell &amp; druckvoll</option>
+                </select>
+              </label>
+            </div>
 
             <label className="text-xs text-zinc-500">
               Ton / Stimmung
               <input
                 value={tone}
                 onChange={(e) => setTone(e.target.value)}
-                placeholder="z. B. düster, hoffnungsvoll, schnell …"
+                placeholder="z. B. düster, hoffnungsvoll, witzig …"
                 className="mt-1 w-full rounded-xl border border-surface-border bg-surface px-3 py-2 text-base"
               />
             </label>
 
             <label className="text-xs text-zinc-500">
-              Wichtige Figuren mit Stimme (optional)
+              Wichtige Figuren mit Stimme
               <textarea
                 value={castNotes}
                 onChange={(e) => setCastNotes(e.target.value)}
                 rows={2}
-                placeholder="z. B. Mentor, Antagonist, beste Freundin …"
+                placeholder="Wer soll sprechen? Namen aus dem Buch, Beziehungen …"
                 className="mt-1 w-full rounded-xl border border-surface-border bg-surface px-3 py-2 text-base"
               />
             </label>
 
             <label className="text-xs text-zinc-500">
-              Sonstiges (optional)
+              Antagonisten &amp; Fraktionen
+              <textarea
+                value={antagonistNotes}
+                onChange={(e) => setAntagonistNotes(e.target.value)}
+                rows={2}
+                placeholder="Gegner, Gruppen, innere Konflikte …"
+                className="mt-1 w-full rounded-xl border border-surface-border bg-surface px-3 py-2 text-base"
+              />
+            </label>
+
+            <label className="text-xs text-zinc-500">
+              Welt &amp; Regeln (Lore-Schwerpunkt)
+              <textarea
+                value={worldFocus}
+                onChange={(e) => setWorldFocus(e.target.value)}
+                rows={2}
+                placeholder="Magie, Politik, Technik, Orte die wichtig sind …"
+                className="mt-1 w-full rounded-xl border border-surface-border bg-surface px-3 py-2 text-base"
+              />
+            </label>
+
+            <label className="text-xs text-zinc-500">
+              Umfang — wie viel vom Buch?
+              <textarea
+                value={scopeNotes}
+                onChange={(e) => setScopeNotes(e.target.value)}
+                rows={2}
+                placeholder="z. B. nur Band 1, bis zur Enthüllung in Kap. 12, ganze Saga als Sandkasten …"
+                className="mt-1 w-full rounded-xl border border-surface-border bg-surface px-3 py-2 text-base"
+              />
+            </label>
+
+            <label className="text-xs text-zinc-500">
+              Spoiler vermeiden (Eröffnung &amp; erste Kapitel)
+              <textarea
+                value={avoidSpoilers}
+                onChange={(e) => setAvoidSpoilers(e.target.value)}
+                rows={2}
+                placeholder="Was die KI in der Eröffnung noch nicht verraten soll …"
+                className="mt-1 w-full rounded-xl border border-surface-border bg-surface px-3 py-2 text-base"
+              />
+            </label>
+
+            <label className="text-xs text-zinc-500">
+              Sonstiges
               <textarea
                 value={extraNotes}
                 onChange={(e) => setExtraNotes(e.target.value)}
                 rows={2}
+                placeholder="Tabus, Lieblingsmomente aus dem Buch, Stil-Referenzen …"
                 className="mt-1 w-full rounded-xl border border-surface-border bg-surface px-3 py-2 text-base"
               />
             </label>
@@ -444,7 +577,8 @@ export default function EpubImportPage() {
           <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
             <GeneratingIndicator label={genStatus} />
             <p className="mt-3 text-xs text-zinc-500">
-              Das kann 30–90 Sekunden dauern (ein großer KI-Aufruf).
+              Das kann 60–120 Sekunden dauern (großer KI-Aufruf mit mehreren
+              Buchabschnitten).
             </p>
           </section>
         ) : null}
