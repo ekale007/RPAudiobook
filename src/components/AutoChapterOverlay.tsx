@@ -4,6 +4,7 @@ import { GeneratingIndicator } from "@/components/GeneratingIndicator";
 import { OverlayPanel } from "@/components/ui/OverlayPanel";
 import {
   AUTO_CHAPTER_HARD_TURNS,
+  chapterCompletionProgress,
   estimateTranscriptChars,
 } from "@/lib/chapter/autoChapter";
 import type { TurnRow } from "@/lib/db/stories";
@@ -32,6 +33,7 @@ export function AutoChapterOverlay({
   const turnCount = rows.length;
   const charCount = estimateTranscriptChars(rows);
   const hardLimit = turnCount >= AUTO_CHAPTER_HARD_TURNS;
+  const chapterProgress = chapterCompletionProgress(rows);
 
   if (!open) return null;
 
@@ -71,9 +73,29 @@ export function AutoChapterOverlay({
             ? "Dieses Kapitel ist sehr lang — ein Übergang wird empfohlen, damit die Story übersichtlich bleibt."
             : "Dieses Kapitel ist groß genug für einen natürlichen Schnitt. Du kannst den Übergang automatisch starten oder ihn selbst gestalten."}
         </p>
-        <p className="text-xs text-zinc-500">
-          {turnCount} Nachrichten · ca. {Math.round(charCount / 1000)}k Zeichen
-        </p>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs text-zinc-500">
+            <span>
+              {turnCount} Nachrichten · ca. {Math.round(charCount / 1000)}k
+              Zeichen
+            </span>
+            <span className="text-accent">
+              {chapterProgress.percent}% Kapitel
+            </span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
+            <div
+              className="h-full rounded-full bg-accent transition-[width] duration-300"
+              style={{ width: `${chapterProgress.percent}%` }}
+            />
+          </div>
+          {!chapterProgress.ready ? (
+            <p className="text-xs text-zinc-500">
+              Noch ca. {chapterProgress.remainingPercent} % bis zum empfohlenen
+              Kapitelabschluss.
+            </p>
+          ) : null}
+        </div>
         <button
           type="button"
           onClick={onAutoContinue}

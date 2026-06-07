@@ -11,13 +11,28 @@ export function downloadBlob(blob: Blob, filename: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
+function safeChapterSlug(chapterTitle?: string | null): string {
+  return (chapterTitle ?? "kapitel")
+    .replace(/[^\wäöüÄÖÜß\-]+/gi, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40);
+}
+
 export function audioFilenameForTurn(
   turnId: string,
   chapterTitle?: string | null,
 ): string {
-  const safeChapter = (chapterTitle ?? "kapitel")
-    .replace(/[^\wäöüÄÖÜß\-]+/gi, "-")
-    .slice(0, 40);
+  const safeChapter = safeChapterSlug(chapterTitle);
   const shortId = turnId.replace(/[^a-z0-9-]/gi, "").slice(0, 8);
   return `hoerbuchki-${safeChapter}-${shortId}.mp3`;
+}
+
+export function audioFilenameForChapter(
+  chapterTitle?: string | null,
+  complete = true,
+): string {
+  const safeChapter = safeChapterSlug(chapterTitle);
+  const suffix = complete ? "kapitel" : "kapitel-teil";
+  return `hoerbuchki-${safeChapter}-${suffix}.wav`;
 }

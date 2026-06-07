@@ -54,6 +54,11 @@ import { regenerateRollingSummary } from "@/lib/chapter/rollingSummary";
 import { summarizeChapter } from "@/lib/chapter/summarize";
 import { resolveChapterIntro } from "@/lib/chapter/chapterIntro";
 import { shouldAutoCreateNextChapter } from "@/lib/chapter/autoChapter";
+import { ChapterProgressBar } from "@/components/ChapterProgressBar";
+import {
+  analyzeChapterCloudAudio,
+  exportChapterAudioFromCloud,
+} from "@/lib/audio/chapterAudioExport";
 import {
   finalizeChapterPlotState,
   phaseHintForNextChapter,
@@ -247,6 +252,7 @@ export function ChatView({
     null,
   );
   const [copiedChatDebug, setCopiedChatDebug] = useState(false);
+  const [chapterExportBusy, setChapterExportBusy] = useState(false);
   const bubbleRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const [bubbleFocusIndex, setBubbleFocusIndex] = useState(0);
@@ -1597,6 +1603,22 @@ export function ChatView({
 
   const chapterLabel = chapterTitle ?? chapter.title;
   const chapterTransitionOpen = autoChapterPhase != null;
+  const chapterCloudAudio = useMemo(
+    () => analyzeChapterCloudAudio(turns),
+    [turns],
+  );
+
+  const downloadChapterAudio = useCallback(async () => {
+    if (chapterExportBusy || !chapterCloudAudio.canExport) return;
+    setChapterExportBusy(true);
+    setError(null);
+    try {
+      const result = await exportChapterAudioFromCloud(turns, chapterLabel);
+      if (!result.ok) setError(result.error ?? "Kapitel-Export fehlgeschlagen.");
+    } finally {
+      setChapterExportBusy(false);
+    }
+  }, [chapterCloudAudio.canExport, chapterExportBusy, chapterLabel, turns]);
 
   return (
     <div
@@ -1609,6 +1631,10 @@ export function ChatView({
         }
       }}
     >
+      {!readOnly && turns.length > 0 ? (
+        <ChapterProgressBar rows={turns} />
+      ) : null}
+
       <div className="relative min-h-0 flex-1">
         <BubbleNavArrows
           count={turns.length}
@@ -1715,6 +1741,28 @@ export function ChatView({
               >
                 Cloud: {ttsCloudQuota.used}/{ttsCloudQuota.max}
               </span>
+            ) : null}
+            {!readOnly && turns.length > 0 ? (
+              <ChapterProgressBar rows={turns} compact />
+            ) : null}
+            {hasTts && chapterCloudAudio.canExport ? (
+              <button
+                type="button"
+                onClick={() => void downloadChapterAudio()}
+                disabled={chapterExportBusy}
+                className="shrink-0 rounded-full border border-surface-border px-3 py-1 text-zinc-400 disabled:opacity-40"
+                title={
+                  chapterCloudAudio.complete
+                    ? "Alle Erzähler-Aufnahmen aus der Cloud zu einer Datei"
+                    : `${chapterCloudAudio.cloudTurns}/${chapterCloudAudio.assistantTurns} Cloud-Aufnahmen — nur gespeicherte Teile`
+                }
+              >
+                {chapterExportBusy
+                  ? "Kapitel …"
+                  : chapterCloudAudio.complete
+                    ? "Kapitel-Audio"
+                    : `Kapitel-Audio (${chapterCloudAudio.cloudTurns}/${chapterCloudAudio.assistantTurns})`}
+              </button>
             ) : null}
             {hasTts ? (
               <TtsAutoplayToggle
