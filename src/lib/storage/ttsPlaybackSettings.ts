@@ -1,5 +1,6 @@
 const STORAGE_KEY = "hoerbuch-tts-playback-rate";
 const AUTOPLAY_KEY = "hoerbuch-tts-autoplay";
+const MUTED_KEY = "hoerbuch-tts-read-only";
 
 export const PLAYBACK_RATE_MIN = 0.75;
 export const PLAYBACK_RATE_MAX = 1.5;
@@ -50,4 +51,15 @@ export function loadTtsAutoplay(): boolean {
 export function saveTtsAutoplay(enabled: boolean): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(AUTOPLAY_KEY, enabled ? "1" : "0");
+}
+
+/** Read-only mode: no TTS, no silent audio keepalive — background music can play. */
+export function loadTtsReadOnly(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(MUTED_KEY) === "1";
+}
+
+export function saveTtsReadOnly(enabled: boolean): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(MUTED_KEY, enabled ? "1" : "0");
 }

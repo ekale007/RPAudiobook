@@ -4,7 +4,10 @@ import {
   DRIVE_MODE_MINUTES,
   type DriveModeMinutes,
 } from "@/lib/chat/autoContinue";
-import { unlockAudioForAutoplay } from "@/lib/tts/audioUnlock";
+import {
+  isTtsReadOnly,
+  unlockAudioForAutoplay,
+} from "@/lib/tts/audioUnlock";
 
 export function AutoPlayControls({
   disabled,
@@ -24,7 +27,9 @@ export function AutoPlayControls({
             key={m}
             type="button"
             disabled={disabled}
-            onPointerDown={() => unlockAudioForAutoplay()}
+            onPointerDown={() => {
+              if (!isTtsReadOnly()) unlockAudioForAutoplay();
+            }}
             onClick={() => onDriveStart(m)}
             className="min-h-[44px] touch-manipulation rounded-full border border-accent/30 bg-accent/10 px-4 py-2 text-xs font-medium text-accent transition hover:bg-accent/20 disabled:opacity-40"
           >

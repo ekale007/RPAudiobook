@@ -1,4 +1,8 @@
 import {
+  loadTtsReadOnly,
+  saveTtsReadOnly,
+} from "@/lib/storage/ttsPlaybackSettings";
+import {
   primeTtsAudioContext,
   stopTtsAudioContext,
 } from "@/lib/tts/mobileAudioPlayback";
@@ -14,6 +18,24 @@ const SILENT_WAV =
 let unlockEl: HTMLAudioElement | null = null;
 let sessionKeepalive: HTMLAudioElement | null = null;
 let visibilityBound = false;
+let readOnlyMode = false;
+
+export function isTtsReadOnly(): boolean {
+  return readOnlyMode;
+}
+
+/** Hydrate from localStorage on client mount. */
+export function syncTtsReadOnlyFromStorage(): boolean {
+  readOnlyMode = loadTtsReadOnly();
+  if (readOnlyMode) stopAudioSession();
+  return readOnlyMode;
+}
+
+export function setTtsReadOnly(enabled: boolean): void {
+  readOnlyMode = enabled;
+  saveTtsReadOnly(enabled);
+  if (enabled) stopAudioSession();
+}
 
 function configureUnlockElement(audio: HTMLAudioElement): void {
   audio.setAttribute("playsinline", "true");
@@ -42,7 +64,7 @@ function bindVisibilityResume(): void {
 
 /** Call synchronously inside click/touch handlers before async TTS work. */
 export function unlockAudioForAutoplay(): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || readOnlyMode) return;
   void primeTtsAudioContext();
   try {
     if (!unlockEl) {
@@ -63,7 +85,7 @@ export function unlockAudioForAutoplay(): void {
  * Start on user gesture; stop when autoplay / drive mode ends.
  */
 export function startAudioSession(): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || readOnlyMode) return;
   unlockAudioForAutoplay();
   bindVisibilityResume();
   void requestScreenWakeLock();

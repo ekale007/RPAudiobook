@@ -36,6 +36,7 @@ export function ChatTurnBubble({
   onReroll,
   onStoragePath,
   registerTtsPlayer,
+  ttsReadOnly = false,
   ttsAutoplayChain,
   onTtsChainPlay,
   ttsPlaying = false,
@@ -62,6 +63,8 @@ export function ChatTurnBubble({
     turnId: string,
     player: MessageAudioPlayerHandle | null,
   ) => void;
+  /** No TTS UI — read text only (e.g. with background music). */
+  ttsReadOnly?: boolean;
   ttsAutoplayChain?: boolean;
   onTtsChainPlay?: (turnId: string) => void;
   ttsPlaying?: boolean;
@@ -278,9 +281,9 @@ export function ChatTurnBubble({
         ) : turn.role === "assistant" ? (
           <p className="mb-1 text-xs font-medium text-zinc-500">
             Narrator
-            {ttsPlaying ? (
+            {!ttsReadOnly && ttsPlaying ? (
               <span className="ml-2 text-accent/80">· läuft</span>
-            ) : ttsQueued ? (
+            ) : !ttsReadOnly && ttsQueued ? (
               <span className="ml-2">· in Warteschlange</span>
             ) : null}
           </p>
@@ -308,7 +311,9 @@ export function ChatTurnBubble({
           <p className="prose-chat">{displayContent}</p>
         )}
 
-        {turn.role === "assistant" && !turn.id.startsWith("tmp-") ? (
+        {turn.role === "assistant" &&
+        !turn.id.startsWith("tmp-") &&
+        !ttsReadOnly ? (
           <MessageAudioPlayer
             ref={(handle) => registerTtsPlayer?.(turn.id, handle)}
             turnId={turn.id}

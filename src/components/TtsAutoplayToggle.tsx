@@ -5,6 +5,7 @@ import {
   saveTtsAutoplay,
 } from "@/lib/storage/ttsPlaybackSettings";
 import {
+  isTtsReadOnly,
   startAudioSession,
   unlockAudioForAutoplay,
 } from "@/lib/tts/audioUnlock";
@@ -21,6 +22,7 @@ export function TtsAutoplayToggle({
   queueActive?: boolean;
 }) {
   const toggle = () => {
+    if (isTtsReadOnly()) return;
     const next = !enabled;
     saveTtsAutoplay(next);
     if (next) {
@@ -33,8 +35,10 @@ export function TtsAutoplayToggle({
   return (
     <button
       type="button"
-      disabled={disabled}
-      onPointerDown={() => unlockAudioForAutoplay()}
+      disabled={disabled || isTtsReadOnly()}
+      onPointerDown={() => {
+        if (!isTtsReadOnly()) unlockAudioForAutoplay();
+      }}
       onClick={toggle}
       className={`min-h-[44px] shrink-0 touch-manipulation rounded-full border px-3 py-1 text-xs transition disabled:opacity-40 ${
         enabled

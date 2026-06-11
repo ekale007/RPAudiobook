@@ -28,6 +28,7 @@ import {
   readTtsAutoplayPreference,
   TtsAutoplayToggle,
 } from "@/components/TtsAutoplayToggle";
+import { TtsReadOnlyToggle } from "@/components/TtsReadOnlyToggle";
 import {
   autoContinuePrompt,
   type AutoPlayTurnCount,
@@ -101,7 +102,12 @@ import { subscribeServerCapabilities } from "@/lib/server/serverCapabilities";
 import type { MessageAudioPlayerHandle } from "@/lib/tts/messageAudioPlayerHandle";
 import { TtsAutoplayQueue } from "@/lib/tts/ttsAutoplayQueue";
 import { ttsPlayerWaitMs } from "@/lib/tts/mobilePlayback";
-import { unlockAudioForAutoplay, startAudioSession, stopAudioSession } from "@/lib/tts/audioUnlock";
+import {
+  syncTtsReadOnlyFromStorage,
+  unlockAudioForAutoplay,
+  startAudioSession,
+  stopAudioSession,
+} from "@/lib/tts/audioUnlock";
 import {
   clearTtsMediaSessionHandlers,
   setTtsMediaSessionControls,
@@ -243,6 +249,7 @@ export function ChatView({
   const ttsQueueRef = useRef(new TtsAutoplayQueue());
   const ttsPlayingTurnIdRef = useRef<string | null>(null);
   const [ttsAutoplay, setTtsAutoplay] = useState(false);
+  const [ttsReadOnly, setTtsReadOnly] = useState(false);
   const [hasTts, setHasTts] = useState(false);
   const [ttsQueueActive, setTtsQueueActive] = useState(false);
   const [ttsPlayingTurnId, setTtsPlayingTurnId] = useState<string | null>(null);
@@ -265,6 +272,7 @@ export function ChatView({
   useEffect(() => {
     const refreshTts = () => setHasTts(isTtsReady(loadTtsSettings()));
     setTtsAutoplay(readTtsAutoplayPreference());
+    setTtsReadOnly(syncTtsReadOnlyFromStorage());
     refreshTts();
     const unsubCaps = subscribeServerCapabilities(refreshTts);
     const queue = ttsQueueRef.current;
@@ -316,6 +324,7 @@ export function ChatView({
   }, [assistantTurnIds]);
 
   const resumeBlockedTts = useCallback(() => {
+    if (ttsReadOnly) return;
     unlockAudioForAutoplay();
     startAudioSession();
     const blocked = ttsBlockedTurnId;
@@ -323,15 +332,15 @@ export function ChatView({
     if (blocked) {
       ttsQueueRef.current.playFrom(blocked, assistantTurnIds);
     }
-  }, [ttsBlockedTurnId, assistantTurnIds]);
+  }, [ttsBlockedTurnId, assistantTurnIds, ttsReadOnly]);
 
   const requestTtsChainPlay = useCallback(
     (turnId: string) => {
-      if (!hasTts || !ttsAutoplay) return;
+      if (!hasTts || !ttsAutoplay || ttsReadOnly) return;
       unlockAudioForAutoplay();
       ttsQueueRef.current.playFrom(turnId, assistantTurnIds);
     },
-    [hasTts, ttsAutoplay, assistantTurnIds],
+    [hasTts, ttsAutoplay, ttsReadOnly, assistantTurnIds],
   );
 
   const handleTtsPlaybackChange = useCallback(
@@ -375,7 +384,12 @@ export function ChatView({
   const enqueueNewAssistantTts = useCallback(
     (rows: TurnRow[], force = false) => {
       if (autoSessionRef.current && !force) return;
-      if ((!ttsAutoplay && !force) || !hasTts || !ttsBaselineReadyRef.current) {
+      if (
+        ttsReadOnly ||
+        (!ttsAutoplay && !force) ||
+        !hasTts ||
+        !ttsBaselineReadyRef.current
+      ) {
         return;
       }
       const prev = knownTurnIdsRef.current;
@@ -390,7 +404,7 @@ export function ChatView({
       if (!fresh.length) return;
       ttsQueueRef.current.enqueue(fresh.map((t) => t.id));
     },
-    [ttsAutoplay, hasTts],
+    [ttsAutoplay, ttsReadOnly, hasTts],
   );
 
   const syncKnownTurns = useCallback((rows: TurnRow[]) => {
@@ -405,13 +419,14 @@ export function ChatView({
   }, []);
 
   const ensureTtsAutoplayForSession = useCallback(() => {
+    if (ttsReadOnly) return;
     startAudioSession();
     unlockAudioForAutoplay();
     if (!ttsAutoplay) {
       setTtsAutoplay(true);
       saveTtsAutoplay(true);
     }
-  }, [ttsAutoplay]);
+  }, [ttsAutoplay, ttsReadOnly]);
 
   const waitForLatestAssistantTts = useCallback(
     async (history: TurnRow[], options?: { forDrive?: boolean }) => {
@@ -420,6 +435,7 @@ export function ChatView({
       );
       const latest = assistants[assistants.length - 1];
       if (!latest) return "ok" as const;
+      if (ttsReadOnly) return "ok" as const;
 
       unlockAudioForAutoplay();
       await new Promise<void>((resolve) => {
@@ -434,7 +450,7 @@ export function ChatView({
         ? ttsQueueRef.current.playTurnForDrive(latest.id)
         : ttsQueueRef.current.playTurnAndWaitForDrive(latest.id);
     },
-    [],
+    [ttsReadOnly],
   );
 
   const load = useCallback(async () => {
@@ -1269,7 +1285,15 @@ export function ChatView({
   };
 
   const runDriveMode = async (minutes: DriveModeMinutes) => {
-    if (generating || readOnly || autoSession || !turns.length || !hasTts) return;
+    if (
+      generating ||
+      readOnly ||
+      ttsReadOnly ||
+      autoSession ||
+      !turns.length ||
+      !hasTts
+    )
+      return;
 
     ensureTtsAutoplayForSession();
     setBeatOptions(null);
@@ -1624,7 +1648,7 @@ export function ChatView({
     <div
       className="flex min-h-0 flex-1 flex-col"
       onPointerDownCapture={() => {
-        if (!hasTts) return;
+        if (!hasTts || ttsReadOnly) return;
         unlockAudioForAutoplay();
         if (ttsAutoplay && !ttsQueueRef.current.isClipPlaying()) {
           startAudioSession();
@@ -1678,8 +1702,11 @@ export function ChatView({
                   );
                   refreshTtsCloudQuota();
                 }}
-                registerTtsPlayer={hasTts ? registerTtsPlayer : undefined}
-                ttsAutoplayChain={ttsAutoplay && hasTts}
+                registerTtsPlayer={
+                  hasTts && !ttsReadOnly ? registerTtsPlayer : undefined
+                }
+                ttsReadOnly={ttsReadOnly}
+                ttsAutoplayChain={ttsAutoplay && hasTts && !ttsReadOnly}
                 onTtsChainPlay={requestTtsChainPlay}
                 ttsPlaying={ttsPlayingTurnId === t.id}
                 ttsQueued={
@@ -1712,7 +1739,7 @@ export function ChatView({
         <p className="px-4 pb-2 text-center text-sm text-red-400">{error}</p>
       ) : null}
 
-      {ttsBlockedTurnId && hasTts ? (
+      {ttsBlockedTurnId && hasTts && !ttsReadOnly ? (
         <TtsMobileUnlockBar onResume={resumeBlockedTts} />
       ) : null}
 
@@ -1722,11 +1749,13 @@ export function ChatView({
           hint={
             toolsActivity
               ? undefined
-              : ttsQueueActive
-                ? "TTS läuft"
-                : ttsAutoplay
-                  ? "Autoplay an"
-                  : "Autoplay aus"
+              : ttsReadOnly
+                ? "Nur lesen"
+                : ttsQueueActive
+                  ? "TTS läuft"
+                  : ttsAutoplay
+                    ? "Autoplay an"
+                    : "Autoplay aus"
           }
           activityLabel={toolsActivity?.label}
           onActivityCancel={toolsActivity?.onCancel}
@@ -1765,16 +1794,32 @@ export function ChatView({
               </button>
             ) : null}
             {hasTts ? (
-              <TtsAutoplayToggle
-                enabled={ttsAutoplay}
-                disabled={generating || autoSession || chapterTransitionOpen}
-                queueActive={ttsQueueActive}
-                onChange={(next) => {
-                  setTtsAutoplay(next);
-                  saveTtsAutoplay(next);
-                  if (!next) stopTtsAutoplay();
-                }}
-              />
+              <>
+                <TtsReadOnlyToggle
+                  enabled={ttsReadOnly}
+                  disabled={generating || autoSession || chapterTransitionOpen}
+                  onStopPlayback={stopTtsAutoplay}
+                  onChange={(next) => {
+                    setTtsReadOnly(next);
+                    if (next) setTtsAutoplay(false);
+                  }}
+                />
+                <TtsAutoplayToggle
+                  enabled={ttsAutoplay}
+                  disabled={
+                    ttsReadOnly ||
+                    generating ||
+                    autoSession ||
+                    chapterTransitionOpen
+                  }
+                  queueActive={ttsQueueActive}
+                  onChange={(next) => {
+                    setTtsAutoplay(next);
+                    saveTtsAutoplay(next);
+                    if (!next) stopTtsAutoplay();
+                  }}
+                />
+              </>
             ) : null}
             <Link
               href={`/story/${storyId}`}
@@ -1809,9 +1854,13 @@ export function ChatView({
           {!readOnly ? (
             <AutoPlayControls
               disabled={
-                generating || autoSession || chapterTransitionOpen || turns.length === 0
+                ttsReadOnly ||
+                generating ||
+                autoSession ||
+                chapterTransitionOpen ||
+                turns.length === 0
               }
-              onDriveStart={hasTts ? runDriveMode : undefined}
+              onDriveStart={hasTts && !ttsReadOnly ? runDriveMode : undefined}
             />
           ) : null}
         </MobileCollapsibleTools>
