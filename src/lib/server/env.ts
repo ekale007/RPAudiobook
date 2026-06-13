@@ -25,8 +25,7 @@ export function getOpenRouterNarratorModel(): string | undefined {
 
 export function getOpenRouterTtsModel(): string {
   return (
-    process.env.OPENROUTER_TTS_MODEL?.trim() ||
-    "google/gemini-2.5-flash-preview-tts"
+    process.env.OPENROUTER_TTS_MODEL?.trim() || "hexgrad/kokoro-82m"
   );
 }
 

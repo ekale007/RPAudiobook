@@ -65,7 +65,7 @@ export const DEFAULT_TTS: TtsSettings = {
   elevenLabsVoiceId: "JBFqnCBsd6RMkjVDRZzb",
   elevenLabsModelId: "eleven_multilingual_v2",
   openRouterTtsModel: DEFAULT_OPENROUTER_TTS_MODEL,
-  openRouterTtsVoice: "Kore",
+  openRouterTtsVoice: "af_bella",
   fishAudioModel: DEFAULT_FISH_AUDIO_MODEL,
   fishAudioReferenceId: DEFAULT_FISH_AUDIO_REFERENCE_ID,
   pronunciationMap: {},

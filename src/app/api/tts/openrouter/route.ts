@@ -14,6 +14,7 @@ import { insertUsageEvent } from "@/lib/server/usageEvents";
 import {
   normalizeOpenRouterTtsModel,
   normalizeOpenRouterTtsVoice,
+  formatOpenRouterTtsError,
 } from "@/lib/tts/openRouterTtsModels";
 
 const OPENROUTER_SPEECH_URL = "https://openrouter.ai/api/v1/audio/speech";
@@ -96,16 +97,15 @@ export async function POST(req: Request) {
 
   if (!upstream.ok) {
     const errText = await upstream.text().catch(() => "");
-    let message = errText?.slice(0, 800) || upstream.statusText || "TTS failed";
-    try {
-      const parsed = JSON.parse(errText) as { error?: { message?: string } };
-      if (parsed.error?.message?.trim()) message = parsed.error.message.trim();
-    } catch {
-      /* plain text */
-    }
+    const message = formatOpenRouterTtsError(upstream.status, errText, model);
     return NextResponse.json(
       { error: message, model, voice },
-      { status: upstream.status >= 400 && upstream.status < 600 ? upstream.status : 502 },
+      {
+        status:
+          upstream.status >= 400 && upstream.status < 600
+            ? upstream.status
+            : 502,
+      },
     );
   }
 
