@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { ElevenLabsVoiceSelect } from "@/components/ElevenLabsVoiceSelect";
+import { FishAudioVoiceSelect } from "@/components/FishAudioVoiceSelect";
+import { OpenRouterTtsVoiceSelect } from "@/components/OpenRouterTtsVoiceSelect";
 import { QwenVoiceEditor } from "@/components/QwenVoiceEditor";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -30,8 +32,8 @@ import {
 } from "@/lib/tts/qwenVoiceProfiles";
 import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
 import {
-  openRouterTtsModelMeta,
   DEFAULT_OPENROUTER_TTS_MODEL,
+  normalizeOpenRouterTtsModel,
 } from "@/lib/tts/openRouterTtsModels";
 import { defaultEnabledCastSlugs } from "@/lib/tts/voiceActivation";
 import {
@@ -95,6 +97,8 @@ export default function StoryVoicesPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [protagonistLabel, setProtagonistLabel] = useState("Protagonist (du)");
+  const [orTtsModel, setOrTtsModel] = useState(DEFAULT_OPENROUTER_TTS_MODEL);
+  const [fishModel, setFishModel] = useState("s2-pro");
   const [expandedSlug, setExpandedSlug] = useState<string | null>("narrator");
 
   useEffect(() => {
@@ -107,6 +111,8 @@ export default function StoryVoicesPage() {
         }
         const tts = loadTtsSettings();
         setTtsProvider(tts.provider);
+        setOrTtsModel(normalizeOpenRouterTtsModel(tts.openRouterTtsModel));
+        setFishModel(tts.fishAudioModel || "s2-pro");
         setLocalEngine(tts.localEngine ?? "edge");
 
         Promise.all([
@@ -364,35 +370,22 @@ export default function StoryVoicesPage() {
                       }
                     />
                   ) : ttsProvider === "openrouter-tts" ? (
-                    <select
+                    <OpenRouterTtsVoiceSelect
+                      model={orTtsModel}
                       value={currentVoice}
-                      onChange={(e) =>
-                        setVoiceMap((prev) => ({
-                          ...prev,
-                          [s.slug]: e.target.value,
-                        }))
+                      onChange={(id) =>
+                        setVoiceMap((prev) => ({ ...prev, [s.slug]: id }))
                       }
-                      className="w-full rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-xs"
-                    >
-                      {openRouterTtsModelMeta(DEFAULT_OPENROUTER_TTS_MODEL).voices.map(
-                        (v) => (
-                          <option key={v.id} value={v.id}>
-                            {v.label}
-                          </option>
-                        ),
-                      )}
-                    </select>
+                      allowCustom
+                    />
                   ) : ttsProvider === "fish-audio" ? (
-                    <input
+                    <FishAudioVoiceSelect
                       value={currentVoice}
-                      onChange={(e) =>
-                        setVoiceMap((prev) => ({
-                          ...prev,
-                          [s.slug]: e.target.value,
-                        }))
+                      onChange={(id) =>
+                        setVoiceMap((prev) => ({ ...prev, [s.slug]: id }))
                       }
-                      className="w-full rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-xs"
-                      placeholder="Fish reference_id"
+                      fishModel={fishModel}
+                      allowCustom
                     />
                   ) : (
                     <select

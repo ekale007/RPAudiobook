@@ -30,6 +30,8 @@ import {
 } from "@/lib/tts/pronunciation";
 import { useServerCapabilities } from "@/lib/server/useServerCapabilities";
 import { ElevenLabsVoiceSelect } from "@/components/ElevenLabsVoiceSelect";
+import { FishAudioVoiceSelect } from "@/components/FishAudioVoiceSelect";
+import { OpenRouterTtsVoiceSelect } from "@/components/OpenRouterTtsVoiceSelect";
 import { ELEVEN_DEFAULT_MODEL } from "@/lib/tts/elevenLabsVoices";
 import {
   ELEVEN_TTS_MODEL_OPTIONS,
@@ -44,7 +46,7 @@ import {
   OPENROUTER_TTS_MODEL_OPTIONS,
   normalizeOpenRouterTtsModel,
   normalizeOpenRouterTtsVoice,
-  openRouterTtsModelMeta,
+  defaultOpenRouterTtsVoice,
 } from "@/lib/tts/openRouterTtsModels";
 import {
   PREFS_UPDATED_EVENT,
@@ -210,11 +212,6 @@ export default function SettingsPage() {
       applyEnginePreset("qwen");
     }
   }, [ttsProvider]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const selectedOrTtsMeta = useMemo(
-    () => openRouterTtsModelMeta(orTtsModel),
-    [orTtsModel],
-  );
 
   const saveTts = () => {
     saveTtsSettings({
@@ -582,7 +579,7 @@ export default function SettingsPage() {
                     value={normalizeOpenRouterTtsModel(orTtsModel)}
                     onChange={(e) => {
                       const nextModel = normalizeOpenRouterTtsModel(e.target.value);
-                      const nextVoice = openRouterTtsModelMeta(nextModel).defaultVoice;
+                      const nextVoice = defaultOpenRouterTtsVoice(nextModel);
                       setOrTtsModel(nextModel);
                       setOrTtsVoice(nextVoice);
                       persistTtsFromState({
@@ -602,26 +599,20 @@ export default function SettingsPage() {
                   <label className="mb-1 block text-xs text-zinc-400">
                     Erzähler-Stimme
                   </label>
-                  <select
-                    value={normalizeOpenRouterTtsVoice(orTtsModel, orTtsVoice)}
-                    onChange={(e) => {
-                      setOrTtsVoice(e.target.value);
+                  <OpenRouterTtsVoiceSelect
+                    model={normalizeOpenRouterTtsModel(orTtsModel)}
+                    value={orTtsVoice}
+                    onChange={(id) => {
+                      setOrTtsVoice(id);
                       persistTtsFromState({
                         ttsProvider: "openrouter-tts",
-                        orTtsVoice: e.target.value,
+                        orTtsVoice: id,
                       });
                     }}
-                    className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-2 py-2 text-sm"
-                  >
-                    {selectedOrTtsMeta.voices.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.label}
-                      </option>
-                    ))}
-                  </select>
+                    label=""
+                  />
                   <p className="text-[10px] text-zinc-600">
-                    Günstigster Einstieg: Kokoro 82M. Cast-Stimmen unter
-                    Figuren-Stimmen (Voice-ID pro Sprecher).
+                    Alle Preset-Stimmen pro Modell. Cast unter Figuren-Stimmen.
                   </p>
                 </>
               ) : (
@@ -669,30 +660,30 @@ export default function SettingsPage() {
                       </option>
                     ))}
                   </select>
-                  <label className="mb-1 block text-xs text-zinc-400">
-                    Erzähler reference_id
-                  </label>
-                  <input
+                  <FishAudioVoiceSelect
                     value={fishRefId}
-                    onChange={(e) => setFishRefId(e.target.value)}
-                    onBlur={() =>
-                      persistTtsFromState({ ttsProvider: "fish-audio" })
-                    }
-                    className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
-                    placeholder={DEFAULT_FISH_AUDIO_REFERENCE_ID}
-                    autoComplete="off"
+                    onChange={(id) => {
+                      setFishRefId(id);
+                      persistTtsFromState({
+                        ttsProvider: "fish-audio",
+                        fishRefId: id,
+                      });
+                    }}
+                    fishModel={fishModel}
+                    label="Erzähler-Stimme (My Voices)"
                   />
                   <p className="text-[10px] text-zinc-600">
-                    Voice-ID aus der{" "}
+                    Wie ElevenLabs: Stimmen aus deinem Fish-Konto. Auf{" "}
                     <a
                       href="https://fish.audio"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-accent underline"
                     >
-                      Fish Audio Voice Library
+                      fish.audio
                     </a>
-                    . Pro Cast-Figur eigene ID unter Figuren-Stimmen.
+                    klonen, dann hier auswählen. Pro Cast-Figur unter
+                    Figuren-Stimmen.
                   </p>
                 </>
               )}

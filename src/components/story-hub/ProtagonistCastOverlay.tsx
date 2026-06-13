@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { ElevenLabsVoiceSelect } from "@/components/ElevenLabsVoiceSelect";
+import { FishAudioVoiceSelect } from "@/components/FishAudioVoiceSelect";
+import { OpenRouterTtsVoiceSelect } from "@/components/OpenRouterTtsVoiceSelect";
 import { QwenVoiceEditor } from "@/components/QwenVoiceEditor";
 import { OverlayPanel } from "@/components/ui/OverlayPanel";
 import { updateStorySettings } from "@/lib/db/stories";
@@ -9,7 +11,8 @@ import { formatUnknownError } from "@/lib/util/formatUnknownError";
 import { voiceMapForStorage } from "@/lib/tts/defaultVoiceMap";
 import { emptyQwenProfile } from "@/lib/tts/qwenVoiceProfiles";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
-import type { TtsProvider } from "@/lib/storage/ttsSettings";
+import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
+import { normalizeOpenRouterTtsModel } from "@/lib/tts/openRouterTtsModels";
 import {
   defaultProtagonistProfile,
   PROTAGONIST_SPEAKER_SLUG,
@@ -256,6 +259,32 @@ export function ProtagonistCastOverlay({
               })
             }
             storyLocale={storyLocale}
+            allowCustom
+          />
+        ) : ttsProvider === "openrouter-tts" ? (
+          <OpenRouterTtsVoiceSelect
+            model={normalizeOpenRouterTtsModel(
+              loadTtsSettings().openRouterTtsModel,
+            )}
+            value={currentVoice}
+            onChange={(id) =>
+              onVoiceMapChange({
+                ...voiceMap,
+                [PROTAGONIST_SPEAKER_SLUG]: id,
+              })
+            }
+            allowCustom
+          />
+        ) : ttsProvider === "fish-audio" ? (
+          <FishAudioVoiceSelect
+            value={currentVoice}
+            onChange={(id) =>
+              onVoiceMapChange({
+                ...voiceMap,
+                [PROTAGONIST_SPEAKER_SLUG]: id,
+              })
+            }
+            fishModel={loadTtsSettings().fishAudioModel || "s2-pro"}
             allowCustom
           />
         ) : (

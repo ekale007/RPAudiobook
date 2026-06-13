@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CharacterAvatarUpload } from "@/components/CharacterAvatarUpload";
 import { ElevenLabsVoiceSelect } from "@/components/ElevenLabsVoiceSelect";
+import { FishAudioVoiceSelect } from "@/components/FishAudioVoiceSelect";
+import { OpenRouterTtsVoiceSelect } from "@/components/OpenRouterTtsVoiceSelect";
 import { QwenVoiceEditor } from "@/components/QwenVoiceEditor";
 import { OverlayPanel } from "@/components/ui/OverlayPanel";
 import {
@@ -25,6 +27,7 @@ import {
 } from "@/lib/storage/openRouterSettings";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
 import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
+import { normalizeOpenRouterTtsModel } from "@/lib/tts/openRouterTtsModels";
 import type {
   QwenVoiceProfile,
   StorySettings,
@@ -118,6 +121,9 @@ export function CastCharacterOverlay({
   if (!character || !draft) return null;
 
   const isNarrator = character.role === "narrator";
+  const ttsSettings = loadTtsSettings();
+  const orTtsModel = normalizeOpenRouterTtsModel(ttsSettings.openRouterTtsModel);
+  const fishModel = ttsSettings.fishAudioModel || "s2-pro";
   const voiceDisabled = !isNarrator && !voiceEnabledSlugs.includes(character.slug);
   const profile =
     qwenProfile ?? emptyQwenProfile(character.slug);
@@ -318,6 +324,26 @@ export function CastCharacterOverlay({
               }
               disabled={voiceDisabled}
               storyLocale={storyLocale}
+              allowCustom
+            />
+          ) : ttsProvider === "openrouter-tts" ? (
+            <OpenRouterTtsVoiceSelect
+              model={orTtsModel}
+              value={currentVoice}
+              onChange={(id) =>
+                onVoiceMapChange({ ...voiceMap, [character.slug]: id })
+              }
+              disabled={voiceDisabled}
+              allowCustom
+            />
+          ) : ttsProvider === "fish-audio" ? (
+            <FishAudioVoiceSelect
+              value={currentVoice}
+              onChange={(id) =>
+                onVoiceMapChange({ ...voiceMap, [character.slug]: id })
+              }
+              disabled={voiceDisabled}
+              fishModel={fishModel}
               allowCustom
             />
           ) : (

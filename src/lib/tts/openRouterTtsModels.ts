@@ -1,11 +1,20 @@
 /** OpenRouter speech models — POST /api/v1/audio/speech */
 
+import {
+  defaultOpenRouterTtsVoice,
+  isKnownOpenRouterTtsVoice,
+  openRouterTtsVoicesForModel,
+  type OpenRouterTtsVoiceEntry,
+} from "@/lib/tts/openRouterTtsVoices";
+
+export { defaultOpenRouterTtsVoice } from "@/lib/tts/openRouterTtsVoices";
+
 export type OpenRouterTtsModelOption = {
   id: string;
   label: string;
   hint: string;
   defaultVoice: string;
-  voices: Array<{ id: string; label: string }>;
+  voices: OpenRouterTtsVoiceEntry[];
 };
 
 /** Slugs that OpenRouter no longer serves — map to a current default. */
@@ -17,42 +26,23 @@ export const OPENROUTER_TTS_MODEL_OPTIONS: OpenRouterTtsModelOption[] = [
   {
     id: "hexgrad/kokoro-82m",
     label: "Kokoro 82M",
-    hint: "~$0,62/M Zeichen",
-    defaultVoice: "af_bella",
-    voices: [
-      { id: "af_bella", label: "Bella (EN)" },
-      { id: "af_heart", label: "Heart (EN)" },
-      { id: "am_adam", label: "Adam (EN)" },
-      { id: "bf_emma", label: "Emma (EN)" },
-      { id: "alloy", label: "Alloy (OpenRouter)" },
-    ],
+    hint: "~$0,62/M Zeichen · 54 Stimmen",
+    defaultVoice: defaultOpenRouterTtsVoice("hexgrad/kokoro-82m"),
+    voices: openRouterTtsVoicesForModel("hexgrad/kokoro-82m"),
   },
   {
     id: "google/gemini-3.1-flash-tts-preview",
     label: "Gemini 3.1 Flash TTS",
     hint: "~$20/M Audio · Emotion-Tags",
-    defaultVoice: "Kore",
-    voices: [
-      { id: "Kore", label: "Kore" },
-      { id: "Puck", label: "Puck" },
-      { id: "Charon", label: "Charon" },
-      { id: "Fenrir", label: "Fenrir" },
-      { id: "Aoede", label: "Aoede" },
-    ],
+    defaultVoice: defaultOpenRouterTtsVoice("google/gemini-3.1-flash-tts-preview"),
+    voices: openRouterTtsVoicesForModel("google/gemini-3.1-flash-tts-preview"),
   },
   {
     id: "mistralai/voxtral-mini-tts-2603",
     label: "Voxtral Mini TTS",
     hint: "~$16/M Zeichen",
-    defaultVoice: "alloy",
-    voices: [
-      { id: "alloy", label: "Alloy" },
-      { id: "echo", label: "Echo" },
-      { id: "fable", label: "Fable" },
-      { id: "onyx", label: "Onyx" },
-      { id: "nova", label: "Nova" },
-      { id: "shimmer", label: "Shimmer" },
-    ],
+    defaultVoice: defaultOpenRouterTtsVoice("mistralai/voxtral-mini-tts-2603"),
+    voices: openRouterTtsVoicesForModel("mistralai/voxtral-mini-tts-2603"),
   },
 ];
 
@@ -82,11 +72,11 @@ export function normalizeOpenRouterTtsVoice(
   model: string | undefined | null,
   voice?: string | null,
 ): string {
-  const meta = openRouterTtsModelMeta(model);
   const trimmed = voice?.trim();
-  if (!trimmed) return meta.defaultVoice;
-  if (meta.voices.some((v) => v.id === trimmed)) return trimmed;
-  return meta.defaultVoice;
+  if (!trimmed) return defaultOpenRouterTtsVoice(model);
+  if (isKnownOpenRouterTtsVoice(model, trimmed)) return trimmed;
+  if (trimmed.length >= 4) return trimmed;
+  return defaultOpenRouterTtsVoice(model);
 }
 
 export function parseOpenRouterTtsErrorBody(raw: string): string {
