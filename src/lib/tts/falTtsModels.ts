@@ -114,6 +114,13 @@ export function isKnownFalTtsVoice(
   return meta.voices.some((v) => v.id === voice);
 }
 
+/** Fish / Eleven voice IDs are invalid for fal presets — fall back to default. */
+function looksLikeForeignTtsVoiceId(voice: string): boolean {
+  if (/^[a-f0-9]{32}$/i.test(voice)) return true;
+  if (/^[A-Za-z0-9]{20,}$/.test(voice) && !voice.includes("_")) return true;
+  return false;
+}
+
 export function normalizeFalTtsVoice(
   model: string | undefined | null,
   voice?: string | null,
@@ -121,6 +128,9 @@ export function normalizeFalTtsVoice(
   const trimmed = voice?.trim();
   if (!trimmed) return defaultFalTtsVoice(model);
   if (isKnownFalTtsVoice(model, trimmed)) return trimmed;
+  if (looksLikeForeignTtsVoiceId(trimmed)) {
+    return defaultFalTtsVoice(model);
+  }
   if (trimmed.length >= 2) return trimmed;
   return defaultFalTtsVoice(model);
 }
@@ -147,33 +157,64 @@ export function buildFalTtsInput(
   if (meta.voiceStyle === "minimax_voice_id") {
     return {
       text,
+      output_format: "url",
+      language_boost: "auto",
       voice_setting: { voice_id: resolvedVoice },
     };
   }
 
+  if (model.includes("elevenlabs")) {
+    return {
+      text,
+      voice: resolvedVoice,
+      stability: 0.5,
+      apply_text_normalization: "auto",
+    };
+  }
+
+  if (meta.textField === "prompt") {
+    return {
+      prompt: text,
+      voice: resolvedVoice,
+      speed: 1,
+    };
+  }
+
   return {
-    [meta.textField]: text,
+    text,
     voice: resolvedVoice,
   };
 }
 
-export function formatFalTtsError(status: number, rawBody?: string): string {
-  const trimmed = rawBody?.trim() ?? "";
-  let detail = trimmed;
+function parseFalErrorDetail(raw: string): string {
   try {
-    const parsed = JSON.parse(trimmed) as {
-      detail?: string;
+    const parsed = JSON.parse(raw) as {
+      detail?: string | Array<{ msg?: string; type?: string }>;
       message?: string;
       error?: string;
     };
-    detail =
-      parsed.detail?.trim() ||
+    if (Array.isArray(parsed.detail)) {
+      const parts = parsed.detail
+        .map((entry) => entry.msg?.trim())
+        .filter(Boolean);
+      if (parts.length) return parts.join(" · ");
+    }
+    if (typeof parsed.detail === "string" && parsed.detail.trim()) {
+      return parsed.detail.trim();
+    }
+    return (
       parsed.message?.trim() ||
       parsed.error?.trim() ||
-      trimmed;
+      raw.slice(0, 400)
+    );
   } catch {
-    detail = trimmed.slice(0, 400);
+    return raw.slice(0, 400);
   }
+}
+
+export function formatFalTtsError(status: number, rawBody?: string): string {
+  const trimmed = rawBody?.trim() ?? "";
+  const detail = trimmed ? parseFalErrorDetail(trimmed) : "";
 
   const lower = detail.toLowerCase();
   if (status === 401 || status === 403) {

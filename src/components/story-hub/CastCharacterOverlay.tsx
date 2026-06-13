@@ -27,7 +27,7 @@ import {
   resolveChatModelSettings,
 } from "@/lib/storage/openRouterSettings";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
-import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
+import { loadTtsSettings, saveFishAudioPinnedIds, type TtsProvider } from "@/lib/storage/ttsSettings";
 import { normalizeOpenRouterTtsModel } from "@/lib/tts/openRouterTtsModels";
 import { normalizeFalTtsModel } from "@/lib/tts/falTtsModels";
 import type {
@@ -347,6 +347,8 @@ export function CastCharacterOverlay({
               }
               disabled={voiceDisabled}
               fishModel={fishModel}
+              pinnedIds={ttsSettings.fishAudioPinnedIds ?? []}
+              onPinnedIdsChange={saveFishAudioPinnedIds}
               allowCustom
             />
           ) : ttsProvider === "fal-ai" ? (

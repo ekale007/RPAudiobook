@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   clearFishAudioVoiceCatalogCache,
+  fishVoiceGroupLabel,
   fishVoiceOptionLabel,
   loadFishAudioVoiceCatalogDetailed,
   type FishVoiceCatalogEntry,
@@ -16,6 +17,8 @@ export function FishAudioVoiceSelect({
   label,
   allowCustom = true,
   fishModel = "s2-pro",
+  pinnedIds = [],
+  onPinnedIdsChange,
 }: {
   value: string;
   onChange: (referenceId: string) => void;
@@ -23,22 +26,29 @@ export function FishAudioVoiceSelect({
   label?: string;
   allowCustom?: boolean;
   fishModel?: string;
+  pinnedIds?: string[];
+  onPinnedIdsChange?: (ids: string[]) => void;
 }) {
   const [voices, setVoices] = useState<FishVoiceCatalogEntry[]>([]);
   const [catalogHint, setCatalogHint] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [previewing, setPreviewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [customIds, setCustomIds] = useState<string[]>([]);
   const [customDraft, setCustomDraft] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const autoPickedRef = useRef(false);
 
+  const pinned = useMemo(
+    () => pinnedIds.map((id) => id.trim()).filter((id) => id.length >= 8),
+    [pinnedIds],
+  );
+
   useEffect(() => {
     clearFishAudioVoiceCatalogCache();
-    loadFishAudioVoiceCatalogDetailed()
+    setLoading(true);
+    loadFishAudioVoiceCatalogDetailed(pinned)
       .then((result) => {
         setCatalogHint(result.hint);
         setVoices(result.voices);
@@ -51,33 +61,36 @@ export function FishAudioVoiceSelect({
         }
       })
       .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per mount
-  }, []);
-
-  useEffect(() => {
-    const trimmed = value?.trim();
-    if (
-      trimmed &&
-      trimmed.length >= 8 &&
-      !voices.some((v) => v.id === trimmed) &&
-      !customIds.includes(trimmed)
-    ) {
-      setCustomIds((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
-    }
-  }, [value, voices, customIds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when pinned list changes
+  }, [pinned.join(",")]);
 
   const catalogIds = useMemo(() => new Set(voices.map((v) => v.id)), [voices]);
 
-  const allOptions = useMemo(() => {
-    const extra = customIds
-      .filter((id) => !catalogIds.has(id))
-      .map((id) => ({
-        id,
-        label: "Eigene ID",
-        hint: id.slice(0, 14) + (id.length > 14 ? "…" : ""),
+  const groups = useMemo(() => {
+    const order: Array<NonNullable<FishVoiceCatalogEntry["source"]>> = [
+      "pinned",
+      "bookmark",
+      "self",
+    ];
+    const bySource = new Map<string, FishVoiceCatalogEntry[]>();
+    for (const v of voices) {
+      const key = v.source ?? "self";
+      const list = bySource.get(key) ?? [];
+      list.push(v);
+      bySource.set(key, list);
+    }
+    return order
+      .filter((src) => bySource.has(src))
+      .map((src) => ({
+        source: src,
+        label: fishVoiceGroupLabel(src),
+        voices: bySource.get(src)!,
       }));
-    return [...voices, ...extra];
-  }, [voices, customIds, catalogIds]);
+  }, [voices]);
+
+  const currentEntry = voices.find((v) => v.id === value);
+  const canRemovePinned =
+    currentEntry?.source === "pinned" && onPinnedIdsChange && value.trim();
 
   const stopPreview = useCallback(() => {
     audioRef.current?.pause();
@@ -134,20 +147,32 @@ export function FishAudioVoiceSelect({
     }
   };
 
-  const addCustomVoice = () => {
-    const id = customDraft.trim();
-    if (!id || id.length < 8) {
+  const addPinnedId = (id: string) => {
+    if (!onPinnedIdsChange) return;
+    const trimmed = id.trim();
+    if (trimmed.length < 8) {
       setError("reference_id mindestens 8 Zeichen.");
       return;
     }
     setError(null);
-    setCustomIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-    onChange(id);
+    if (!pinned.includes(trimmed)) {
+      onPinnedIdsChange([...pinned, trimmed]);
+    }
+    onChange(trimmed);
     setCustomDraft("");
     setShowCustomInput(false);
   };
 
-  const known = allOptions.some((v) => v.id === value);
+  const removePinnedId = (id: string) => {
+    if (!onPinnedIdsChange) return;
+    onPinnedIdsChange(pinned.filter((p) => p !== id));
+    if (value === id) {
+      const fallback = voices.find((v) => v.id !== id)?.id ?? "";
+      if (fallback) onChange(fallback);
+    }
+  };
+
+  const known = catalogIds.has(value);
 
   return (
     <div className={disabled ? "opacity-50" : undefined}>
@@ -155,12 +180,21 @@ export function FishAudioVoiceSelect({
         <label className="mb-1 block text-[10px] text-zinc-500">{label}</label>
       ) : null}
       {catalogHint && !loading ? (
-        <p className="mb-1 text-[10px] leading-snug text-zinc-500">{catalogHint}</p>
+        <p className="mb-1 text-[10px] leading-snug text-zinc-500">
+          {catalogHint} ·{" "}
+          <a
+            href="https://fish.audio/de/app/bookmarks/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent underline"
+          >
+            Lesezeichen verwalten
+          </a>
+        </p>
       ) : null}
       {!known && value && !loading ? (
         <p className="mb-1 text-[10px] text-amber-200/90">
-          Diese ID ist nicht in deiner Fish-Liste — unten eigene ID hinzufügen
-          oder auf fish.audio klonen.
+          ID nicht in der Liste — unten speichern oder auf fish.audio bookmarken.
         </p>
       ) : null}
       <div className="flex gap-1.5">
@@ -172,17 +206,19 @@ export function FishAudioVoiceSelect({
         >
           {loading ? (
             <option value={value}>Lade Fish-Stimmen…</option>
-          ) : allOptions.length === 0 ? (
+          ) : groups.length === 0 ? (
             <option value={value || ""}>
-              {value ? `Eigene: ${value.slice(0, 12)}…` : "Keine Stimmen geladen"}
+              {value ? `ID: ${value.slice(0, 12)}…` : "Keine Stimmen geladen"}
             </option>
           ) : (
-            allOptions.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.label === "Eigene ID"
-                  ? `Eigene: ${v.hint}`
-                  : fishVoiceOptionLabel(v as FishVoiceCatalogEntry)}
-              </option>
+            groups.map((g) => (
+              <optgroup key={g.source ?? g.label} label={g.label}>
+                {g.voices.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {fishVoiceOptionLabel(v)}
+                  </option>
+                ))}
+              </optgroup>
             ))
           )}
         </select>
@@ -208,10 +244,10 @@ export function FishAudioVoiceSelect({
             />
             <button
               type="button"
-              onClick={addCustomVoice}
+              onClick={() => addPinnedId(customDraft)}
               className="shrink-0 rounded-lg bg-accent/20 px-2 py-1 text-xs text-accent"
             >
-              OK
+              Speichern
             </button>
             <button
               type="button"
@@ -231,9 +267,20 @@ export function FishAudioVoiceSelect({
             onClick={() => setShowCustomInput(true)}
             className="mt-1.5 text-[10px] text-accent underline disabled:opacity-40"
           >
-            + Eigene reference_id hinzufügen
+            + ID aus Lesezeichen speichern
           </button>
         )
+      ) : null}
+
+      {canRemovePinned ? (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => removePinnedId(value)}
+          className="mt-1 text-[10px] text-zinc-500 underline disabled:opacity-40"
+        >
+          Gespeicherte ID entfernen
+        </button>
       ) : null}
 
       {error ? <p className="mt-1 text-[10px] text-red-400">{error}</p> : null}

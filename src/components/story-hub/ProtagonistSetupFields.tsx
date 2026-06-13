@@ -13,7 +13,7 @@ import {
   PROTAGONIST_SPEAKER_SLUG,
   type StoryContentLocale,
 } from "@/lib/story/protagonist";
-import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
+import { loadTtsSettings, saveFishAudioPinnedIds, type TtsProvider } from "@/lib/storage/ttsSettings";
 import { PREFS_UPDATED_EVENT } from "@/lib/storage/userPreferencesSync";
 import { normalizeOpenRouterTtsModel } from "@/lib/tts/openRouterTtsModels";
 import { normalizeFalTtsModel } from "@/lib/tts/falTtsModels";
@@ -216,6 +216,8 @@ export function ProtagonistSetupFields({
               })
             }
             fishModel={fishModel}
+            pinnedIds={ttsSettings.fishAudioPinnedIds ?? []}
+            onPinnedIdsChange={saveFishAudioPinnedIds}
             allowCustom
           />
         ) : ttsProvider === "fal-ai" ? (

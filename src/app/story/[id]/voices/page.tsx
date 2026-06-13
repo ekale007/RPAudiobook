@@ -31,7 +31,12 @@ import {
   buildQwenProfilesFromSettings,
   emptyQwenProfile,
 } from "@/lib/tts/qwenVoiceProfiles";
-import { loadTtsSettings, DEFAULT_TTS, type TtsProvider } from "@/lib/storage/ttsSettings";
+import {
+  loadTtsSettings,
+  saveFishAudioPinnedIds,
+  DEFAULT_TTS,
+  type TtsProvider,
+} from "@/lib/storage/ttsSettings";
 import {
   DEFAULT_OPENROUTER_TTS_MODEL,
   normalizeOpenRouterTtsModel,
@@ -102,6 +107,7 @@ export default function StoryVoicesPage() {
   const [orTtsModel, setOrTtsModel] = useState(DEFAULT_OPENROUTER_TTS_MODEL);
   const [fishModel, setFishModel] = useState("s2-pro");
   const [falTtsModel, setFalTtsModel] = useState(DEFAULT_TTS.falTtsModel);
+  const [fishPinnedIds, setFishPinnedIds] = useState<string[]>([]);
   const [expandedSlug, setExpandedSlug] = useState<string | null>("narrator");
 
   useEffect(() => {
@@ -117,6 +123,7 @@ export default function StoryVoicesPage() {
         setOrTtsModel(normalizeOpenRouterTtsModel(tts.openRouterTtsModel));
         setFishModel(tts.fishAudioModel || "s2-pro");
         setFalTtsModel(normalizeFalTtsModel(tts.falTtsModel));
+        setFishPinnedIds(tts.fishAudioPinnedIds ?? []);
         setLocalEngine(tts.localEngine ?? "edge");
 
         Promise.all([
@@ -391,6 +398,11 @@ export default function StoryVoicesPage() {
                         setVoiceMap((prev) => ({ ...prev, [s.slug]: id }))
                       }
                       fishModel={fishModel}
+                      pinnedIds={fishPinnedIds}
+                      onPinnedIdsChange={(ids) => {
+                        setFishPinnedIds(ids);
+                        saveFishAudioPinnedIds(ids);
+                      }}
                       allowCustom
                     />
                   ) : ttsProvider === "fal-ai" ? (

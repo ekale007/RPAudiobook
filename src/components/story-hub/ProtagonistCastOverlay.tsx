@@ -12,7 +12,7 @@ import { formatUnknownError } from "@/lib/util/formatUnknownError";
 import { voiceMapForStorage } from "@/lib/tts/defaultVoiceMap";
 import { emptyQwenProfile } from "@/lib/tts/qwenVoiceProfiles";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
-import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
+import { loadTtsSettings, saveFishAudioPinnedIds, type TtsProvider } from "@/lib/storage/ttsSettings";
 import { normalizeOpenRouterTtsModel } from "@/lib/tts/openRouterTtsModels";
 import { normalizeFalTtsModel } from "@/lib/tts/falTtsModels";
 import {
@@ -287,6 +287,8 @@ export function ProtagonistCastOverlay({
               })
             }
             fishModel={loadTtsSettings().fishAudioModel || "s2-pro"}
+            pinnedIds={loadTtsSettings().fishAudioPinnedIds ?? []}
+            onPinnedIdsChange={saveFishAudioPinnedIds}
             allowCustom
           />
         ) : ttsProvider === "fal-ai" ? (

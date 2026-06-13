@@ -137,6 +137,13 @@ function hasRemoteTts(remote: Partial<SyncedTtsPrefs>): boolean {
       remote.localVoice ||
       remote.elevenLabsVoiceId ||
       remote.elevenLabsModelId ||
+      remote.openRouterTtsModel ||
+      remote.openRouterTtsVoice ||
+      remote.fishAudioModel ||
+      remote.fishAudioReferenceId ||
+      (remote.fishAudioPinnedIds && remote.fishAudioPinnedIds.length > 0) ||
+      remote.falTtsModel ||
+      remote.falTtsVoice ||
       (remote.pronunciationMap &&
         Object.keys(remote.pronunciationMap).length > 0),
   );

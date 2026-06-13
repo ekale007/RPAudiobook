@@ -13,6 +13,7 @@ import { DEFAULT_OPENROUTER } from "@/lib/types";
 import {
   DEFAULT_TTS,
   loadTtsSettings,
+  saveFishAudioPinnedIds,
   saveTtsSettings,
   type TtsProvider,
   isBetaTtsProvider,
@@ -100,6 +101,9 @@ export default function SettingsPage() {
   const [orTtsVoice, setOrTtsVoice] = useState(DEFAULT_TTS.openRouterTtsVoice);
   const [fishModel, setFishModel] = useState(DEFAULT_TTS.fishAudioModel);
   const [fishRefId, setFishRefId] = useState(DEFAULT_TTS.fishAudioReferenceId);
+  const [fishPinnedIds, setFishPinnedIds] = useState<string[]>(
+    DEFAULT_TTS.fishAudioPinnedIds,
+  );
   const [falTtsModel, setFalTtsModel] = useState(DEFAULT_TTS.falTtsModel);
   const [falTtsVoice, setFalTtsVoice] = useState(DEFAULT_TTS.falTtsVoice);
   const [pronunciationText, setPronunciationText] = useState("");
@@ -145,6 +149,7 @@ export default function SettingsPage() {
     setOrTtsVoice(tts.openRouterTtsVoice);
     setFishModel(tts.fishAudioModel);
     setFishRefId(tts.fishAudioReferenceId);
+    setFishPinnedIds(tts.fishAudioPinnedIds ?? []);
     setFalTtsModel(tts.falTtsModel);
     setFalTtsVoice(tts.falTtsVoice);
     setPronunciationText(serializePronunciationMap(tts.pronunciationMap ?? {}));
@@ -239,6 +244,7 @@ export default function SettingsPage() {
       openRouterTtsVoice: orTtsVoice.trim(),
       fishAudioModel: fishModel.trim(),
       fishAudioReferenceId: fishRefId.trim(),
+      fishAudioPinnedIds: fishPinnedIds,
       falTtsModel: falTtsModel.trim(),
       falTtsVoice: falTtsVoice.trim(),
       pronunciationMap: parsePronunciationLines(pronunciationText),
@@ -291,6 +297,7 @@ export default function SettingsPage() {
         openRouterTtsVoice: nextOrVoice,
         fishAudioModel: nextFishModel,
         fishAudioReferenceId: nextFishRef,
+        fishAudioPinnedIds: fishPinnedIds,
         falTtsModel: nextFalModel,
         falTtsVoice: nextFalVoice,
         pronunciationMap: parsePronunciationLines(pronunciationText),
@@ -357,6 +364,7 @@ export default function SettingsPage() {
       orTtsVoice,
       fishModel,
       fishRefId,
+      fishPinnedIds,
       falTtsModel,
       falTtsVoice,
       pronunciationText,
@@ -708,19 +716,25 @@ export default function SettingsPage() {
                       });
                     }}
                     fishModel={fishModel}
-                    label="Erzähler-Stimme (My Voices)"
+                    pinnedIds={fishPinnedIds}
+                    onPinnedIdsChange={(ids) => {
+                      setFishPinnedIds(ids);
+                      saveFishAudioPinnedIds(ids);
+                    }}
+                    label="Erzähler-Stimme (Lesezeichen + gespeicherte IDs)"
                   />
                   <p className="text-[10px] text-zinc-600">
-                    Wie ElevenLabs: Stimmen aus deinem Fish-Konto. Auf{" "}
+                    Wie ElevenLabs: Lesezeichen von{" "}
                     <a
-                      href="https://fish.audio"
+                      href="https://fish.audio/de/app/bookmarks/"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-accent underline"
                     >
-                      fish.audio
+                      fish.audio/bookmarks
                     </a>
-                    klonen, dann hier auswählen. Pro Cast-Figur unter
+                    {" "}werden automatisch geladen. IDs kannst du zusätzlich
+                    speichern oder entfernen. Pro Cast-Figur unter
                     Figuren-Stimmen.
                   </p>
                 </>

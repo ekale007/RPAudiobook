@@ -35,3 +35,16 @@ export function normalizeFishAudioReferenceId(ref?: string | null): string {
   const trimmed = ref?.trim();
   return trimmed || DEFAULT_FISH_AUDIO_REFERENCE_ID;
 }
+
+export function normalizeFishAudioPinnedIds(ids?: string[] | null): string[] {
+  if (!ids?.length) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of ids) {
+    const id = raw?.trim();
+    if (!id || id.length < 8 || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}

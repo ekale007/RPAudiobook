@@ -6,27 +6,40 @@ export type FishVoiceCatalogEntry = {
   hint: string;
   languages?: string[];
   state?: string;
+  source?: "self" | "bookmark" | "pinned";
 };
 
 export type FishVoiceCatalogLoadResult = {
   voices: FishVoiceCatalogEntry[];
   hint: string;
-  source: "my-voices" | "empty" | "static-no-key" | "upstream-error" | "client-error";
+  source: "my-voices" | "bookmarks" | "pinned" | "empty" | "static-no-key" | "upstream-error" | "client-error";
 };
 
+let cacheKey: string | null = null;
 let cache: FishVoiceCatalogLoadResult | null = null;
 let inflight: Promise<FishVoiceCatalogLoadResult> | null = null;
 
 export function clearFishAudioVoiceCatalogCache(): void {
   cache = null;
+  cacheKey = null;
   inflight = null;
 }
 
-export async function loadFishAudioVoiceCatalogDetailed(): Promise<FishVoiceCatalogLoadResult> {
-  if (cache) return cache;
-  if (inflight) return inflight;
+export async function loadFishAudioVoiceCatalogDetailed(
+  pinnedIds: string[] = [],
+): Promise<FishVoiceCatalogLoadResult> {
+  const key = pinnedIds.join(",");
+  if (cache && cacheKey === key) return cache;
+  if (inflight && cacheKey === key) return inflight;
 
-  inflight = authFetch("/api/tts/fish/voices", { cache: "no-store" })
+  cacheKey = key;
+  const pinnedQuery = pinnedIds.length
+    ? `?pinned=${encodeURIComponent(pinnedIds.join(","))}`
+    : "";
+
+  inflight = authFetch(`/api/tts/fish/voices${pinnedQuery}`, {
+    cache: "no-store",
+  })
     .then(async (res) => {
       if (!res.ok) throw new Error(`Fish-Stimmenliste ${res.status}`);
       const json = (await res.json()) as Partial<FishVoiceCatalogLoadResult>;
@@ -57,4 +70,13 @@ export async function loadFishAudioVoiceCatalogDetailed(): Promise<FishVoiceCata
 
 export function fishVoiceOptionLabel(v: FishVoiceCatalogEntry): string {
   return `${v.label} — ${v.hint}`;
+}
+
+export function fishVoiceGroupLabel(
+  source: FishVoiceCatalogEntry["source"],
+): string {
+  if (source === "bookmark") return "Lesezeichen (fish.audio)";
+  if (source === "pinned") return "Gespeicherte IDs";
+  if (source === "self") return "Eigene Klone";
+  return "Stimmen";
 }

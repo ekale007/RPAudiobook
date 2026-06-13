@@ -18,6 +18,7 @@ import {
   DEFAULT_FISH_AUDIO_MODEL,
   DEFAULT_FISH_AUDIO_REFERENCE_ID,
   normalizeFishAudioModel,
+  normalizeFishAudioPinnedIds,
   normalizeFishAudioReferenceId,
 } from "@/lib/tts/fishAudioVoices";
 import {
@@ -59,6 +60,8 @@ export interface TtsSettings {
   /** Fish Audio model header + reference_id */
   fishAudioModel: string;
   fishAudioReferenceId: string;
+  /** Manually saved Fish reference_ids (Lesezeichen-IDs aus der App). */
+  fishAudioPinnedIds: string[];
   /** fal.ai endpoint id — POST fal.run/{id} */
   falTtsModel: string;
   falTtsVoice: string;
@@ -78,6 +81,7 @@ export const DEFAULT_TTS: TtsSettings = {
   openRouterTtsVoice: "af_bella",
   fishAudioModel: DEFAULT_FISH_AUDIO_MODEL,
   fishAudioReferenceId: DEFAULT_FISH_AUDIO_REFERENCE_ID,
+  fishAudioPinnedIds: [],
   falTtsModel: DEFAULT_FAL_TTS_MODEL,
   falTtsVoice: "af_bella",
   pronunciationMap: {},
@@ -164,6 +168,7 @@ export function normalizeTtsSettings(settings: TtsSettings): TtsSettings {
     out.fishAudioReferenceId = normalizeFishAudioReferenceId(
       out.fishAudioReferenceId,
     );
+    out.fishAudioPinnedIds = normalizeFishAudioPinnedIds(out.fishAudioPinnedIds);
   }
   if (out.provider === "fal-ai") {
     out.falTtsModel = normalizeFalTtsModel(out.falTtsModel);
@@ -229,6 +234,14 @@ export function saveTtsSettings(
       m.pushUserPreferencesToAccount(),
     );
   }
+}
+
+export function saveFishAudioPinnedIds(ids: string[]): void {
+  const tts = loadTtsSettings();
+  saveTtsSettings({
+    ...tts,
+    fishAudioPinnedIds: normalizeFishAudioPinnedIds(ids),
+  });
 }
 
 export function isTtsReady(settings: TtsSettings): boolean {
