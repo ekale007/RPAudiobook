@@ -109,6 +109,8 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     if (e instanceof FalTtsUpstreamError) {
+      const clientStatus =
+        e.status === 405 || e.status === 502 ? 502 : e.status;
       return NextResponse.json(
         {
           error: formatFalTtsError(e.status, e.rawBody),
@@ -117,7 +119,7 @@ export async function POST(req: Request) {
         },
         {
           status:
-            e.status >= 400 && e.status < 600 ? e.status : 502,
+            clientStatus >= 400 && clientStatus < 600 ? clientStatus : 502,
         },
       );
     }

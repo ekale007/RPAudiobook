@@ -35,7 +35,9 @@ export function FishAudioVoiceSelect({
   const [previewing, setPreviewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customDraft, setCustomDraft] = useState("");
+  const [bulkDraft, setBulkDraft] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
+  const [showBulkInput, setShowBulkInput] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const autoPickedRef = useRef(false);
@@ -163,6 +165,29 @@ export function FishAudioVoiceSelect({
     setShowCustomInput(false);
   };
 
+  const addPinnedIdsBulk = (raw: string) => {
+    if (!onPinnedIdsChange) return;
+    const tokens = raw
+      .split(/[\s,;]+/)
+      .map((t) => t.trim())
+      .filter((t) => t.length >= 8);
+    if (!tokens.length) {
+      setError("Keine gültigen IDs (min. 8 Zeichen, Leerzeichen/Komma getrennt).");
+      return;
+    }
+    setError(null);
+    const merged = [...pinned];
+    for (const id of tokens) {
+      if (!merged.includes(id)) merged.push(id);
+    }
+    onPinnedIdsChange(merged);
+    if (!value.trim() || !merged.includes(value)) {
+      onChange(tokens[0]!);
+    }
+    setBulkDraft("");
+    setShowBulkInput(false);
+  };
+
   const removePinnedId = (id: string) => {
     if (!onPinnedIdsChange) return;
     onPinnedIdsChange(pinned.filter((p) => p !== id));
@@ -234,7 +259,36 @@ export function FishAudioVoiceSelect({
       </div>
 
       {allowCustom ? (
-        showCustomInput ? (
+        showBulkInput ? (
+          <div className="mt-1.5 space-y-1">
+            <textarea
+              value={bulkDraft}
+              onChange={(e) => setBulkDraft(e.target.value)}
+              placeholder="IDs aus Lesezeichen einfügen (Leerzeile, Komma oder Leerzeichen)"
+              rows={3}
+              className="w-full rounded-lg border border-surface-border bg-surface px-2 py-1 text-xs"
+            />
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => addPinnedIdsBulk(bulkDraft)}
+                className="shrink-0 rounded-lg bg-accent/20 px-2 py-1 text-xs text-accent"
+              >
+                IDs speichern
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBulkInput(false);
+                  setBulkDraft("");
+                }}
+                className="shrink-0 rounded-lg border border-surface-border px-2 py-1 text-xs text-zinc-500"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        ) : showCustomInput ? (
           <div className="mt-1.5 flex gap-1">
             <input
               value={customDraft}
@@ -261,14 +315,24 @@ export function FishAudioVoiceSelect({
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => setShowCustomInput(true)}
-            className="mt-1.5 text-[10px] text-accent underline disabled:opacity-40"
-          >
-            + ID aus Lesezeichen speichern
-          </button>
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => setShowBulkInput(true)}
+              className="text-[10px] text-accent underline disabled:opacity-40"
+            >
+              + IDs aus Lesezeichen einfügen
+            </button>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => setShowCustomInput(true)}
+              className="text-[10px] text-zinc-500 underline disabled:opacity-40"
+            >
+              + einzelne ID
+            </button>
+          </div>
         )
       ) : null}
 

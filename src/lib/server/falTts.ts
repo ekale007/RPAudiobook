@@ -1,4 +1,4 @@
-/** Server-side fal.ai TTS — queue API (recommended) with sync fallback */
+/** Server-side fal.ai TTS — sync fal.run first, queue fallback with correct response URLs */
 
 import {
   buildFalTtsInput,
@@ -42,11 +42,15 @@ export class FalTtsUpstreamError extends Error {
   }
 }
 
-function authHeaders(apiKey: string): Record<string, string> {
+function postHeaders(apiKey: string): Record<string, string> {
   return {
     Authorization: `Key ${apiKey}`,
     "Content-Type": "application/json",
   };
+}
+
+function queueGetHeaders(apiKey: string): Record<string, string> {
+  return { Authorization: `Key ${apiKey}` };
 }
 
 function sleep(ms: number): Promise<void> {
@@ -58,6 +62,17 @@ function extractAudioUrl(data: FalTtsResponse): string | null {
   if (fromFile) return fromFile;
   const flat = data.audio_url?.trim();
   return flat || null;
+}
+
+function unwrapFalQueuePayload(raw: unknown): FalTtsResponse {
+  if (!raw || typeof raw !== "object") {
+    return (raw ?? {}) as FalTtsResponse;
+  }
+  const obj = raw as Record<string, unknown>;
+  if (obj.response && typeof obj.response === "object") {
+    return obj.response as FalTtsResponse;
+  }
+  return obj as FalTtsResponse;
 }
 
 async function downloadFalAudio(
@@ -80,17 +95,16 @@ async function downloadFalAudio(
 
 async function pollFalQueueResult(
   apiKey: string,
-  model: string,
-  requestId: string,
+  statusUrl: string,
+  responseUrl: string,
   timeoutMs = 120_000,
 ): Promise<FalTtsResponse> {
-  const statusUrl = `${FAL_QUEUE_BASE}/${model}/requests/${requestId}/status`;
-  const resultUrl = `${FAL_QUEUE_BASE}/${model}/requests/${requestId}`;
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
     const statusRes = await fetch(statusUrl, {
-      headers: { Authorization: `Key ${apiKey}` },
+      method: "GET",
+      headers: queueGetHeaders(apiKey),
       cache: "no-store",
     });
     if (!statusRes.ok) {
@@ -112,8 +126,9 @@ async function pollFalQueueResult(
     await sleep(600);
   }
 
-  const resultRes = await fetch(resultUrl, {
-    headers: { Authorization: `Key ${apiKey}` },
+  const resultRes = await fetch(responseUrl, {
+    method: "GET",
+    headers: queueGetHeaders(apiKey),
     cache: "no-store",
   });
   if (!resultRes.ok) {
@@ -121,7 +136,24 @@ async function pollFalQueueResult(
     throw new FalTtsUpstreamError(resultRes.status, errText);
   }
 
-  return (await resultRes.json()) as FalTtsResponse;
+  return unwrapFalQueuePayload(await resultRes.json());
+}
+
+function buildQueueUrls(
+  model: string,
+  submitJson: FalQueueSubmitResponse,
+): { statusUrl: string; responseUrl: string; requestId: string } {
+  const requestId = submitJson.request_id?.trim();
+  if (!requestId) {
+    throw new Error("fal.ai: keine request_id von der Queue");
+  }
+  const statusUrl =
+    submitJson.status_url?.trim() ||
+    `${FAL_QUEUE_BASE}/${model}/requests/${requestId}/status`;
+  const responseUrl =
+    submitJson.response_url?.trim() ||
+    `${FAL_QUEUE_BASE}/${model}/requests/${requestId}/response`;
+  return { statusUrl, responseUrl, requestId };
 }
 
 async function synthesizeFalTtsViaQueue(
@@ -131,7 +163,7 @@ async function synthesizeFalTtsViaQueue(
 ): Promise<{ audio: ArrayBuffer; contentType: string }> {
   const submitRes = await fetch(`${FAL_QUEUE_BASE}/${model}`, {
     method: "POST",
-    headers: authHeaders(apiKey),
+    headers: postHeaders(apiKey),
     body: JSON.stringify(input),
   });
 
@@ -141,12 +173,9 @@ async function synthesizeFalTtsViaQueue(
   }
 
   const submitJson = (await submitRes.json()) as FalQueueSubmitResponse;
-  const requestId = submitJson.request_id?.trim();
-  if (!requestId) {
-    throw new Error("fal.ai: keine request_id von der Queue");
-  }
+  const { statusUrl, responseUrl } = buildQueueUrls(model, submitJson);
 
-  const result = await pollFalQueueResult(apiKey, model, requestId);
+  const result = await pollFalQueueResult(apiKey, statusUrl, responseUrl);
   const audioUrl = extractAudioUrl(result);
   if (!audioUrl) {
     throw new Error("fal.ai: keine Audio-URL in der Queue-Antwort");
@@ -162,7 +191,7 @@ async function synthesizeFalTtsViaRun(
 ): Promise<{ audio: ArrayBuffer; contentType: string }> {
   const upstream = await fetch(`${FAL_RUN_BASE}/${model}`, {
     method: "POST",
-    headers: authHeaders(apiKey),
+    headers: postHeaders(apiKey),
     body: JSON.stringify(input),
   });
 
@@ -171,13 +200,21 @@ async function synthesizeFalTtsViaRun(
     throw new FalTtsUpstreamError(upstream.status, errText);
   }
 
-  const json = (await upstream.json()) as FalTtsResponse;
+  const json = unwrapFalQueuePayload(await upstream.json());
   const audioUrl = extractAudioUrl(json);
   if (!audioUrl) {
     throw new Error("fal.ai: keine Audio-URL in der Antwort");
   }
 
   return downloadFalAudio(audioUrl, json.audio?.content_type);
+}
+
+function shouldFallbackFromRun(status: number): boolean {
+  return status === 422 || status === 405 || status === 503 || status === 429;
+}
+
+function shouldFallbackFromQueue(status: number): boolean {
+  return status === 422 || status === 405 || status === 503;
 }
 
 export async function synthesizeFalTts(
@@ -191,10 +228,23 @@ export async function synthesizeFalTts(
   const input = buildFalTtsInput(model, text, resolvedVoice);
 
   try {
-    return await synthesizeFalTtsViaQueue(apiKey, model, input);
+    return await synthesizeFalTtsViaRun(apiKey, model, input);
   } catch (e) {
-    if (e instanceof FalTtsUpstreamError && e.status === 422) {
-      return synthesizeFalTtsViaRun(apiKey, model, input);
+    if (
+      e instanceof FalTtsUpstreamError &&
+      shouldFallbackFromRun(e.status)
+    ) {
+      try {
+        return await synthesizeFalTtsViaQueue(apiKey, model, input);
+      } catch (queueErr) {
+        if (
+          queueErr instanceof FalTtsUpstreamError &&
+          shouldFallbackFromQueue(queueErr.status)
+        ) {
+          return synthesizeFalTtsViaRun(apiKey, model, input);
+        }
+        throw queueErr;
+      }
     }
     throw e;
   }

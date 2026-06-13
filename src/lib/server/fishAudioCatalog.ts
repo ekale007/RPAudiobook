@@ -154,6 +154,7 @@ async function listSelfVoices(apiKey: string): Promise<FishVoiceCatalogEntry[]> 
     if (pageResult.error) break;
 
     for (const row of pageResult.items) {
+      if (!isTtsRow(row) || row.marked) continue;
       if (!isUsableFishRow(row)) continue;
       const mapped = mapFishRow(row, "self");
       if (mapped) voices.push(mapped);
@@ -167,7 +168,38 @@ async function listSelfVoices(apiKey: string): Promise<FishVoiceCatalogEntry[]> 
   return voices;
 }
 
-/** Paginate public library and collect marked=true (Fish Lesezeichen). */
+/** Marked voices from account listing (Fish may include saved/bookmarked here). */
+async function listMarkedFromSelf(apiKey: string): Promise<FishVoiceCatalogEntry[]> {
+  const voices: FishVoiceCatalogEntry[] = [];
+  const seen = new Set<string>();
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore && page <= 20) {
+    const pageResult = await fetchFishModelPage(apiKey, {
+      self: "true",
+      page_size: "50",
+      page_number: String(page),
+    });
+    if (pageResult.error) break;
+
+    for (const row of pageResult.items) {
+      if (!row.marked || !isUsableFishRow(row)) continue;
+      const mapped = mapFishRow(row, "bookmark");
+      if (!mapped || seen.has(mapped.id)) continue;
+      seen.add(mapped.id);
+      voices.push(mapped);
+    }
+
+    hasMore = pageResult.hasMore;
+    page += 1;
+    if (!pageResult.items.length) break;
+  }
+
+  return voices;
+}
+
+/** Scan discovery catalog for marked=true (only finds bookmarks on surfaced pages). */
 async function listBookmarkVoices(
   apiKey: string,
 ): Promise<FishVoiceCatalogEntry[]> {
@@ -175,28 +207,22 @@ async function listBookmarkVoices(
   const seen = new Set<string>();
   let page = 1;
   let hasMore = true;
-  let emptyMarkedStreak = 0;
 
-  while (hasMore && page <= 40) {
+  while (hasMore && page <= 80) {
     const pageResult = await fetchFishModelPage(apiKey, {
       page_size: "50",
       page_number: String(page),
-      sort_by: "created_at",
+      sort_by: "score",
     });
     if (pageResult.error) break;
 
-    let markedOnPage = 0;
     for (const row of pageResult.items) {
       if (!row.marked || !isUsableFishRow(row)) continue;
       const mapped = mapFishRow(row, "bookmark");
       if (!mapped || seen.has(mapped.id)) continue;
       seen.add(mapped.id);
       voices.push(mapped);
-      markedOnPage += 1;
     }
-
-    emptyMarkedStreak = markedOnPage === 0 ? emptyMarkedStreak + 1 : 0;
-    if (voices.length > 0 && emptyMarkedStreak >= 8) break;
 
     hasMore = pageResult.hasMore;
     page += 1;
@@ -278,7 +304,13 @@ export async function getFishAudioVoiceCatalog(
 
   try {
     const selfVoices = await listSelfVoices(apiKey);
-    const bookmarkVoices = await listBookmarkVoices(apiKey);
+    const markedFromSelf = await listMarkedFromSelf(apiKey);
+    const bookmarkFromCatalog = await listBookmarkVoices(apiKey);
+    const bookmarkById = new Map<string, FishVoiceCatalogEntry>();
+    for (const voice of [...markedFromSelf, ...bookmarkFromCatalog]) {
+      bookmarkById.set(voice.id, voice);
+    }
+    const bookmarkVoices = Array.from(bookmarkById.values());
     const pinnedVoices = await listPinnedVoices(apiKey, pinnedIds);
     const voices = mergeVoiceLists(pinnedVoices, bookmarkVoices, selfVoices);
 
@@ -287,7 +319,7 @@ export async function getFishAudioVoiceCatalog(
         voices: [],
         source: "empty",
         hint:
-          "Keine Fish-Stimmen gefunden. Lesezeichen auf fish.audio/de/app/bookmarks/ anlegen oder unten IDs speichern.",
+          "Keine Fish-Stimmen gefunden. IDs von fish.audio/de/app/bookmarks/ unten speichern (Lesezeichen-API ist account-gebunden — FISH_AUDIO_API_KEY muss dasselbe Konto sein).",
       };
     }
 
