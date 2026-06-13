@@ -1,5 +1,5 @@
 import { extractMarkedSnippets } from "@/lib/chat/dialogueQuotes";
-import { stripSpeakerTags } from "@/lib/chat/parseSpeakerBlocks";
+import { assistantTurnProseText } from "@/lib/chat/parseSpeakerBlocks";
 import type { CharacterRow } from "@/lib/db/stories";
 import { completeOpenRouter } from "@/lib/llm/openrouter";
 import {
@@ -104,7 +104,7 @@ export async function attributeDialogueWithLlm(
   },
 ): Promise<LlmAttributionMap> {
   const locale = options?.locale ?? "en";
-  const text = stripSpeakerTags(rawContent);
+  const text = assistantTurnProseText(rawContent);
   const snippets = extractMarkedSnippets(text, locale);
   const out: LlmAttributionMap = new Map();
 

@@ -10,6 +10,7 @@ import {
 } from "@/lib/chat/dialogueSpeakerInference";
 import type { SpeakerBlock } from "@/lib/chat/parseSpeakerBlocks";
 import {
+  assistantTurnProseText,
   hasSpeakerTags,
   parseSpeakerBlocks,
   preprocessAssistantMarkup,
@@ -38,9 +39,10 @@ export function buildDialogueAttributionMap(
   locale: StoryContentLocale = "en",
 ): Map<string, string> {
   const out = new Map<string, string>();
-  const text = stripSpeakerTags(rawContent);
+  const preprocessed = preprocessAssistantMarkup(rawContent);
+  const text = assistantTurnProseText(rawContent);
 
-  if (!hasSpeakerTags(rawContent)) {
+  if (!hasSpeakerTags(preprocessed)) {
     const snippets = extractMarkedSnippets(text, locale);
     const inferred = inferSpeakersOrdered(text, snippets, cast, locale);
     for (const snippet of snippets) {
@@ -50,7 +52,7 @@ export function buildDialogueAttributionMap(
     return out;
   }
 
-  const blocks = parseSpeakerBlocks(rawContent);
+  const blocks = parseSpeakerBlocks(preprocessed);
   const snippets = extractMarkedSnippets(text, locale);
   const inferred = inferSpeakersOrdered(text, snippets, cast, locale);
 
@@ -136,12 +138,13 @@ export function analyzeDialogueAttribution(
   llm?: Map<string, { slug: string; reasons: string[] }>,
   locale: StoryContentLocale = "en",
 ): DialogueSnippetAnalysis[] {
-  const text = stripSpeakerTags(content);
+  const preprocessed = preprocessAssistantMarkup(content);
+  const text = assistantTurnProseText(content);
   const snippets = extractMarkedSnippets(text, locale);
-  const tagged = hasSpeakerTags(content);
+  const tagged = hasSpeakerTags(preprocessed);
   const attribution = buildDialogueAttributionMap(content, cast, llm, locale);
   const inferred = inferSpeakersOrdered(text, snippets, cast, locale);
-  const blocks = tagged ? parseSpeakerBlocks(content) : [];
+  const blocks = tagged ? parseSpeakerBlocks(preprocessed) : [];
 
   return snippets.map((snippet) => {
     const block = tagged ? findBlockForSnippet(blocks, snippet, text) : null;

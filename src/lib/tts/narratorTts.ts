@@ -1,7 +1,7 @@
 import { concatAudioBlobs } from "@/lib/audio/concatAudioBlobs";
 import { chunkTextForTts } from "@/lib/tts/chunkText";
 import { QWEN_CLOUD_MAX_TEXT_CHARS } from "@/lib/tts/qwenCloudLimits";
-import { stripSpeakerTags } from "@/lib/chat/parseSpeakerBlocks";
+import { assistantTurnProseText } from "@/lib/chat/parseSpeakerBlocks";
 import {
   isSpeakableForTts,
   sanitizeTextForTtsRetry,
@@ -535,7 +535,7 @@ export async function getNarratorAudio(
     storySettings?: StorySettings | null;
   },
 ): Promise<{ blob: Blob; ttsCostCents?: number }> {
-  const splitSource = stripSpeakerTags(
+  const splitSource = assistantTurnProseText(
     stripSfxTags(options?.rawContent ?? text),
   );
   const activeOverrides = filterSegmentOverridesForActivation(
@@ -726,14 +726,18 @@ function splitByOverrides(
   }> = [];
   for (const [snippet, slug] of Object.entries(overrides)) {
     if (!snippet.trim() || !slug || slug === "narrator") continue;
-    const idx = text.indexOf(snippet);
-    if (idx < 0) continue;
-    occurrences.push({
-      start: idx,
-      end: idx + snippet.length,
-      snippet,
-      speakerSlug: slug,
-    });
+    let searchFrom = 0;
+    while (searchFrom < text.length) {
+      const idx = text.indexOf(snippet, searchFrom);
+      if (idx < 0) break;
+      occurrences.push({
+        start: idx,
+        end: idx + snippet.length,
+        snippet,
+        speakerSlug: slug,
+      });
+      searchFrom = idx + snippet.length;
+    }
   }
   if (!occurrences.length) return [{ text, speakerSlug: null }];
   occurrences.sort((a, b) => a.start - b.start);

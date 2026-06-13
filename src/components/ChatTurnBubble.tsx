@@ -130,7 +130,7 @@ export function ChatTurnBubble({
       map.set(s, attribution.get(s) ?? "narrator");
     }
     return map;
-  }, [markedSnippets, turn.content, cast, llmAttribution]);
+  }, [markedSnippets, turn.content, cast, llmAttribution, contentLocale]);
   const ttsContent = displayContent;
   const effectiveSegmentOverrides = useMemo(() => {
     const out: Record<string, string> = {};
@@ -505,13 +505,16 @@ function buildHighlightRanges(
   const occurrences: Array<{ start: number; end: number; snippet: string }> =
     [];
   for (const snippet of snippets) {
-    const idx = text.indexOf(snippet);
-    if (idx >= 0) {
+    let searchFrom = 0;
+    while (searchFrom < text.length) {
+      const idx = text.indexOf(snippet, searchFrom);
+      if (idx < 0) break;
       occurrences.push({
         start: idx,
         end: idx + snippet.length,
         snippet,
       });
+      searchFrom = idx + snippet.length;
     }
   }
   occurrences.sort((a, b) => a.start - b.start);

@@ -4,6 +4,7 @@ import {
 } from "@/lib/chat/dialogueAttributionLlm";
 import { buildDialogueAttributionMap } from "@/lib/chat/dialogueScript";
 import { extractMarkedSnippets } from "@/lib/chat/dialogueQuotes";
+import { assistantTurnProseText } from "@/lib/chat/parseSpeakerBlocks";
 import type { CharacterRow } from "@/lib/db/stories";
 import {
   normalizeStoryContentLocale,
@@ -76,7 +77,8 @@ export async function ensureDialogueAttribution(
   if (!orSettings) return null;
   if (!isLlmReady() && !orSettings.apiKey?.trim()) return null;
 
-  const snippets = extractMarkedSnippets(content, locale);
+  const prose = assistantTurnProseText(content);
+  const snippets = extractMarkedSnippets(prose, locale);
   if (!snippets.length) return null;
 
   const flightKey = `${turnId}:${hashTurnContent(content)}:${locale}`;

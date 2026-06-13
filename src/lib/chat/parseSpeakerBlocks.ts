@@ -107,6 +107,11 @@ export function stripSpeakerTags(text: string): string {
   );
 }
 
+/** Prose-only assistant text — same pipeline as chat bubbles (tags normalized, then stripped). */
+export function assistantTurnProseText(rawContent: string): string {
+  return stripSpeakerTags(preprocessAssistantMarkup(rawContent));
+}
+
 /** Collapse repeated tag-only lines and inline duplicate tags (model habit). */
 export function collapseConsecutiveSpeakerTags(text: string): string {
   let out = text.replace(
