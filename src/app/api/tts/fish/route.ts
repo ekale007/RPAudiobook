@@ -14,6 +14,7 @@ import {
   normalizeFishAudioModel,
   normalizeFishAudioReferenceId,
 } from "@/lib/tts/fishAudioVoices";
+import { formatFishAudioTtsError } from "@/lib/tts/fishAudioErrors";
 
 const FISH_TTS_URL = "https://api.fish.audio/v1/tts";
 
@@ -90,17 +91,20 @@ export async function POST(req: Request) {
 
   if (!upstream.ok) {
     const errText = await upstream.text().catch(() => "");
-    let message = errText?.slice(0, 800) || upstream.statusText || "TTS failed";
-    try {
-      const parsed = JSON.parse(errText) as { message?: string; error?: string };
-      if (parsed.message?.trim()) message = parsed.message.trim();
-      else if (parsed.error?.trim()) message = parsed.error.trim();
-    } catch {
-      /* plain text */
-    }
+    const formatted = formatFishAudioTtsError(upstream.status, errText);
     return NextResponse.json(
-      { error: message, model, referenceId },
-      { status: upstream.status >= 400 && upstream.status < 600 ? upstream.status : 502 },
+      {
+        error: formatted.message,
+        code: formatted.code,
+        model,
+        referenceId,
+      },
+      {
+        status:
+          upstream.status >= 400 && upstream.status < 600
+            ? upstream.status
+            : 502,
+      },
     );
   }
 

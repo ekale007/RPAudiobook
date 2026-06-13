@@ -636,7 +636,17 @@ export default function SettingsPage() {
                     <p className="mb-2 text-xs text-zinc-500">
                       Fish Audio S2-Pro aktiv — Emotion-Tags inline, z. B.{" "}
                       <code className="text-zinc-400">[excited]</code> oder{" "}
-                      <code className="text-zinc-400">[whisper]</code>.
+                      <code className="text-zinc-400">[whisper]</code>. API
+                      braucht Guthaben auf deinem Fish-Konto (
+                      <a
+                        href="https://fish.audio/app/billing"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-accent underline"
+                      >
+                        Billing
+                      </a>
+                      ) — sonst Fehler 402.
                     </p>
                   )}
                   <label className="mb-1 block text-xs text-zinc-400">
