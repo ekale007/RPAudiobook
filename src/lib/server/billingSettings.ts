@@ -161,6 +161,14 @@ export async function estimateTtsCostCents(
   modelId?: string,
 ): Promise<number> {
   const billing = await fetchBillingSettings(supabase);
+  return estimateTtsCostCentsFromBilling(billing, characters, modelId);
+}
+
+export function estimateTtsCostCentsFromBilling(
+  billing: BillingSettings,
+  characters: number,
+  modelId?: string,
+): number {
   const chars = Math.max(0, characters);
   if (!chars) return 0;
 
@@ -171,6 +179,48 @@ export async function estimateTtsCostCents(
 
   const eurCents = openRouterUsdToEurCents(
     (chars / 1000) * usdPer1k,
+    billing.usdToEurRate,
+  );
+  return eurCents > 0 ? eurCents : 0;
+}
+
+function envOpenRouterTtsUsdPer1k(): number {
+  const raw = process.env.BETA_OPENROUTER_TTS_USD_PER_1K?.trim();
+  const n = raw ? Number.parseFloat(raw) : 1;
+  return Number.isFinite(n) && n >= 0 ? n : 1;
+}
+
+function envFishTtsUsdPer1mBytes(): number {
+  const raw = process.env.BETA_FISH_TTS_USD_PER_1M_BYTES?.trim();
+  const n = raw ? Number.parseFloat(raw) : 15;
+  return Number.isFinite(n) && n >= 0 ? n : 15;
+}
+
+/** OpenRouter speech — flat $/1k chars (override via BETA_OPENROUTER_TTS_USD_PER_1K). */
+export async function estimateOpenRouterTtsCostCents(
+  supabase: SupabaseClient,
+  characters: number,
+): Promise<number> {
+  const billing = await fetchBillingSettings(supabase);
+  const chars = Math.max(0, characters);
+  if (!chars) return 0;
+  const eurCents = openRouterUsdToEurCents(
+    (chars / 1000) * envOpenRouterTtsUsdPer1k(),
+    billing.usdToEurRate,
+  );
+  return eurCents > 0 ? eurCents : 0;
+}
+
+/** Fish Audio — $/1M UTF-8 bytes (override via BETA_FISH_TTS_USD_PER_1M_BYTES). */
+export async function estimateFishTtsCostCents(
+  supabase: SupabaseClient,
+  utf8Bytes: number,
+): Promise<number> {
+  const billing = await fetchBillingSettings(supabase);
+  const bytes = Math.max(0, utf8Bytes);
+  if (!bytes) return 0;
+  const eurCents = openRouterUsdToEurCents(
+    (bytes / 1_000_000) * envFishTtsUsdPer1mBytes(),
     billing.usdToEurRate,
   );
   return eurCents > 0 ? eurCents : 0;

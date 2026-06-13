@@ -3,9 +3,22 @@ import type { PronunciationMap } from "@/lib/tts/pronunciation";
 
 import {
   isServerElevenLabsAvailable,
+  isServerFishAudioTtsAvailable,
+  isServerOpenRouterTtsAvailable,
   isServerQwenCloudTtsAvailable,
   isServerQwenTtsAvailable,
 } from "@/lib/server/serverCapabilities";
+import {
+  DEFAULT_FISH_AUDIO_MODEL,
+  DEFAULT_FISH_AUDIO_REFERENCE_ID,
+  normalizeFishAudioModel,
+  normalizeFishAudioReferenceId,
+} from "@/lib/tts/fishAudioVoices";
+import {
+  DEFAULT_OPENROUTER_TTS_MODEL,
+  normalizeOpenRouterTtsModel,
+  normalizeOpenRouterTtsVoice,
+} from "@/lib/tts/openRouterTtsModels";
 import {
   coerceQwenPresetVoice,
   isValidQwenPresetVoice,
@@ -15,7 +28,13 @@ import { normalizeElevenLabsModelId } from "@/lib/tts/elevenLabsModels";
 import { QWEN_CLOUD_DEFAULT_NARRATOR } from "@/lib/tts/qwenCloudVoices";
 import { QWEN_DEFAULT_NARRATOR } from "@/lib/tts/qwenVoices";
 
-export type TtsProvider = "local" | "elevenlabs" | "qwen" | "qwen-cloud";
+export type TtsProvider =
+  | "local"
+  | "elevenlabs"
+  | "openrouter-tts"
+  | "fish-audio"
+  | "qwen"
+  | "qwen-cloud";
 
 export interface TtsSettings {
   provider: TtsProvider;
@@ -27,6 +46,12 @@ export interface TtsSettings {
   elevenLabsApiKey: string;
   elevenLabsVoiceId: string;
   elevenLabsModelId: string;
+  /** OpenRouter speech model — POST /api/v1/audio/speech */
+  openRouterTtsModel: string;
+  openRouterTtsVoice: string;
+  /** Fish Audio model header + reference_id */
+  fishAudioModel: string;
+  fishAudioReferenceId: string;
   /** Optional pronunciation overrides, e.g. "Elias" -> "Eh-LEE-as". */
   pronunciationMap?: PronunciationMap;
 }
@@ -39,8 +64,23 @@ export const DEFAULT_TTS: TtsSettings = {
   elevenLabsApiKey: "",
   elevenLabsVoiceId: "JBFqnCBsd6RMkjVDRZzb",
   elevenLabsModelId: "eleven_multilingual_v2",
+  openRouterTtsModel: DEFAULT_OPENROUTER_TTS_MODEL,
+  openRouterTtsVoice: "Kore",
+  fishAudioModel: DEFAULT_FISH_AUDIO_MODEL,
+  fishAudioReferenceId: DEFAULT_FISH_AUDIO_REFERENCE_ID,
   pronunciationMap: {},
 };
+
+/** Beta server UI — only these three cloud providers. */
+export const BETA_TTS_PROVIDERS: TtsProvider[] = [
+  "elevenlabs",
+  "openrouter-tts",
+  "fish-audio",
+];
+
+export function isBetaTtsProvider(provider: TtsProvider): boolean {
+  return BETA_TTS_PROVIDERS.includes(provider);
+}
 
 const STORAGE_KEY = "hoerbuchki.tts";
 const TTS_META_KEY = "hoerbuchki.tts.meta";
@@ -98,6 +138,19 @@ export function normalizeTtsSettings(settings: TtsSettings): TtsSettings {
   if (out.provider === "elevenlabs") {
     out.elevenLabsVoiceId = coerceElevenLabsVoiceId(out.elevenLabsVoiceId);
     out.elevenLabsModelId = normalizeElevenLabsModelId(out.elevenLabsModelId);
+  }
+  if (out.provider === "openrouter-tts") {
+    out.openRouterTtsModel = normalizeOpenRouterTtsModel(out.openRouterTtsModel);
+    out.openRouterTtsVoice = normalizeOpenRouterTtsVoice(
+      out.openRouterTtsModel,
+      out.openRouterTtsVoice,
+    );
+  }
+  if (out.provider === "fish-audio") {
+    out.fishAudioModel = normalizeFishAudioModel(out.fishAudioModel);
+    out.fishAudioReferenceId = normalizeFishAudioReferenceId(
+      out.fishAudioReferenceId,
+    );
   }
   if (
     (out.provider === "qwen" || out.provider === "qwen-cloud") &&
@@ -163,6 +216,15 @@ export function saveTtsSettings(
 
 export function isTtsReady(settings: TtsSettings): boolean {
   if (settings.provider === "local") return true;
+  if (settings.provider === "openrouter-tts") {
+    return isServerOpenRouterTtsAvailable();
+  }
+  if (settings.provider === "fish-audio") {
+    return (
+      isServerFishAudioTtsAvailable() &&
+      Boolean(settings.fishAudioReferenceId.trim())
+    );
+  }
   if (settings.provider === "qwen") {
     return isServerQwenTtsAvailable() || settings.localServerUrl.trim().length > 0;
   }
@@ -183,6 +245,12 @@ export function ttsCacheVoiceKey(settings: TtsSettings): string {
   }
   if (settings.provider === "qwen-cloud") {
     return `qwen-cloud:${settings.localVoice}:v1`;
+  }
+  if (settings.provider === "openrouter-tts") {
+    return `or-tts:${settings.openRouterTtsModel}:${settings.openRouterTtsVoice}`;
+  }
+  if (settings.provider === "fish-audio") {
+    return `fish:${settings.fishAudioModel}:${settings.fishAudioReferenceId}`;
   }
   const elModel = settings.elevenLabsModelId || "eleven_multilingual_v2";
   const elVer = elModel.includes("v3") ? "v3d" : "v2";

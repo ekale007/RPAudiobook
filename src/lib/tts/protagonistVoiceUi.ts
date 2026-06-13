@@ -8,8 +8,9 @@ import { KOKORO_VOICES } from "@/lib/tts/kokoroVoices";
 import { QWEN_DEFAULT_NARRATOR, QWEN_VOICES } from "@/lib/tts/qwenVoices";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
 import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
-import type { StoryContentLocale } from "@/lib/story/protagonist";
-import { PROTAGONIST_SPEAKER_SLUG } from "@/lib/story/protagonist";
+import { DEFAULT_FISH_AUDIO_REFERENCE_ID } from "@/lib/tts/fishAudioVoices";
+import { openRouterTtsModelMeta, DEFAULT_OPENROUTER_TTS_MODEL } from "@/lib/tts/openRouterTtsModels";
+import { PROTAGONIST_SPEAKER_SLUG, type StoryContentLocale } from "@/lib/story/protagonist";
 import type { VoiceMap } from "@/lib/types";
 
 export function voiceOptionsForEngine(engine: LocalTtsEngine) {
@@ -33,6 +34,12 @@ export function fallbackVoice(provider: TtsProvider, engine: LocalTtsEngine): st
   if (provider === "elevenlabs") return ELEVEN_DEFAULT_NARRATOR;
   if (provider === "qwen" || provider === "qwen-cloud") {
     return QWEN_DEFAULT_NARRATOR;
+  }
+  if (provider === "openrouter-tts") {
+    return openRouterTtsModelMeta(DEFAULT_OPENROUTER_TTS_MODEL).defaultVoice;
+  }
+  if (provider === "fish-audio") {
+    return DEFAULT_FISH_AUDIO_REFERENCE_ID;
   }
   return engine === "qwen" ? QWEN_DEFAULT_NARRATOR : "af_bella";
 }

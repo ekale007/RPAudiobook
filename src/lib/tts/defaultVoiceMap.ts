@@ -10,6 +10,15 @@ import {
   mergeElevenVoiceMap,
 } from "@/lib/tts/elevenLabsVoices";
 import type { TtsProvider } from "@/lib/storage/ttsSettings";
+import {
+  DEFAULT_FISH_AUDIO_REFERENCE_ID,
+  normalizeFishAudioReferenceId,
+} from "@/lib/tts/fishAudioVoices";
+import {
+  DEFAULT_OPENROUTER_TTS_MODEL,
+  normalizeOpenRouterTtsVoice,
+  openRouterTtsModelMeta,
+} from "@/lib/tts/openRouterTtsModels";
 import { normalizeStoryLocale } from "@/lib/tts/ttsLocaleRouting";
 import { withProtagonistVoice } from "@/lib/story/protagonist";
 import { sanitizeVoiceMapForQwen } from "@/lib/tts/qwenVoiceSanitize";
@@ -53,6 +62,17 @@ export function mergeVoiceMapForProvider(
     map = mergeElevenVoiceMap(normalizeStoryLocale(locale), custom);
   } else if (provider === "qwen" || provider === "qwen-cloud") {
     map = sanitizeVoiceMapForQwen({ ...DEFAULT_QWEN_VOICE_MAP, ...custom });
+  } else if (provider === "openrouter-tts") {
+    const narrator = normalizeOpenRouterTtsVoice(
+      DEFAULT_OPENROUTER_TTS_MODEL,
+      custom?.narrator,
+    );
+    map = { narrator, ...custom };
+  } else if (provider === "fish-audio") {
+    const narrator = normalizeFishAudioReferenceId(
+      custom?.narrator ?? DEFAULT_FISH_AUDIO_REFERENCE_ID,
+    );
+    map = { narrator, ...custom };
   } else {
     map = mergeVoiceMap(custom);
   }
@@ -80,6 +100,12 @@ export function defaultNarratorVoiceForProvider(
   }
   if (provider === "qwen" || provider === "qwen-cloud") {
     return DEFAULT_QWEN_VOICE_MAP.narrator ?? "Ryan";
+  }
+  if (provider === "openrouter-tts") {
+    return openRouterTtsModelMeta(DEFAULT_OPENROUTER_TTS_MODEL).defaultVoice;
+  }
+  if (provider === "fish-audio") {
+    return DEFAULT_FISH_AUDIO_REFERENCE_ID;
   }
   return DEFAULT_WRYTOUR_VOICE_MAP.narrator ?? "af_heart";
 }

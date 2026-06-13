@@ -23,6 +23,28 @@ export function getOpenRouterNarratorModel(): string | undefined {
   return m || undefined;
 }
 
+export function getOpenRouterTtsModel(): string {
+  return (
+    process.env.OPENROUTER_TTS_MODEL?.trim() ||
+    "google/gemini-2.5-flash-preview-tts"
+  );
+}
+
+export function getFishAudioApiKey(): string | null {
+  const key =
+    process.env.FISH_AUDIO_API_KEY?.trim() ||
+    process.env.FISH_API_KEY?.trim();
+  return key || null;
+}
+
+export function isServerOpenRouterTtsConfigured(): boolean {
+  return Boolean(getOpenRouterApiKey());
+}
+
+export function isServerFishAudioTtsConfigured(): boolean {
+  return Boolean(getFishAudioApiKey());
+}
+
 export function getRateLimitLlmPerHour(): number {
   return parseInt(process.env.RATE_LIMIT_LLM_PER_HOUR ?? "80", 10);
 }
@@ -65,6 +87,8 @@ export function isServerElevenLabsConfigured(): boolean {
 export function isServerTtsConfigured(): boolean {
   return (
     isServerElevenLabsConfigured() ||
+    isServerOpenRouterTtsConfigured() ||
+    isServerFishAudioTtsConfigured() ||
     isServerQwenTtsConfigured() ||
     isServerQwenCloudTtsConfigured()
   );

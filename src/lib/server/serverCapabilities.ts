@@ -3,6 +3,8 @@
 export type ServerCapabilities = {
   serverTts: boolean;
   serverElevenLabsTts: boolean;
+  serverOpenRouterTts: boolean;
+  serverFishAudioTts: boolean;
   serverQwenTts: boolean;
   serverQwenCloudTts: boolean;
   serverLlm: boolean;
@@ -21,6 +23,8 @@ export function getServerCapabilitiesSync(): ServerCapabilities {
     cached ?? {
       serverTts: false,
       serverElevenLabsTts: false,
+      serverOpenRouterTts: false,
+      serverFishAudioTts: false,
       serverQwenTts: false,
       serverQwenCloudTts: false,
       serverLlm: false,
@@ -43,6 +47,8 @@ export async function refreshServerCapabilities(): Promise<ServerCapabilities> {
       cached = {
         serverTts: Boolean(json.serverTts),
         serverElevenLabsTts: Boolean(json.serverElevenLabsTts),
+        serverOpenRouterTts: Boolean(json.serverOpenRouterTts),
+        serverFishAudioTts: Boolean(json.serverFishAudioTts),
         serverQwenTts: Boolean(json.serverQwenTts),
         serverQwenCloudTts: Boolean(json.serverQwenCloudTts),
         serverLlm: Boolean(json.serverLlm),
@@ -54,6 +60,8 @@ export async function refreshServerCapabilities(): Promise<ServerCapabilities> {
       cached = {
         serverTts: false,
         serverElevenLabsTts: false,
+        serverOpenRouterTts: false,
+        serverFishAudioTts: false,
         serverQwenTts: false,
         serverQwenCloudTts: false,
         serverLlm: false,
@@ -76,6 +84,16 @@ export function isServerTtsAvailable(): boolean {
 export function isServerElevenLabsAvailable(): boolean {
   if (process.env.NEXT_PUBLIC_SERVER_ELEVENLABS_TTS === "1") return true;
   return getServerCapabilitiesSync().serverElevenLabsTts;
+}
+
+export function isServerOpenRouterTtsAvailable(): boolean {
+  if (process.env.NEXT_PUBLIC_SERVER_OPENROUTER_TTS === "1") return true;
+  return getServerCapabilitiesSync().serverOpenRouterTts;
+}
+
+export function isServerFishAudioTtsAvailable(): boolean {
+  if (process.env.NEXT_PUBLIC_SERVER_FISH_AUDIO_TTS === "1") return true;
+  return getServerCapabilitiesSync().serverFishAudioTts;
 }
 
 export function isServerQwenTtsAvailable(): boolean {

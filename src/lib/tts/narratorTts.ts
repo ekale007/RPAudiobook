@@ -43,6 +43,11 @@ import {
   isServerElevenLabsAvailable,
   isServerQwenTtsAvailable,
 } from "@/lib/server/serverCapabilities";
+import { normalizeFishAudioReferenceId } from "@/lib/tts/fishAudioVoices";
+import {
+  normalizeOpenRouterTtsModel,
+  normalizeOpenRouterTtsVoice,
+} from "@/lib/tts/openRouterTtsModels";
 import { coerceElevenLabsVoiceId } from "@/lib/tts/elevenLabsVoices";
 import { normalizeElevenLabsModelId } from "@/lib/tts/elevenLabsModels";
 import { resolveQwenTtsParams } from "@/lib/tts/qwenVoiceProfiles";
@@ -172,6 +177,73 @@ async function synthesizeChunkQwen(
   );
 }
 
+async function synthesizeChunkOpenRouter(
+  settings: TtsSettings,
+  text: string,
+  voice: string,
+): Promise<{ blob: Blob; ttsCostCents: number }> {
+  const model = normalizeOpenRouterTtsModel(settings.openRouterTtsModel);
+  const resolvedVoice = normalizeOpenRouterTtsVoice(model, voice);
+
+  const res = await authFetch("/api/tts/openrouter", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text,
+      model,
+      voice: resolvedVoice,
+    }),
+  });
+
+  if (!res.ok) {
+    const raw = await res.text();
+    let message = raw || `OpenRouter TTS failed (${res.status})`;
+    try {
+      const parsed = JSON.parse(raw) as { error?: string };
+      if (parsed.error?.trim()) message = parsed.error.trim();
+    } catch {
+      /* plain text */
+    }
+    throw new Error(message);
+  }
+
+  const blob = await res.blob();
+  const ttsCostCents = readCostCentsHeader(res, TTS_COST_HEADER) ?? 0;
+  return { blob, ttsCostCents };
+}
+
+async function synthesizeChunkFishAudio(
+  settings: TtsSettings,
+  text: string,
+  referenceId: string,
+): Promise<{ blob: Blob; ttsCostCents: number }> {
+  const res = await authFetch("/api/tts/fish", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text,
+      model: settings.fishAudioModel,
+      referenceId: normalizeFishAudioReferenceId(referenceId),
+    }),
+  });
+
+  if (!res.ok) {
+    const raw = await res.text();
+    let message = raw || `Fish Audio TTS failed (${res.status})`;
+    try {
+      const parsed = JSON.parse(raw) as { error?: string };
+      if (parsed.error?.trim()) message = parsed.error.trim();
+    } catch {
+      /* plain text */
+    }
+    throw new Error(message);
+  }
+
+  const blob = await res.blob();
+  const ttsCostCents = readCostCentsHeader(res, TTS_COST_HEADER) ?? 0;
+  return { blob, ttsCostCents };
+}
+
 async function synthesizeChunkElevenLabs(
   settings: TtsSettings,
   text: string,
@@ -268,6 +340,12 @@ async function synthesizeChunk(
     );
     return { blob, ttsCostCents: 0 };
   }
+  if (settings.provider === "openrouter-tts") {
+    return synthesizeChunkOpenRouter(settings, text, voice);
+  }
+  if (settings.provider === "fish-audio") {
+    return synthesizeChunkFishAudio(settings, text, voice);
+  }
   return synthesizeChunkElevenLabs(settings, text, voice, storyLocale, {
     speakerSlug: deliveryContext?.speakerSlug,
     storySettings: deliveryContext?.storySettings,
@@ -289,7 +367,11 @@ function resolveVoice(
       settings.provider === "qwen" ||
       settings.provider === "qwen-cloud"
         ? settings.localVoice
-        : settings.elevenLabsVoiceId;
+        : settings.provider === "openrouter-tts"
+          ? settings.openRouterTtsVoice
+          : settings.provider === "fish-audio"
+            ? settings.fishAudioReferenceId
+            : settings.elevenLabsVoiceId;
     const resolved = voiceForSpeaker(
       speakerSlug,
       voiceMap,
@@ -305,6 +387,15 @@ function resolveVoice(
     if (settings.provider === "elevenlabs") {
       return coerceElevenLabsVoiceId(resolved, speakerSlug, elLocale);
     }
+    if (settings.provider === "openrouter-tts") {
+      return normalizeOpenRouterTtsVoice(
+        settings.openRouterTtsModel,
+        resolved,
+      );
+    }
+    if (settings.provider === "fish-audio") {
+      return normalizeFishAudioReferenceId(resolved);
+    }
     return resolved;
   }
   if (
@@ -316,6 +407,15 @@ function resolveVoice(
     return settings.provider === "qwen" || settings.provider === "qwen-cloud"
       ? coerceQwenPresetVoice(v, speakerSlug)
       : v;
+  }
+  if (settings.provider === "openrouter-tts") {
+    return normalizeOpenRouterTtsVoice(
+      settings.openRouterTtsModel,
+      settings.openRouterTtsVoice,
+    );
+  }
+  if (settings.provider === "fish-audio") {
+    return normalizeFishAudioReferenceId(settings.fishAudioReferenceId);
   }
   return coerceElevenLabsVoiceId(
     settings.elevenLabsVoiceId,
@@ -334,6 +434,9 @@ function cacheVoiceKey(
     return `${ttsCacheVoiceKey(settings)}:${voice}${localeSuffix}`;
   }
   if (settings.provider === "qwen" || settings.provider === "qwen-cloud") {
+    return `${ttsCacheVoiceKey(settings)}:${voice}:${normalizeStoryLocaleKey(storyLocale)}`;
+  }
+  if (settings.provider === "openrouter-tts" || settings.provider === "fish-audio") {
     return `${ttsCacheVoiceKey(settings)}:${voice}:${normalizeStoryLocaleKey(storyLocale)}`;
   }
   return `${ttsCacheVoiceKey(settings)}:${voice}:${normalizeStoryLocaleKey(storyLocale)}`;

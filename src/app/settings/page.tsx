@@ -15,6 +15,7 @@ import {
   loadTtsSettings,
   saveTtsSettings,
   type TtsProvider,
+  isBetaTtsProvider,
 } from "@/lib/storage/ttsSettings";
 import { KokoroVoicePicker } from "@/components/KokoroVoicePicker";
 import { QwenVoicePicker } from "@/components/QwenVoicePicker";
@@ -36,6 +37,16 @@ import {
 } from "@/lib/tts/elevenLabsModels";
 import { LlmUsagePanel } from "@/components/LlmUsagePanel";
 import {
+  FISH_AUDIO_MODEL_OPTIONS,
+  DEFAULT_FISH_AUDIO_REFERENCE_ID,
+} from "@/lib/tts/fishAudioVoices";
+import {
+  OPENROUTER_TTS_MODEL_OPTIONS,
+  normalizeOpenRouterTtsModel,
+  normalizeOpenRouterTtsVoice,
+  openRouterTtsModelMeta,
+} from "@/lib/tts/openRouterTtsModels";
+import {
   PREFS_UPDATED_EVENT,
   syncUserPreferences,
 } from "@/lib/storage/userPreferencesSync";
@@ -52,6 +63,8 @@ export default function SettingsPage() {
   const serverCaps = useServerCapabilities();
   const serverLlm = serverCaps.serverLlm;
   const serverElevenLabsTts = serverCaps.serverElevenLabsTts;
+  const serverOpenRouterTts = serverCaps.serverOpenRouterTts;
+  const serverFishAudioTts = serverCaps.serverFishAudioTts;
   const serverQwenTts = serverCaps.serverQwenTts;
   const serverQwenCloudTts = serverCaps.serverQwenCloudTts;
   const capsReady = serverCaps.ready;
@@ -72,6 +85,10 @@ export default function SettingsPage() {
   const [elApiKey, setElApiKey] = useState("");
   const [elVoiceId, setElVoiceId] = useState(DEFAULT_TTS.elevenLabsVoiceId);
   const [elModelId, setElModelId] = useState(DEFAULT_TTS.elevenLabsModelId);
+  const [orTtsModel, setOrTtsModel] = useState(DEFAULT_TTS.openRouterTtsModel);
+  const [orTtsVoice, setOrTtsVoice] = useState(DEFAULT_TTS.openRouterTtsVoice);
+  const [fishModel, setFishModel] = useState(DEFAULT_TTS.fishAudioModel);
+  const [fishRefId, setFishRefId] = useState(DEFAULT_TTS.fishAudioReferenceId);
   const [pronunciationText, setPronunciationText] = useState("");
   const [ttsSaved, setTtsSaved] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
@@ -99,15 +116,24 @@ export default function SettingsPage() {
       setTemperature(s.temperature);
     }
     const tts = loadTtsSettings();
-    setTtsProvider(tts.provider);
+    let provider = tts.provider;
+    if (betaMode && !isBetaTtsProvider(provider)) {
+      provider = "elevenlabs";
+      saveTtsSettings({ ...tts, provider }, { sync: false });
+    }
+    setTtsProvider(provider);
     setLocalEngine(tts.localEngine ?? "edge");
     setLocalUrl(tts.localServerUrl);
     setLocalVoice(tts.localVoice);
     setElApiKey(tts.elevenLabsApiKey);
     setElVoiceId(tts.elevenLabsVoiceId);
     setElModelId(tts.elevenLabsModelId);
+    setOrTtsModel(tts.openRouterTtsModel);
+    setOrTtsVoice(tts.openRouterTtsVoice);
+    setFishModel(tts.fishAudioModel);
+    setFishRefId(tts.fishAudioReferenceId);
     setPronunciationText(serializePronunciationMap(tts.pronunciationMap ?? {}));
-  }, []);
+  }, [betaMode]);
 
   useEffect(() => {
     reloadFromStorage();
@@ -185,6 +211,11 @@ export default function SettingsPage() {
     }
   }, [ttsProvider]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const selectedOrTtsMeta = useMemo(
+    () => openRouterTtsModelMeta(orTtsModel),
+    [orTtsModel],
+  );
+
   const saveTts = () => {
     saveTtsSettings({
       provider: ttsProvider,
@@ -194,6 +225,10 @@ export default function SettingsPage() {
       elevenLabsApiKey: elApiKey.trim(),
       elevenLabsVoiceId: elVoiceId.trim(),
       elevenLabsModelId: elModelId.trim(),
+      openRouterTtsModel: orTtsModel.trim(),
+      openRouterTtsVoice: orTtsVoice.trim(),
+      fishAudioModel: fishModel.trim(),
+      fishAudioReferenceId: fishRefId.trim(),
       pronunciationMap: parsePronunciationLines(pronunciationText),
     });
     setTtsSaved(true);
@@ -206,11 +241,37 @@ export default function SettingsPage() {
       elVoiceId?: string;
       elModelId?: string;
       localVoice?: string;
+      orTtsModel?: string;
+      orTtsVoice?: string;
+      fishModel?: string;
+      fishRefId?: string;
     }) => {
       const provider = overrides?.ttsProvider ?? ttsProvider;
       const voiceId = (overrides?.elVoiceId ?? elVoiceId).trim();
       const modelId = (overrides?.elModelId ?? elModelId).trim();
       const qwenVoice = (overrides?.localVoice ?? localVoice).trim();
+      const nextOrModel = normalizeOpenRouterTtsModel(
+        overrides?.orTtsModel ?? orTtsModel,
+      );
+      const nextOrVoice = normalizeOpenRouterTtsVoice(
+        nextOrModel,
+        overrides?.orTtsVoice ?? orTtsVoice,
+      );
+      const nextFishModel = (overrides?.fishModel ?? fishModel).trim() || "s2-pro";
+      const nextFishRef =
+        (overrides?.fishRefId ?? fishRefId).trim() ||
+        DEFAULT_FISH_AUDIO_REFERENCE_ID;
+
+      const shared = {
+        elevenLabsApiKey: elApiKey.trim(),
+        elevenLabsVoiceId: voiceId || elVoiceId.trim(),
+        elevenLabsModelId: modelId || elModelId.trim(),
+        openRouterTtsModel: nextOrModel,
+        openRouterTtsVoice: nextOrVoice,
+        fishAudioModel: nextFishModel,
+        fishAudioReferenceId: nextFishRef,
+        pronunciationMap: parsePronunciationLines(pronunciationText),
+      };
 
       if (provider === "qwen" || provider === "qwen-cloud") {
         saveTtsSettings({
@@ -223,10 +284,23 @@ export default function SettingsPage() {
             (provider === "qwen-cloud"
               ? QWEN_CLOUD_DEFAULT_NARRATOR
               : "Ryan"),
-          elevenLabsApiKey: elApiKey.trim(),
-          elevenLabsVoiceId: voiceId || elVoiceId.trim(),
-          elevenLabsModelId: modelId || elModelId.trim(),
-          pronunciationMap: parsePronunciationLines(pronunciationText),
+          ...shared,
+        });
+      } else if (provider === "openrouter-tts") {
+        saveTtsSettings({
+          provider,
+          localEngine,
+          localServerUrl: localUrl.trim(),
+          localVoice: qwenVoice || localVoice.trim(),
+          ...shared,
+        });
+      } else if (provider === "fish-audio") {
+        saveTtsSettings({
+          provider,
+          localEngine,
+          localServerUrl: localUrl.trim(),
+          localVoice: qwenVoice || localVoice.trim(),
+          ...shared,
         });
       } else {
         saveTtsSettings({
@@ -234,10 +308,7 @@ export default function SettingsPage() {
           localEngine,
           localServerUrl: localUrl.trim(),
           localVoice: qwenVoice || localVoice.trim(),
-          elevenLabsApiKey: elApiKey.trim(),
-          elevenLabsVoiceId: voiceId,
-          elevenLabsModelId: modelId,
-          pronunciationMap: parsePronunciationLines(pronunciationText),
+          ...shared,
         });
       }
       setTtsSaved(true);
@@ -251,6 +322,10 @@ export default function SettingsPage() {
       elApiKey,
       elVoiceId,
       elModelId,
+      orTtsModel,
+      orTtsVoice,
+      fishModel,
+      fishRefId,
       pronunciationText,
     ],
   );
@@ -383,33 +458,20 @@ export default function SettingsPage() {
             <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
               <h2 className="mb-1 font-medium text-accent">Sprachausgabe (TTS)</h2>
               <p className="mb-3 text-xs text-zinc-500">
-                <strong>ElevenLabs</strong> = Premium-Cloud.{" "}
-                <strong>Qwen Cloud</strong> = Alibaba DashScope (eigener{" "}
-                <code className="text-zinc-400">DASHSCOPE_API_KEY</code>, nicht
-                RunPod).{" "}
-                <strong>
-                  {serverQwenTts ? "Qwen RunPod" : "Qwen lokal"}
-                </strong>{" "}
-                = {serverQwenTts ? (
-                  <>dein RunPod-Endpoint über <code className="text-zinc-400">QWEN_TTS_URL</code></>
-                ) : (
-                  <>
-                    dein PC (
-                    <code className="text-zinc-400">npm run tts:qwen</code>)
-                  </>
-                )}
-                . Cast-Stimmen pro Story unter Figuren-Stimmen.
+                <strong>ElevenLabs</strong> = Premium.{" "}
+                <strong>OpenRouter TTS</strong> = günstige Cloud-Modelle
+                (Gemini, Kokoro, Voxtral).{" "}
+                <strong>Fish Audio</strong> = S2-Pro mit Emotion-Tags wie{" "}
+                <code className="text-zinc-400">[whisper]</code>. Cast-Stimmen
+                pro Story unter Figuren-Stimmen.
               </p>
 
               <div className="mb-3 flex flex-wrap gap-2">
                 {(
                   [
                     { id: "elevenlabs" as const, label: "ElevenLabs" },
-                    { id: "qwen-cloud" as const, label: "Qwen Cloud" },
-                    {
-                      id: "qwen" as const,
-                      label: serverQwenTts ? "Qwen RunPod" : "Qwen lokal",
-                    },
+                    { id: "openrouter-tts" as const, label: "OpenRouter TTS" },
+                    { id: "fish-audio" as const, label: "Fish Audio" },
                   ] as const
                 ).map(({ id, label }) => (
                   <button
@@ -417,9 +479,6 @@ export default function SettingsPage() {
                     type="button"
                     onClick={() => {
                       setTtsProvider(id);
-                      if (id === "qwen" || id === "qwen-cloud") {
-                        applyEnginePreset("qwen");
-                      }
                       persistTtsFromState({ ttsProvider: id });
                     }}
                     className={`min-w-[30%] flex-1 rounded-lg py-2 text-xs sm:text-sm ${
@@ -503,60 +562,128 @@ export default function SettingsPage() {
                     v3 nur mit Szenen-Stil (Cast).
                   </p>
                 </>
-              ) : ttsProvider === "qwen-cloud" ? (
+              ) : ttsProvider === "openrouter-tts" ? (
                 <>
-                  {!serverQwenCloudTts ? (
+                  {!serverOpenRouterTts ? (
                     <p className="mb-2 text-xs text-amber-200">
-                      Qwen Cloud nicht aktiv —{" "}
-                      <code className="text-amber-100">DASHSCOPE_API_KEY</code>{" "}
-                      in Vercel/.env setzen (Singapore-Key für intl.).
+                      OpenRouter TTS nicht aktiv —{" "}
+                      <code className="text-amber-100">OPENROUTER_API_KEY</code>{" "}
+                      in Vercel/.env setzen (gleicher Key wie LLM).
                     </p>
                   ) : (
                     <p className="mb-2 text-xs text-zinc-500">
-                      Qwen Cloud aktiv — Stil-instruct aus Cast/Plot. Ca. $0,10
-                      / 10k Zeichen (Flash).
+                      OpenRouter TTS aktiv — Abrechnung über dein OpenRouter-Guthaben.
                     </p>
                   )}
-                  <QwenVoicePicker
-                    serverUrl={localUrl}
-                    value={localVoice}
-                    onChange={setLocalVoice}
-                    cloudProxy
-                  />
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    TTS-Modell
+                  </label>
+                  <select
+                    value={normalizeOpenRouterTtsModel(orTtsModel)}
+                    onChange={(e) => {
+                      const nextModel = normalizeOpenRouterTtsModel(e.target.value);
+                      const nextVoice = openRouterTtsModelMeta(nextModel).defaultVoice;
+                      setOrTtsModel(nextModel);
+                      setOrTtsVoice(nextVoice);
+                      persistTtsFromState({
+                        ttsProvider: "openrouter-tts",
+                        orTtsModel: nextModel,
+                        orTtsVoice: nextVoice,
+                      });
+                    }}
+                    className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-2 py-2 text-sm"
+                  >
+                    {OPENROUTER_TTS_MODEL_OPTIONS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label} — {m.hint}
+                      </option>
+                    ))}
+                  </select>
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    Erzähler-Stimme
+                  </label>
+                  <select
+                    value={normalizeOpenRouterTtsVoice(orTtsModel, orTtsVoice)}
+                    onChange={(e) => {
+                      setOrTtsVoice(e.target.value);
+                      persistTtsFromState({
+                        ttsProvider: "openrouter-tts",
+                        orTtsVoice: e.target.value,
+                      });
+                    }}
+                    className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-2 py-2 text-sm"
+                  >
+                    {selectedOrTtsMeta.voices.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-zinc-600">
+                    Günstigster Einstieg: Kokoro 82M. Cast-Stimmen unter
+                    Figuren-Stimmen (Voice-ID pro Sprecher).
+                  </p>
                 </>
               ) : (
                 <>
-                  <p className="mb-2 text-xs text-zinc-500">
-                    {serverQwenTts ? (
-                      <>
-                        RunPod Serverless aktiv — TTS läuft über{" "}
-                        <code className="text-accent">/api/tts/qwen</code>{" "}
-                        (kein lokaler{" "}
-                        <code className="text-zinc-400">npm run tts:qwen</code>
-                        ).
-                      </>
-                    ) : (
-                      <>
-                        Server:{" "}
-                        <code className="text-accent">{localUrl}</code> — vor
-                        ▶{" "}
-                        <code className="text-accent">npm run tts:qwen</code>{" "}
-                        starten.
-                      </>
-                    )}
-                  </p>
-                  <QwenVoicePicker
-                    serverUrl={localUrl}
-                    value={localVoice}
-                    onChange={setLocalVoice}
-                    serverProxy={serverQwenTts}
-                  />
-                  <Link
-                    href="/dev/qwen-voices"
-                    className="mt-2 inline-block text-xs text-accent underline"
+                  {!serverFishAudioTts ? (
+                    <p className="mb-2 text-xs text-amber-200">
+                      Fish Audio nicht aktiv —{" "}
+                      <code className="text-amber-100">FISH_AUDIO_API_KEY</code>{" "}
+                      in Vercel/.env setzen.
+                    </p>
+                  ) : (
+                    <p className="mb-2 text-xs text-zinc-500">
+                      Fish Audio S2-Pro aktiv — Emotion-Tags inline, z. B.{" "}
+                      <code className="text-zinc-400">[excited]</code> oder{" "}
+                      <code className="text-zinc-400">[whisper]</code>.
+                    </p>
+                  )}
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    Modell
+                  </label>
+                  <select
+                    value={fishModel}
+                    onChange={(e) => {
+                      setFishModel(e.target.value);
+                      persistTtsFromState({
+                        ttsProvider: "fish-audio",
+                        fishModel: e.target.value,
+                      });
+                    }}
+                    className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-2 py-2 text-sm"
                   >
-                    Qwen Stimmen-Labor (instruct testen)
-                  </Link>
+                    {FISH_AUDIO_MODEL_OPTIONS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label} — {m.hint}
+                      </option>
+                    ))}
+                  </select>
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    Erzähler reference_id
+                  </label>
+                  <input
+                    value={fishRefId}
+                    onChange={(e) => setFishRefId(e.target.value)}
+                    onBlur={() =>
+                      persistTtsFromState({ ttsProvider: "fish-audio" })
+                    }
+                    className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
+                    placeholder={DEFAULT_FISH_AUDIO_REFERENCE_ID}
+                    autoComplete="off"
+                  />
+                  <p className="text-[10px] text-zinc-600">
+                    Voice-ID aus der{" "}
+                    <a
+                      href="https://fish.audio"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-accent underline"
+                    >
+                      Fish Audio Voice Library
+                    </a>
+                    . Pro Cast-Figur eigene ID unter Figuren-Stimmen.
+                  </p>
                 </>
               )}
 

@@ -29,6 +29,10 @@ import {
   emptyQwenProfile,
 } from "@/lib/tts/qwenVoiceProfiles";
 import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
+import {
+  openRouterTtsModelMeta,
+  DEFAULT_OPENROUTER_TTS_MODEL,
+} from "@/lib/tts/openRouterTtsModels";
 import { defaultEnabledCastSlugs } from "@/lib/tts/voiceActivation";
 import {
   PROTAGONIST_SPEAKER_SLUG,
@@ -216,9 +220,13 @@ export default function StoryVoicesPage() {
     ? "Qwen3-TTS"
     : ttsProvider === "elevenlabs"
       ? "ElevenLabs"
-      : engine === "kokoro"
-        ? "Kokoro"
-        : "Local";
+      : ttsProvider === "openrouter-tts"
+        ? "OpenRouter TTS"
+        : ttsProvider === "fish-audio"
+          ? "Fish Audio"
+          : engine === "kokoro"
+            ? "Kokoro"
+            : "Local";
 
   return (
     <main className="flex min-h-dvh flex-col">
@@ -354,6 +362,37 @@ export default function StoryVoicesPage() {
                       onChange={(id) =>
                         setVoiceMap((prev) => ({ ...prev, [s.slug]: id }))
                       }
+                    />
+                  ) : ttsProvider === "openrouter-tts" ? (
+                    <select
+                      value={currentVoice}
+                      onChange={(e) =>
+                        setVoiceMap((prev) => ({
+                          ...prev,
+                          [s.slug]: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-xs"
+                    >
+                      {openRouterTtsModelMeta(DEFAULT_OPENROUTER_TTS_MODEL).voices.map(
+                        (v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.label}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  ) : ttsProvider === "fish-audio" ? (
+                    <input
+                      value={currentVoice}
+                      onChange={(e) =>
+                        setVoiceMap((prev) => ({
+                          ...prev,
+                          [s.slug]: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-xs"
+                      placeholder="Fish reference_id"
                     />
                   ) : (
                     <select
