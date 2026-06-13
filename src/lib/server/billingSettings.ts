@@ -212,8 +212,8 @@ function envFalTtsUsdPer1k(modelId?: string): number {
   const model = modelId?.trim() ?? "";
   if (model.includes("inworld")) {
     const raw = process.env.BETA_FAL_INWORLD_TTS_USD_PER_1K?.trim();
-    const n = raw ? Number.parseFloat(raw) : 10;
-    return Number.isFinite(n) && n >= 0 ? n : 10;
+    const n = raw ? Number.parseFloat(raw) : 0.01;
+    return Number.isFinite(n) && n >= 0 ? n : 0.01;
   }
   if (model.includes("elevenlabs")) {
     const raw = process.env.BETA_FAL_ELEVEN_TTS_USD_PER_1K?.trim();
@@ -222,8 +222,8 @@ function envFalTtsUsdPer1k(modelId?: string): number {
   }
   if (model.includes("minimax")) {
     const raw = process.env.BETA_FAL_MINIMAX_TTS_USD_PER_1K?.trim();
-    const n = raw ? Number.parseFloat(raw) : 0.05;
-    return Number.isFinite(n) && n >= 0 ? n : 0.05;
+    const n = raw ? Number.parseFloat(raw) : 0.1;
+    return Number.isFinite(n) && n >= 0 ? n : 0.1;
   }
   const raw = process.env.BETA_FAL_TTS_USD_PER_1K?.trim();
   const n = raw ? Number.parseFloat(raw) : 0.02;

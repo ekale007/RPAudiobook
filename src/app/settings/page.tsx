@@ -721,22 +721,8 @@ export default function SettingsPage() {
                       setFishPinnedIds(ids);
                       saveFishAudioPinnedIds(ids);
                     }}
-                    label="Erzähler-Stimme (Lesezeichen + gespeicherte IDs)"
+                    label="Erzähler-Stimme"
                   />
-                  <p className="text-[10px] text-zinc-600">
-                    Wie ElevenLabs: Lesezeichen von{" "}
-                    <a
-                      href="https://fish.audio/de/app/bookmarks/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-accent underline"
-                    >
-                      fish.audio/bookmarks
-                    </a>
-                    {" "}werden automatisch geladen. IDs kannst du zusätzlich
-                    speichern oder entfernen. Pro Cast-Figur unter
-                    Figuren-Stimmen.
-                  </p>
                 </>
               ) : (
                 <>

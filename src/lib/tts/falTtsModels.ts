@@ -54,7 +54,7 @@ export const FAL_TTS_MODEL_OPTIONS: FalTtsModelOption[] = [
   {
     id: "fal-ai/inworld-tts",
     label: "Inworld TTS 1.5 Max",
-    hint: "~$10/M Zeichen · 16 Sprachen",
+    hint: "~$0,01 / 1k Zeichen · 16 Sprachen",
     textField: "text",
     voiceStyle: "voice",
     maxChars: 2000,
@@ -76,7 +76,7 @@ export const FAL_TTS_MODEL_OPTIONS: FalTtsModelOption[] = [
   {
     id: "fal-ai/minimax/speech-02-hd",
     label: "MiniMax Speech 02 HD",
-    hint: "~$0,05/1k Zeichen",
+    hint: "~$0,10 / 1k Zeichen",
     textField: "text",
     voiceStyle: "minimax_voice_id",
     maxChars: 2400,
@@ -115,12 +115,6 @@ export function isKnownFalTtsVoice(
 }
 
 /** Fish / Eleven voice IDs are invalid for fal presets — fall back to default. */
-function looksLikeForeignTtsVoiceId(voice: string): boolean {
-  if (/^[a-f0-9]{32}$/i.test(voice)) return true;
-  if (/^[A-Za-z0-9]{20,}$/.test(voice) && !voice.includes("_")) return true;
-  return false;
-}
-
 export function normalizeFalTtsVoice(
   model: string | undefined | null,
   voice?: string | null,
@@ -128,10 +122,6 @@ export function normalizeFalTtsVoice(
   const trimmed = voice?.trim();
   if (!trimmed) return defaultFalTtsVoice(model);
   if (isKnownFalTtsVoice(model, trimmed)) return trimmed;
-  if (looksLikeForeignTtsVoiceId(trimmed)) {
-    return defaultFalTtsVoice(model);
-  }
-  if (trimmed.length >= 2) return trimmed;
   return defaultFalTtsVoice(model);
 }
 
@@ -168,7 +158,16 @@ export function buildFalTtsInput(
       text,
       voice: resolvedVoice,
       stability: 0.5,
+      similarity_boost: 0.75,
       apply_text_normalization: "auto",
+    };
+  }
+
+  if (model.includes("inworld")) {
+    return {
+      text,
+      voice: resolvedVoice,
+      sample_rate_hertz: "48000",
     };
   }
 

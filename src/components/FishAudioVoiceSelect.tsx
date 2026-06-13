@@ -9,7 +9,6 @@ import {
   type FishVoiceCatalogEntry,
 } from "@/lib/tts/fishAudioCatalogClient";
 import { looksLikeFishReferenceId } from "@/lib/tts/fishAudioVoices";
-import { authFetch } from "@/lib/supabase/authFetch";
 
 export function FishAudioVoiceSelect({
   value,
@@ -17,7 +16,6 @@ export function FishAudioVoiceSelect({
   disabled = false,
   label,
   allowCustom = true,
-  fishModel = "s2-pro",
   pinnedIds = [],
   onPinnedIdsChange,
 }: {
@@ -75,12 +73,11 @@ export function FishAudioVoiceSelect({
   const groups = useMemo(() => {
     const order: Array<NonNullable<FishVoiceCatalogEntry["source"]>> = [
       "pinned",
-      "bookmark",
       "self",
     ];
     const bySource = new Map<string, FishVoiceCatalogEntry[]>();
     for (const v of voices) {
-      const key = v.source ?? "self";
+      const key = v.source ?? "pinned";
       const list = bySource.get(key) ?? [];
       list.push(v);
       bySource.set(key, list);
@@ -110,41 +107,28 @@ export function FishAudioVoiceSelect({
 
   useEffect(() => () => stopPreview(), [stopPreview]);
 
+  const previewUrlFor = (referenceId: string) =>
+    voices.find((v) => v.id === referenceId)?.previewUrl?.trim() ?? null;
+
   const playPreview = async (referenceId: string) => {
     if (disabled || !referenceId.trim()) return;
     stopPreview();
     setError(null);
+
+    const previewUrl = previewUrlFor(referenceId);
+    if (!previewUrl) {
+      setError("Keine Vorschau — Fish liefert für diese ID kein Sample-Audio.");
+      return;
+    }
+
     setPreviewing(true);
     try {
-      const res = await authFetch("/api/tts/fish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: "Hallo, das ist eine kurze Stimm-Vorschau.",
-          referenceId,
-          model: fishModel,
-        }),
-      });
-      if (!res.ok) {
-        const raw = await res.text();
-        let message = raw || `Vorschau fehlgeschlagen (${res.status})`;
-        try {
-          const parsed = JSON.parse(raw) as { error?: string };
-          if (parsed.error?.trim()) message = parsed.error.trim();
-        } catch {
-          /* plain */
-        }
-        throw new Error(message);
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      objectUrlRef.current = url;
-      const audio = new Audio(url);
+      const audio = new Audio(previewUrl);
       audioRef.current = audio;
       audio.onended = () => stopPreview();
       audio.onerror = () => {
         stopPreview();
-        setError("Vorschau konnte nicht abgespielt werden.");
+        setError("Vorschau-URL konnte nicht abgespielt werden.");
       };
       await audio.play();
     } catch (e) {
@@ -157,7 +141,7 @@ export function FishAudioVoiceSelect({
     if (!onPinnedIdsChange) return;
     const trimmed = id.trim();
     if (!looksLikeFishReferenceId(trimmed)) {
-      setError("Fish reference_id: 24–64 Hex-Zeichen (von fish.audio/bookmarks).");
+      setError("Fish-ID: 24–64 Hex-Zeichen.");
       return;
     }
     setError(null);
@@ -176,9 +160,7 @@ export function FishAudioVoiceSelect({
       .map((t) => t.trim())
       .filter((t) => looksLikeFishReferenceId(t));
     if (!tokens.length) {
-      setError(
-        "Keine gültigen Fish-IDs (32-stellige Hex von fish.audio/bookmarks).",
-      );
+      setError("Keine gültigen Fish-IDs (32-stellige Hex-Zeichen).");
       return;
     }
     setError(null);
@@ -212,20 +194,12 @@ export function FishAudioVoiceSelect({
       ) : null}
       {catalogHint && !loading ? (
         <p className="mb-1 text-[10px] leading-snug text-zinc-500">
-          {catalogHint} ·{" "}
-          <a
-            href="https://fish.audio/de/app/bookmarks/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent underline"
-          >
-            Lesezeichen verwalten
-          </a>
+          {catalogHint}
         </p>
       ) : null}
       {!known && value && !loading ? (
         <p className="mb-1 text-[10px] text-amber-200/90">
-          ID nicht in der Liste — unten speichern oder auf fish.audio bookmarken.
+          ID nicht in der Liste — unten speichern.
         </p>
       ) : null}
       <div className="flex gap-1.5">
@@ -255,10 +229,16 @@ export function FishAudioVoiceSelect({
         </select>
         <button
           type="button"
-          disabled={disabled || loading || previewing || !value.trim()}
+          disabled={
+            disabled ||
+            loading ||
+            previewing ||
+            !value.trim() ||
+            !previewUrlFor(value)
+          }
           onClick={() => playPreview(value)}
           className="shrink-0 rounded-lg border border-surface-border px-2 py-1.5 text-xs text-zinc-300 hover:border-accent/50 hover:text-accent disabled:opacity-40"
-          title="Kurz-Vorschau (verbraucht Fish-Guthaben)"
+          title="Sample-Audio von Fish (kein Guthaben)"
         >
           {previewing ? "…" : "▶"}
         </button>
@@ -270,7 +250,7 @@ export function FishAudioVoiceSelect({
             <textarea
               value={bulkDraft}
               onChange={(e) => setBulkDraft(e.target.value)}
-              placeholder="IDs aus Lesezeichen einfügen (Leerzeile, Komma oder Leerzeichen)"
+              placeholder="Fish-IDs einfügen (Leerzeile, Komma oder Leerzeichen)"
               rows={3}
               className="w-full rounded-lg border border-surface-border bg-surface px-2 py-1 text-xs"
             />
@@ -328,7 +308,7 @@ export function FishAudioVoiceSelect({
               onClick={() => setShowBulkInput(true)}
               className="text-[10px] text-accent underline disabled:opacity-40"
             >
-              + IDs aus Lesezeichen einfügen
+              + IDs einfügen
             </button>
             <button
               type="button"
@@ -349,7 +329,7 @@ export function FishAudioVoiceSelect({
           onClick={() => removePinnedId(value)}
           className="mt-1 text-[10px] text-zinc-500 underline disabled:opacity-40"
         >
-          Gespeicherte ID entfernen
+          ID entfernen
         </button>
       ) : null}
 

@@ -6,13 +6,21 @@ export type FishVoiceCatalogEntry = {
   hint: string;
   languages?: string[];
   state?: string;
-  source?: "self" | "bookmark" | "pinned";
+  source?: "self" | "pinned";
+  tags?: string[];
+  previewUrl?: string | null;
 };
 
 export type FishVoiceCatalogLoadResult = {
   voices: FishVoiceCatalogEntry[];
   hint: string;
-  source: "my-voices" | "bookmarks" | "pinned" | "empty" | "static-no-key" | "upstream-error" | "client-error";
+  source:
+    | "my-voices"
+    | "pinned"
+    | "empty"
+    | "static-no-key"
+    | "upstream-error"
+    | "client-error";
 };
 
 let cacheKey: string | null = null;
@@ -45,7 +53,7 @@ export async function loadFishAudioVoiceCatalogDetailed(
       const json = (await res.json()) as Partial<FishVoiceCatalogLoadResult>;
       cache = {
         voices: json.voices ?? [],
-        hint: json.hint ?? "Stimmen aus deinem Fish-Audio-Konto.",
+        hint: json.hint ?? `${json.voices?.length ?? 0} Stimmen`,
         source: json.source ?? "my-voices",
       };
       return cache;
@@ -75,8 +83,7 @@ export function fishVoiceOptionLabel(v: FishVoiceCatalogEntry): string {
 export function fishVoiceGroupLabel(
   source: FishVoiceCatalogEntry["source"],
 ): string {
-  if (source === "bookmark") return "Lesezeichen (fish.audio)";
-  if (source === "pinned") return "Gespeicherte IDs";
+  if (source === "pinned") return "Gespeicherte Stimmen";
   if (source === "self") return "Eigene Klone";
   return "Stimmen";
 }
