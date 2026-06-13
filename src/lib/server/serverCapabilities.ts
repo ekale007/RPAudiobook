@@ -5,6 +5,7 @@ export type ServerCapabilities = {
   serverElevenLabsTts: boolean;
   serverOpenRouterTts: boolean;
   serverFishAudioTts: boolean;
+  serverFalTts: boolean;
   serverQwenTts: boolean;
   serverQwenCloudTts: boolean;
   serverLlm: boolean;
@@ -25,6 +26,7 @@ export function getServerCapabilitiesSync(): ServerCapabilities {
       serverElevenLabsTts: false,
       serverOpenRouterTts: false,
       serverFishAudioTts: false,
+      serverFalTts: false,
       serverQwenTts: false,
       serverQwenCloudTts: false,
       serverLlm: false,
@@ -49,6 +51,7 @@ export async function refreshServerCapabilities(): Promise<ServerCapabilities> {
         serverElevenLabsTts: Boolean(json.serverElevenLabsTts),
         serverOpenRouterTts: Boolean(json.serverOpenRouterTts),
         serverFishAudioTts: Boolean(json.serverFishAudioTts),
+        serverFalTts: Boolean(json.serverFalTts),
         serverQwenTts: Boolean(json.serverQwenTts),
         serverQwenCloudTts: Boolean(json.serverQwenCloudTts),
         serverLlm: Boolean(json.serverLlm),
@@ -62,6 +65,7 @@ export async function refreshServerCapabilities(): Promise<ServerCapabilities> {
         serverElevenLabsTts: false,
         serverOpenRouterTts: false,
         serverFishAudioTts: false,
+        serverFalTts: false,
         serverQwenTts: false,
         serverQwenCloudTts: false,
         serverLlm: false,
@@ -94,6 +98,11 @@ export function isServerOpenRouterTtsAvailable(): boolean {
 export function isServerFishAudioTtsAvailable(): boolean {
   if (process.env.NEXT_PUBLIC_SERVER_FISH_AUDIO_TTS === "1") return true;
   return getServerCapabilitiesSync().serverFishAudioTts;
+}
+
+export function isServerFalTtsAvailable(): boolean {
+  if (process.env.NEXT_PUBLIC_SERVER_FAL_TTS === "1") return true;
+  return getServerCapabilitiesSync().serverFalTts;
 }
 
 export function isServerQwenTtsAvailable(): boolean {

@@ -31,7 +31,7 @@ import {
 import { useServerCapabilities } from "@/lib/server/useServerCapabilities";
 import { ElevenLabsVoiceSelect } from "@/components/ElevenLabsVoiceSelect";
 import { FishAudioVoiceSelect } from "@/components/FishAudioVoiceSelect";
-import { OpenRouterTtsVoiceSelect } from "@/components/OpenRouterTtsVoiceSelect";
+import { FalTtsVoiceSelect } from "@/components/FalTtsVoiceSelect";
 import { ELEVEN_DEFAULT_MODEL } from "@/lib/tts/elevenLabsVoices";
 import {
   ELEVEN_TTS_MODEL_OPTIONS,
@@ -42,6 +42,14 @@ import {
   FISH_AUDIO_MODEL_OPTIONS,
   DEFAULT_FISH_AUDIO_REFERENCE_ID,
 } from "@/lib/tts/fishAudioVoices";
+import { OpenRouterTtsVoiceSelect } from "@/components/OpenRouterTtsVoiceSelect";
+import {
+  FAL_TTS_MODEL_OPTIONS,
+  DEFAULT_FAL_TTS_MODEL,
+  defaultFalTtsVoice,
+  normalizeFalTtsModel,
+  normalizeFalTtsVoice,
+} from "@/lib/tts/falTtsModels";
 import {
   OPENROUTER_TTS_MODEL_OPTIONS,
   normalizeOpenRouterTtsModel,
@@ -67,6 +75,7 @@ export default function SettingsPage() {
   const serverElevenLabsTts = serverCaps.serverElevenLabsTts;
   const serverOpenRouterTts = serverCaps.serverOpenRouterTts;
   const serverFishAudioTts = serverCaps.serverFishAudioTts;
+  const serverFalTts = serverCaps.serverFalTts;
   const serverQwenTts = serverCaps.serverQwenTts;
   const serverQwenCloudTts = serverCaps.serverQwenCloudTts;
   const capsReady = serverCaps.ready;
@@ -91,6 +100,8 @@ export default function SettingsPage() {
   const [orTtsVoice, setOrTtsVoice] = useState(DEFAULT_TTS.openRouterTtsVoice);
   const [fishModel, setFishModel] = useState(DEFAULT_TTS.fishAudioModel);
   const [fishRefId, setFishRefId] = useState(DEFAULT_TTS.fishAudioReferenceId);
+  const [falTtsModel, setFalTtsModel] = useState(DEFAULT_TTS.falTtsModel);
+  const [falTtsVoice, setFalTtsVoice] = useState(DEFAULT_TTS.falTtsVoice);
   const [pronunciationText, setPronunciationText] = useState("");
   const [ttsSaved, setTtsSaved] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
@@ -134,6 +145,8 @@ export default function SettingsPage() {
     setOrTtsVoice(tts.openRouterTtsVoice);
     setFishModel(tts.fishAudioModel);
     setFishRefId(tts.fishAudioReferenceId);
+    setFalTtsModel(tts.falTtsModel);
+    setFalTtsVoice(tts.falTtsVoice);
     setPronunciationText(serializePronunciationMap(tts.pronunciationMap ?? {}));
   }, [betaMode]);
 
@@ -226,6 +239,8 @@ export default function SettingsPage() {
       openRouterTtsVoice: orTtsVoice.trim(),
       fishAudioModel: fishModel.trim(),
       fishAudioReferenceId: fishRefId.trim(),
+      falTtsModel: falTtsModel.trim(),
+      falTtsVoice: falTtsVoice.trim(),
       pronunciationMap: parsePronunciationLines(pronunciationText),
     });
     setTtsSaved(true);
@@ -242,6 +257,8 @@ export default function SettingsPage() {
       orTtsVoice?: string;
       fishModel?: string;
       fishRefId?: string;
+      falModel?: string;
+      falVoice?: string;
     }) => {
       const provider = overrides?.ttsProvider ?? ttsProvider;
       const voiceId = (overrides?.elVoiceId ?? elVoiceId).trim();
@@ -258,6 +275,13 @@ export default function SettingsPage() {
       const nextFishRef =
         (overrides?.fishRefId ?? fishRefId).trim() ||
         DEFAULT_FISH_AUDIO_REFERENCE_ID;
+      const nextFalModel = normalizeFalTtsModel(
+        overrides?.falModel ?? falTtsModel,
+      );
+      const nextFalVoice = normalizeFalTtsVoice(
+        nextFalModel,
+        overrides?.falVoice ?? falTtsVoice,
+      );
 
       const shared = {
         elevenLabsApiKey: elApiKey.trim(),
@@ -267,6 +291,8 @@ export default function SettingsPage() {
         openRouterTtsVoice: nextOrVoice,
         fishAudioModel: nextFishModel,
         fishAudioReferenceId: nextFishRef,
+        falTtsModel: nextFalModel,
+        falTtsVoice: nextFalVoice,
         pronunciationMap: parsePronunciationLines(pronunciationText),
       };
 
@@ -299,6 +325,14 @@ export default function SettingsPage() {
           localVoice: qwenVoice || localVoice.trim(),
           ...shared,
         });
+      } else if (provider === "fal-ai") {
+        saveTtsSettings({
+          provider,
+          localEngine,
+          localServerUrl: localUrl.trim(),
+          localVoice: qwenVoice || localVoice.trim(),
+          ...shared,
+        });
       } else {
         saveTtsSettings({
           provider: "elevenlabs",
@@ -323,6 +357,8 @@ export default function SettingsPage() {
       orTtsVoice,
       fishModel,
       fishRefId,
+      falTtsModel,
+      falTtsVoice,
       pronunciationText,
     ],
   );
@@ -459,8 +495,9 @@ export default function SettingsPage() {
                 <strong>OpenRouter TTS</strong> = günstige Cloud-Modelle
                 (Gemini, Kokoro, Voxtral).{" "}
                 <strong>Fish Audio</strong> = S2-Pro mit Emotion-Tags wie{" "}
-                <code className="text-zinc-400">[whisper]</code>. Cast-Stimmen
-                pro Story unter Figuren-Stimmen.
+                <code className="text-zinc-400">[whisper]</code>.{" "}
+                <strong>fal.ai</strong> = Kokoro, Inworld, Eleven v3, MiniMax.
+                Cast-Stimmen pro Story unter Figuren-Stimmen.
               </p>
 
               <div className="mb-3 flex flex-wrap gap-2">
@@ -469,6 +506,7 @@ export default function SettingsPage() {
                     { id: "elevenlabs" as const, label: "ElevenLabs" },
                     { id: "openrouter-tts" as const, label: "OpenRouter TTS" },
                     { id: "fish-audio" as const, label: "Fish Audio" },
+                    { id: "fal-ai" as const, label: "fal.ai" },
                   ] as const
                 ).map(({ id, label }) => (
                   <button
@@ -478,7 +516,7 @@ export default function SettingsPage() {
                       setTtsProvider(id);
                       persistTtsFromState({ ttsProvider: id });
                     }}
-                    className={`min-w-[30%] flex-1 rounded-lg py-2 text-xs sm:text-sm ${
+                    className={`min-w-[22%] flex-1 rounded-lg py-2 text-xs sm:text-sm ${
                       ttsProvider === id
                         ? "bg-accent text-black"
                         : "border border-surface-border text-zinc-400"
@@ -615,7 +653,7 @@ export default function SettingsPage() {
                     Alle Preset-Stimmen pro Modell. Cast unter Figuren-Stimmen.
                   </p>
                 </>
-              ) : (
+              ) : ttsProvider === "fish-audio" ? (
                 <>
                   {!serverFishAudioTts ? (
                     <p className="mb-2 text-xs text-amber-200">
@@ -684,6 +722,73 @@ export default function SettingsPage() {
                     </a>
                     klonen, dann hier auswählen. Pro Cast-Figur unter
                     Figuren-Stimmen.
+                  </p>
+                </>
+              ) : (
+                <>
+                  {!serverFalTts ? (
+                    <p className="mb-2 text-xs text-amber-200">
+                      fal.ai nicht aktiv —{" "}
+                      <code className="text-amber-100">FAL_API_KEY</code> oder{" "}
+                      <code className="text-amber-100">FAL_KEY</code> in
+                      Vercel/.env setzen.
+                    </p>
+                  ) : (
+                    <p className="mb-2 text-xs text-zinc-500">
+                      fal.ai aktiv — Abrechnung über dein fal-Wallet (
+                      <a
+                        href="https://fal.ai/dashboard/billing"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-accent underline"
+                      >
+                        Billing
+                      </a>
+                      ).
+                    </p>
+                  )}
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    TTS-Modell
+                  </label>
+                  <select
+                    value={normalizeFalTtsModel(falTtsModel)}
+                    onChange={(e) => {
+                      const nextModel = normalizeFalTtsModel(e.target.value);
+                      const nextVoice = defaultFalTtsVoice(nextModel);
+                      setFalTtsModel(nextModel);
+                      setFalTtsVoice(nextVoice);
+                      persistTtsFromState({
+                        ttsProvider: "fal-ai",
+                        falModel: nextModel,
+                        falVoice: nextVoice,
+                      });
+                    }}
+                    className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-2 py-2 text-sm"
+                  >
+                    {FAL_TTS_MODEL_OPTIONS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label} — {m.hint}
+                      </option>
+                    ))}
+                  </select>
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    Erzähler-Stimme
+                  </label>
+                  <FalTtsVoiceSelect
+                    model={normalizeFalTtsModel(falTtsModel)}
+                    value={falTtsVoice}
+                    onChange={(id) => {
+                      setFalTtsVoice(id);
+                      persistTtsFromState({
+                        ttsProvider: "fal-ai",
+                        falVoice: id,
+                      });
+                    }}
+                    label=""
+                  />
+                  <p className="text-[10px] text-zinc-600">
+                    Inworld: Deutsch mit Johanna/Josef. Kokoro: günstig für EN.
+                    ▶ testet die Stimme (kleine Kosten).
                   </p>
                 </>
               )}

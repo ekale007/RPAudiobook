@@ -45,6 +45,11 @@ import {
 } from "@/lib/server/serverCapabilities";
 import { normalizeFishAudioReferenceId } from "@/lib/tts/fishAudioVoices";
 import {
+  falTtsMaxChars,
+  normalizeFalTtsModel,
+  normalizeFalTtsVoice,
+} from "@/lib/tts/falTtsModels";
+import {
   normalizeOpenRouterTtsModel,
   normalizeOpenRouterTtsVoice,
 } from "@/lib/tts/openRouterTtsModels";
@@ -55,9 +60,12 @@ import { coerceQwenPresetVoice } from "@/lib/tts/qwenVoiceSanitize";
 import type { StorySettings } from "@/lib/types";
 import { stripSfxTags } from "@/lib/audio/sfxCatalog";
 
-function ttsChunkCharLimit(provider: TtsProvider): number {
+function ttsChunkCharLimit(provider: TtsProvider, settings?: TtsSettings): number {
   if (provider === "qwen-cloud") return QWEN_CLOUD_MAX_TEXT_CHARS;
   if (provider === "local" || provider === "qwen") return 4000;
+  if (provider === "fal-ai" && settings) {
+    return falTtsMaxChars(settings.falTtsModel);
+  }
   return 2400;
 }
 
@@ -244,6 +252,41 @@ async function synthesizeChunkFishAudio(
   return { blob, ttsCostCents };
 }
 
+async function synthesizeChunkFalAi(
+  settings: TtsSettings,
+  text: string,
+  voice: string,
+): Promise<{ blob: Blob; ttsCostCents: number }> {
+  const model = normalizeFalTtsModel(settings.falTtsModel);
+  const resolvedVoice = normalizeFalTtsVoice(model, voice);
+
+  const res = await authFetch("/api/tts/fal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text,
+      model,
+      voice: resolvedVoice,
+    }),
+  });
+
+  if (!res.ok) {
+    const raw = await res.text();
+    let message = raw || `fal.ai TTS failed (${res.status})`;
+    try {
+      const parsed = JSON.parse(raw) as { error?: string };
+      if (parsed.error?.trim()) message = parsed.error.trim();
+    } catch {
+      /* plain text */
+    }
+    throw new Error(message);
+  }
+
+  const blob = await res.blob();
+  const ttsCostCents = readCostCentsHeader(res, TTS_COST_HEADER) ?? 0;
+  return { blob, ttsCostCents };
+}
+
 async function synthesizeChunkElevenLabs(
   settings: TtsSettings,
   text: string,
@@ -346,6 +389,9 @@ async function synthesizeChunk(
   if (settings.provider === "fish-audio") {
     return synthesizeChunkFishAudio(settings, text, voice);
   }
+  if (settings.provider === "fal-ai") {
+    return synthesizeChunkFalAi(settings, text, voice);
+  }
   return synthesizeChunkElevenLabs(settings, text, voice, storyLocale, {
     speakerSlug: deliveryContext?.speakerSlug,
     storySettings: deliveryContext?.storySettings,
@@ -371,7 +417,9 @@ function resolveVoice(
           ? settings.openRouterTtsVoice
           : settings.provider === "fish-audio"
             ? settings.fishAudioReferenceId
-            : settings.elevenLabsVoiceId;
+            : settings.provider === "fal-ai"
+              ? settings.falTtsVoice
+              : settings.elevenLabsVoiceId;
     const resolved = voiceForSpeaker(
       speakerSlug,
       voiceMap,
@@ -396,6 +444,9 @@ function resolveVoice(
     if (settings.provider === "fish-audio") {
       return normalizeFishAudioReferenceId(resolved);
     }
+    if (settings.provider === "fal-ai") {
+      return normalizeFalTtsVoice(settings.falTtsModel, resolved);
+    }
     return resolved;
   }
   if (
@@ -417,6 +468,12 @@ function resolveVoice(
   if (settings.provider === "fish-audio") {
     return normalizeFishAudioReferenceId(settings.fishAudioReferenceId);
   }
+  if (settings.provider === "fal-ai") {
+    return normalizeFalTtsVoice(
+      settings.falTtsModel,
+      settings.falTtsVoice,
+    );
+  }
   return coerceElevenLabsVoiceId(
     settings.elevenLabsVoiceId,
     speakerSlug,
@@ -436,7 +493,11 @@ function cacheVoiceKey(
   if (settings.provider === "qwen" || settings.provider === "qwen-cloud") {
     return `${ttsCacheVoiceKey(settings)}:${voice}:${normalizeStoryLocaleKey(storyLocale)}`;
   }
-  if (settings.provider === "openrouter-tts" || settings.provider === "fish-audio") {
+  if (
+    settings.provider === "openrouter-tts" ||
+    settings.provider === "fish-audio" ||
+    settings.provider === "fal-ai"
+  ) {
     return `${ttsCacheVoiceKey(settings)}:${voice}:${normalizeStoryLocaleKey(storyLocale)}`;
   }
   return `${ttsCacheVoiceKey(settings)}:${voice}:${normalizeStoryLocaleKey(storyLocale)}`;
@@ -495,7 +556,7 @@ export async function getNarratorAudio(
   const cached = await getCachedAudio(cacheKey);
   if (cached) return { blob: cached };
 
-  const chunkLimit = ttsChunkCharLimit(settings.provider);
+  const chunkLimit = ttsChunkCharLimit(settings.provider, settings);
   let ttsCostCentsTotal = 0;
 
   const qwenForSpeaker = (

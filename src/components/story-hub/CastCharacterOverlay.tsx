@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CharacterAvatarUpload } from "@/components/CharacterAvatarUpload";
 import { ElevenLabsVoiceSelect } from "@/components/ElevenLabsVoiceSelect";
 import { FishAudioVoiceSelect } from "@/components/FishAudioVoiceSelect";
+import { FalTtsVoiceSelect } from "@/components/FalTtsVoiceSelect";
 import { OpenRouterTtsVoiceSelect } from "@/components/OpenRouterTtsVoiceSelect";
 import { QwenVoiceEditor } from "@/components/QwenVoiceEditor";
 import { OverlayPanel } from "@/components/ui/OverlayPanel";
@@ -28,6 +29,7 @@ import {
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
 import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
 import { normalizeOpenRouterTtsModel } from "@/lib/tts/openRouterTtsModels";
+import { normalizeFalTtsModel } from "@/lib/tts/falTtsModels";
 import type {
   QwenVoiceProfile,
   StorySettings,
@@ -124,6 +126,7 @@ export function CastCharacterOverlay({
   const ttsSettings = loadTtsSettings();
   const orTtsModel = normalizeOpenRouterTtsModel(ttsSettings.openRouterTtsModel);
   const fishModel = ttsSettings.fishAudioModel || "s2-pro";
+  const falTtsModel = normalizeFalTtsModel(ttsSettings.falTtsModel);
   const voiceDisabled = !isNarrator && !voiceEnabledSlugs.includes(character.slug);
   const profile =
     qwenProfile ?? emptyQwenProfile(character.slug);
@@ -344,6 +347,16 @@ export function CastCharacterOverlay({
               }
               disabled={voiceDisabled}
               fishModel={fishModel}
+              allowCustom
+            />
+          ) : ttsProvider === "fal-ai" ? (
+            <FalTtsVoiceSelect
+              model={falTtsModel}
+              value={currentVoice}
+              onChange={(id) =>
+                onVoiceMapChange({ ...voiceMap, [character.slug]: id })
+              }
+              disabled={voiceDisabled}
               allowCustom
             />
           ) : (

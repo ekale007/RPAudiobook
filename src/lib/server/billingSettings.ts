@@ -196,6 +196,28 @@ function envFishTtsUsdPer1mBytes(): number {
   return Number.isFinite(n) && n >= 0 ? n : 15;
 }
 
+function envFalTtsUsdPer1k(modelId?: string): number {
+  const model = modelId?.trim() ?? "";
+  if (model.includes("inworld")) {
+    const raw = process.env.BETA_FAL_INWORLD_TTS_USD_PER_1K?.trim();
+    const n = raw ? Number.parseFloat(raw) : 10;
+    return Number.isFinite(n) && n >= 0 ? n : 10;
+  }
+  if (model.includes("elevenlabs")) {
+    const raw = process.env.BETA_FAL_ELEVEN_TTS_USD_PER_1K?.trim();
+    const n = raw ? Number.parseFloat(raw) : 0.1;
+    return Number.isFinite(n) && n >= 0 ? n : 0.1;
+  }
+  if (model.includes("minimax")) {
+    const raw = process.env.BETA_FAL_MINIMAX_TTS_USD_PER_1K?.trim();
+    const n = raw ? Number.parseFloat(raw) : 0.05;
+    return Number.isFinite(n) && n >= 0 ? n : 0.05;
+  }
+  const raw = process.env.BETA_FAL_TTS_USD_PER_1K?.trim();
+  const n = raw ? Number.parseFloat(raw) : 0.02;
+  return Number.isFinite(n) && n >= 0 ? n : 0.02;
+}
+
 /** OpenRouter speech — flat $/1k chars (override via BETA_OPENROUTER_TTS_USD_PER_1K). */
 export async function estimateOpenRouterTtsCostCents(
   supabase: SupabaseClient,
@@ -221,6 +243,22 @@ export async function estimateFishTtsCostCents(
   if (!bytes) return 0;
   const eurCents = openRouterUsdToEurCents(
     (bytes / 1_000_000) * envFishTtsUsdPer1mBytes(),
+    billing.usdToEurRate,
+  );
+  return eurCents > 0 ? eurCents : 0;
+}
+
+/** fal.ai TTS — model-aware $/1k chars (override via BETA_FAL_TTS_USD_PER_1K etc.). */
+export async function estimateFalTtsCostCents(
+  supabase: SupabaseClient,
+  characters: number,
+  modelId?: string,
+): Promise<number> {
+  const billing = await fetchBillingSettings(supabase);
+  const chars = Math.max(0, characters);
+  if (!chars) return 0;
+  const eurCents = openRouterUsdToEurCents(
+    (chars / 1000) * envFalTtsUsdPer1k(modelId),
     billing.usdToEurRate,
   );
   return eurCents > 0 ? eurCents : 0;

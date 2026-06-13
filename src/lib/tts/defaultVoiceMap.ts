@@ -15,6 +15,11 @@ import {
   normalizeFishAudioReferenceId,
 } from "@/lib/tts/fishAudioVoices";
 import {
+  DEFAULT_FAL_TTS_MODEL,
+  falTtsModelMeta,
+  normalizeFalTtsVoice,
+} from "@/lib/tts/falTtsModels";
+import {
   DEFAULT_OPENROUTER_TTS_MODEL,
   normalizeOpenRouterTtsVoice,
   openRouterTtsModelMeta,
@@ -73,6 +78,12 @@ export function mergeVoiceMapForProvider(
       custom?.narrator ?? DEFAULT_FISH_AUDIO_REFERENCE_ID,
     );
     map = { narrator, ...custom };
+  } else if (provider === "fal-ai") {
+    const narrator = normalizeFalTtsVoice(
+      DEFAULT_FAL_TTS_MODEL,
+      custom?.narrator,
+    );
+    map = { narrator, ...custom };
   } else {
     map = mergeVoiceMap(custom);
   }
@@ -106,6 +117,9 @@ export function defaultNarratorVoiceForProvider(
   }
   if (provider === "fish-audio") {
     return DEFAULT_FISH_AUDIO_REFERENCE_ID;
+  }
+  if (provider === "fal-ai") {
+    return falTtsModelMeta(DEFAULT_FAL_TTS_MODEL).defaultVoice;
   }
   return DEFAULT_WRYTOUR_VOICE_MAP.narrator ?? "af_heart";
 }

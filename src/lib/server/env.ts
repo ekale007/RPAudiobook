@@ -44,6 +44,22 @@ export function isServerFishAudioTtsConfigured(): boolean {
   return Boolean(getFishAudioApiKey());
 }
 
+export function getFalApiKey(): string | null {
+  const key =
+    process.env.FAL_API_KEY?.trim() || process.env.FAL_KEY?.trim();
+  return key || null;
+}
+
+export function getFalTtsModel(): string {
+  return (
+    process.env.FAL_TTS_MODEL?.trim() || "fal-ai/kokoro/american-english"
+  );
+}
+
+export function isServerFalTtsConfigured(): boolean {
+  return Boolean(getFalApiKey());
+}
+
 export function getRateLimitLlmPerHour(): number {
   return parseInt(process.env.RATE_LIMIT_LLM_PER_HOUR ?? "80", 10);
 }
@@ -88,6 +104,7 @@ export function isServerTtsConfigured(): boolean {
     isServerElevenLabsConfigured() ||
     isServerOpenRouterTtsConfigured() ||
     isServerFishAudioTtsConfigured() ||
+    isServerFalTtsConfigured() ||
     isServerQwenTtsConfigured() ||
     isServerQwenCloudTtsConfigured()
   );

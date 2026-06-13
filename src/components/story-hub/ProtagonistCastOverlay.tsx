@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ElevenLabsVoiceSelect } from "@/components/ElevenLabsVoiceSelect";
 import { FishAudioVoiceSelect } from "@/components/FishAudioVoiceSelect";
+import { FalTtsVoiceSelect } from "@/components/FalTtsVoiceSelect";
 import { OpenRouterTtsVoiceSelect } from "@/components/OpenRouterTtsVoiceSelect";
 import { QwenVoiceEditor } from "@/components/QwenVoiceEditor";
 import { OverlayPanel } from "@/components/ui/OverlayPanel";
@@ -13,6 +14,7 @@ import { emptyQwenProfile } from "@/lib/tts/qwenVoiceProfiles";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
 import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
 import { normalizeOpenRouterTtsModel } from "@/lib/tts/openRouterTtsModels";
+import { normalizeFalTtsModel } from "@/lib/tts/falTtsModels";
 import {
   defaultProtagonistProfile,
   PROTAGONIST_SPEAKER_SLUG,
@@ -285,6 +287,18 @@ export function ProtagonistCastOverlay({
               })
             }
             fishModel={loadTtsSettings().fishAudioModel || "s2-pro"}
+            allowCustom
+          />
+        ) : ttsProvider === "fal-ai" ? (
+          <FalTtsVoiceSelect
+            model={normalizeFalTtsModel(loadTtsSettings().falTtsModel)}
+            value={currentVoice}
+            onChange={(id) =>
+              onVoiceMapChange({
+                ...voiceMap,
+                [PROTAGONIST_SPEAKER_SLUG]: id,
+              })
+            }
             allowCustom
           />
         ) : (

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { ElevenLabsVoiceSelect } from "@/components/ElevenLabsVoiceSelect";
 import { FishAudioVoiceSelect } from "@/components/FishAudioVoiceSelect";
+import { FalTtsVoiceSelect } from "@/components/FalTtsVoiceSelect";
 import { OpenRouterTtsVoiceSelect } from "@/components/OpenRouterTtsVoiceSelect";
 import { QwenVoiceEditor } from "@/components/QwenVoiceEditor";
 import { createClient } from "@/lib/supabase/client";
@@ -30,11 +31,12 @@ import {
   buildQwenProfilesFromSettings,
   emptyQwenProfile,
 } from "@/lib/tts/qwenVoiceProfiles";
-import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
+import { loadTtsSettings, DEFAULT_TTS, type TtsProvider } from "@/lib/storage/ttsSettings";
 import {
   DEFAULT_OPENROUTER_TTS_MODEL,
   normalizeOpenRouterTtsModel,
 } from "@/lib/tts/openRouterTtsModels";
+import { normalizeFalTtsModel } from "@/lib/tts/falTtsModels";
 import { defaultEnabledCastSlugs } from "@/lib/tts/voiceActivation";
 import {
   PROTAGONIST_SPEAKER_SLUG,
@@ -99,6 +101,7 @@ export default function StoryVoicesPage() {
   const [protagonistLabel, setProtagonistLabel] = useState("Protagonist (du)");
   const [orTtsModel, setOrTtsModel] = useState(DEFAULT_OPENROUTER_TTS_MODEL);
   const [fishModel, setFishModel] = useState("s2-pro");
+  const [falTtsModel, setFalTtsModel] = useState(DEFAULT_TTS.falTtsModel);
   const [expandedSlug, setExpandedSlug] = useState<string | null>("narrator");
 
   useEffect(() => {
@@ -113,6 +116,7 @@ export default function StoryVoicesPage() {
         setTtsProvider(tts.provider);
         setOrTtsModel(normalizeOpenRouterTtsModel(tts.openRouterTtsModel));
         setFishModel(tts.fishAudioModel || "s2-pro");
+        setFalTtsModel(normalizeFalTtsModel(tts.falTtsModel));
         setLocalEngine(tts.localEngine ?? "edge");
 
         Promise.all([
@@ -230,7 +234,9 @@ export default function StoryVoicesPage() {
         ? "OpenRouter TTS"
         : ttsProvider === "fish-audio"
           ? "Fish Audio"
-          : engine === "kokoro"
+          : ttsProvider === "fal-ai"
+            ? "fal.ai"
+            : engine === "kokoro"
             ? "Kokoro"
             : "Local";
 
@@ -385,6 +391,15 @@ export default function StoryVoicesPage() {
                         setVoiceMap((prev) => ({ ...prev, [s.slug]: id }))
                       }
                       fishModel={fishModel}
+                      allowCustom
+                    />
+                  ) : ttsProvider === "fal-ai" ? (
+                    <FalTtsVoiceSelect
+                      model={falTtsModel}
+                      value={currentVoice}
+                      onChange={(id) =>
+                        setVoiceMap((prev) => ({ ...prev, [s.slug]: id }))
+                      }
                       allowCustom
                     />
                   ) : (

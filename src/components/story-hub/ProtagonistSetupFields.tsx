@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ElevenLabsVoiceSelect } from "@/components/ElevenLabsVoiceSelect";
 import { FishAudioVoiceSelect } from "@/components/FishAudioVoiceSelect";
+import { FalTtsVoiceSelect } from "@/components/FalTtsVoiceSelect";
 import { OpenRouterTtsVoiceSelect } from "@/components/OpenRouterTtsVoiceSelect";
 import { QwenVoiceEditor } from "@/components/QwenVoiceEditor";
 import { emptyQwenProfile } from "@/lib/tts/qwenVoiceProfiles";
@@ -15,6 +16,7 @@ import {
 import { loadTtsSettings, type TtsProvider } from "@/lib/storage/ttsSettings";
 import { PREFS_UPDATED_EVENT } from "@/lib/storage/userPreferencesSync";
 import { normalizeOpenRouterTtsModel } from "@/lib/tts/openRouterTtsModels";
+import { normalizeFalTtsModel } from "@/lib/tts/falTtsModels";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
 import {
   defaultMapForEngine,
@@ -93,6 +95,7 @@ export function ProtagonistSetupFields({
   const ttsSettings = loadTtsSettings();
   const orTtsModel = normalizeOpenRouterTtsModel(ttsSettings.openRouterTtsModel);
   const fishModel = ttsSettings.fishAudioModel || "s2-pro";
+  const falTtsModel = normalizeFalTtsModel(ttsSettings.falTtsModel);
 
   const pronounOptions: Array<{
     id: StoryProtagonistProfile["pronouns"];
@@ -213,6 +216,18 @@ export function ProtagonistSetupFields({
               })
             }
             fishModel={fishModel}
+            allowCustom
+          />
+        ) : ttsProvider === "fal-ai" ? (
+          <FalTtsVoiceSelect
+            model={falTtsModel}
+            value={currentVoice}
+            onChange={(id) =>
+              onVoiceMapChange({
+                ...voiceMap,
+                [PROTAGONIST_SPEAKER_SLUG]: id,
+              })
+            }
             allowCustom
           />
         ) : (
