@@ -1,4 +1,5 @@
 import { getFishAudioApiKey } from "@/lib/server/env";
+import { looksLikeFishReferenceId } from "@/lib/tts/fishAudioVoices";
 
 export type FishVoiceCatalogEntry = {
   id: string;
@@ -239,7 +240,7 @@ async function listPinnedVoices(
   const voices: FishVoiceCatalogEntry[] = [];
   for (const rawId of pinnedIds) {
     const id = rawId.trim();
-    if (!id || id.length < 8) continue;
+    if (!id || !looksLikeFishReferenceId(id)) continue;
     const mapped = await fetchFishModelById(apiKey, id, "pinned");
     voices.push(
       mapped ?? {

@@ -8,6 +8,7 @@ import {
   loadFishAudioVoiceCatalogDetailed,
   type FishVoiceCatalogEntry,
 } from "@/lib/tts/fishAudioCatalogClient";
+import { looksLikeFishReferenceId } from "@/lib/tts/fishAudioVoices";
 import { authFetch } from "@/lib/supabase/authFetch";
 
 export function FishAudioVoiceSelect({
@@ -43,7 +44,10 @@ export function FishAudioVoiceSelect({
   const autoPickedRef = useRef(false);
 
   const pinned = useMemo(
-    () => pinnedIds.map((id) => id.trim()).filter((id) => id.length >= 8),
+    () =>
+      pinnedIds
+        .map((id) => id.trim())
+        .filter((id) => looksLikeFishReferenceId(id)),
     [pinnedIds],
   );
 
@@ -152,8 +156,8 @@ export function FishAudioVoiceSelect({
   const addPinnedId = (id: string) => {
     if (!onPinnedIdsChange) return;
     const trimmed = id.trim();
-    if (trimmed.length < 8) {
-      setError("reference_id mindestens 8 Zeichen.");
+    if (!looksLikeFishReferenceId(trimmed)) {
+      setError("Fish reference_id: 24–64 Hex-Zeichen (von fish.audio/bookmarks).");
       return;
     }
     setError(null);
@@ -170,9 +174,11 @@ export function FishAudioVoiceSelect({
     const tokens = raw
       .split(/[\s,;]+/)
       .map((t) => t.trim())
-      .filter((t) => t.length >= 8);
+      .filter((t) => looksLikeFishReferenceId(t));
     if (!tokens.length) {
-      setError("Keine gültigen IDs (min. 8 Zeichen, Leerzeichen/Komma getrennt).");
+      setError(
+        "Keine gültigen Fish-IDs (32-stellige Hex von fish.audio/bookmarks).",
+      );
       return;
     }
     setError(null);

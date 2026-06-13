@@ -1,5 +1,7 @@
 /** Fish Audio S2-Pro — POST https://api.fish.audio/v1/tts */
 
+import type { VoiceMap } from "@/lib/types";
+
 export type FishAudioModel = "s2-pro" | "s1";
 
 export const FISH_AUDIO_MODEL_OPTIONS: Array<{
@@ -31,9 +33,42 @@ export function normalizeFishAudioModel(model?: string | null): FishAudioModel {
   return "s2-pro";
 }
 
+/** Fish model / reference_id (hex, typically 32 chars). */
+export function looksLikeFishReferenceId(id?: string | null): boolean {
+  const trimmed = id?.trim() ?? "";
+  return /^[a-f0-9]{24,64}$/i.test(trimmed);
+}
+
 export function normalizeFishAudioReferenceId(ref?: string | null): string {
   const trimmed = ref?.trim();
-  return trimmed || DEFAULT_FISH_AUDIO_REFERENCE_ID;
+  if (trimmed && looksLikeFishReferenceId(trimmed)) return trimmed;
+  if (trimmed) return trimmed;
+  return DEFAULT_FISH_AUDIO_REFERENCE_ID;
+}
+
+/** Reject Kokoro/Eleven/fal preset IDs — use narrator fallback for Fish TTS. */
+export function coerceFishReferenceId(
+  id: string | undefined | null,
+  fallback: string,
+): string {
+  const trimmed = id?.trim();
+  if (trimmed && looksLikeFishReferenceId(trimmed)) return trimmed;
+  const fb = fallback.trim();
+  if (looksLikeFishReferenceId(fb)) return fb;
+  return normalizeFishAudioReferenceId(fb);
+}
+
+export function sanitizeVoiceMapForFish(
+  map: VoiceMap,
+  narratorFallback: string,
+): VoiceMap {
+  const narrator = coerceFishReferenceId(map.narrator, narratorFallback);
+  const out: VoiceMap = { narrator };
+  for (const [slug, raw] of Object.entries(map)) {
+    if (slug === "narrator" || !raw?.trim()) continue;
+    if (looksLikeFishReferenceId(raw)) out[slug] = raw.trim();
+  }
+  return out;
 }
 
 export function normalizeFishAudioPinnedIds(ids?: string[] | null): string[] {
@@ -42,7 +77,7 @@ export function normalizeFishAudioPinnedIds(ids?: string[] | null): string[] {
   const out: string[] = [];
   for (const raw of ids) {
     const id = raw?.trim();
-    if (!id || id.length < 8 || seen.has(id)) continue;
+    if (!id || !looksLikeFishReferenceId(id) || seen.has(id)) continue;
     seen.add(id);
     out.push(id);
   }

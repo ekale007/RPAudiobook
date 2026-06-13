@@ -12,7 +12,9 @@ import {
 import type { TtsProvider } from "@/lib/storage/ttsSettings";
 import {
   DEFAULT_FISH_AUDIO_REFERENCE_ID,
+  coerceFishReferenceId,
   normalizeFishAudioReferenceId,
+  sanitizeVoiceMapForFish,
 } from "@/lib/tts/fishAudioVoices";
 import {
   DEFAULT_FAL_TTS_MODEL,
@@ -74,10 +76,13 @@ export function mergeVoiceMapForProvider(
     );
     map = { narrator, ...custom };
   } else if (provider === "fish-audio") {
-    const narrator = normalizeFishAudioReferenceId(
-      custom?.narrator ?? DEFAULT_FISH_AUDIO_REFERENCE_ID,
+    const fishCustom: VoiceMap = { ...custom };
+    map = sanitizeVoiceMapForFish(
+      fishCustom,
+      normalizeFishAudioReferenceId(
+        custom?.narrator ?? DEFAULT_FISH_AUDIO_REFERENCE_ID,
+      ),
     );
-    map = { narrator, ...custom };
   } else if (provider === "fal-ai") {
     const narrator = normalizeFalTtsVoice(
       DEFAULT_FAL_TTS_MODEL,

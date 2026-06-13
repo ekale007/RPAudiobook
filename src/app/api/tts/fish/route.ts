@@ -11,6 +11,7 @@ import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 import { getTtsHourlyLimitForUser } from "@/lib/server/userTier";
 import { insertUsageEvent } from "@/lib/server/usageEvents";
 import {
+  looksLikeFishReferenceId,
   normalizeFishAudioModel,
   normalizeFishAudioReferenceId,
 } from "@/lib/tts/fishAudioVoices";
@@ -67,6 +68,17 @@ export async function POST(req: Request) {
 
   if (!text) {
     return NextResponse.json({ error: "Missing text" }, { status: 400 });
+  }
+  if (!looksLikeFishReferenceId(referenceId)) {
+    return NextResponse.json(
+      {
+        error:
+          "Ungültige Fish reference_id (32-stellige Hex-ID von fish.audio). Kokoro/Eleven-Stimmen funktionieren nicht — in Einstellungen oder Lesezeichen-ID speichern.",
+        code: "fish_bad_reference",
+        referenceId,
+      },
+      { status: 400 },
+    );
   }
   if (text.length > 2400) {
     return NextResponse.json(

@@ -140,9 +140,21 @@ export async function fetchBillingSettings(
 export function openRouterUsdToEurCents(
   usd: number,
   usdToEurRate: number,
+  options?: { minCents?: number },
 ): number {
   if (!Number.isFinite(usd) || usd <= 0) return 0;
-  return Math.max(1, Math.ceil(usd * usdToEurRate * 100));
+  const min = options?.minCents ?? 1;
+  const cents = Math.ceil(usd * usdToEurRate * 100);
+  if (min <= 0) return cents > 0 ? cents : 0;
+  return Math.max(min, cents);
+}
+
+function falTtsBillableUnits(chars: number, modelId?: string): number {
+  const model = modelId?.trim() ?? "";
+  if (model.includes("kokoro")) {
+    return Math.max(1, Math.ceil(chars / 1000));
+  }
+  return chars / 1000;
 }
 
 export function elevenUsdPer1kForModel(
@@ -248,7 +260,7 @@ export async function estimateFishTtsCostCents(
   return eurCents > 0 ? eurCents : 0;
 }
 
-/** fal.ai TTS — model-aware $/1k chars (override via BETA_FAL_TTS_USD_PER_1K etc.). */
+/** fal.ai TTS — model-aware $/1k chars (Kokoro: pro 1000-Zeichen-Block). */
 export async function estimateFalTtsCostCents(
   supabase: SupabaseClient,
   characters: number,
@@ -257,10 +269,11 @@ export async function estimateFalTtsCostCents(
   const billing = await fetchBillingSettings(supabase);
   const chars = Math.max(0, characters);
   if (!chars) return 0;
-  const eurCents = openRouterUsdToEurCents(
-    (chars / 1000) * envFalTtsUsdPer1k(modelId),
-    billing.usdToEurRate,
-  );
+  const usd =
+    falTtsBillableUnits(chars, modelId) * envFalTtsUsdPer1k(modelId);
+  const eurCents = openRouterUsdToEurCents(usd, billing.usdToEurRate, {
+    minCents: 0,
+  });
   return eurCents > 0 ? eurCents : 0;
 }
 

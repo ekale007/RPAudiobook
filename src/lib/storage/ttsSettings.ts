@@ -17,6 +17,7 @@ import {
 import {
   DEFAULT_FISH_AUDIO_MODEL,
   DEFAULT_FISH_AUDIO_REFERENCE_ID,
+  looksLikeFishReferenceId,
   normalizeFishAudioModel,
   normalizeFishAudioPinnedIds,
   normalizeFishAudioReferenceId,
@@ -252,7 +253,7 @@ export function isTtsReady(settings: TtsSettings): boolean {
   if (settings.provider === "fish-audio") {
     return (
       isServerFishAudioTtsAvailable() &&
-      Boolean(settings.fishAudioReferenceId.trim())
+      looksLikeFishReferenceId(settings.fishAudioReferenceId)
     );
   }
   if (settings.provider === "fal-ai") {

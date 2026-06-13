@@ -43,7 +43,12 @@ import {
   isServerElevenLabsAvailable,
   isServerQwenTtsAvailable,
 } from "@/lib/server/serverCapabilities";
-import { normalizeFishAudioReferenceId } from "@/lib/tts/fishAudioVoices";
+import {
+  coerceFishReferenceId,
+  DEFAULT_FISH_AUDIO_REFERENCE_ID,
+  looksLikeFishReferenceId,
+  normalizeFishAudioReferenceId,
+} from "@/lib/tts/fishAudioVoices";
 import {
   falTtsMaxChars,
   normalizeFalTtsModel,
@@ -231,7 +236,10 @@ async function synthesizeChunkFishAudio(
     body: JSON.stringify({
       text,
       model: settings.fishAudioModel,
-      referenceId: normalizeFishAudioReferenceId(referenceId),
+      referenceId: coerceFishReferenceId(
+        referenceId,
+        settings.fishAudioReferenceId,
+      ),
     }),
   });
 
@@ -442,7 +450,10 @@ function resolveVoice(
       );
     }
     if (settings.provider === "fish-audio") {
-      return normalizeFishAudioReferenceId(resolved);
+      return coerceFishReferenceId(
+        resolved,
+        settings.fishAudioReferenceId,
+      );
     }
     if (settings.provider === "fal-ai") {
       return normalizeFalTtsVoice(settings.falTtsModel, resolved);
@@ -466,7 +477,10 @@ function resolveVoice(
     );
   }
   if (settings.provider === "fish-audio") {
-    return normalizeFishAudioReferenceId(settings.fishAudioReferenceId);
+    return coerceFishReferenceId(
+      settings.fishAudioReferenceId,
+      DEFAULT_FISH_AUDIO_REFERENCE_ID,
+    );
   }
   if (settings.provider === "fal-ai") {
     return normalizeFalTtsVoice(

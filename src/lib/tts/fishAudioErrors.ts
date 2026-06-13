@@ -56,11 +56,17 @@ export function formatFishAudioTtsError(
   }
 
   if (status === 400) {
+    const invalidRef =
+      lower.includes("reference") ||
+      lower.includes("model") ||
+      lower.includes("not found");
     return {
       code: "fish_bad_request",
-      message: detail
-        ? `Fish Audio: ${detail}`
-        : "Fish Audio: Ungültige Anfrage — reference_id in Settings prüfen.",
+      message: invalidRef
+        ? `Fish Audio: Stimmen-ID ungültig oder nicht verfügbar — ${detail || "reference_id in Einstellungen prüfen (32-stellige Hex-ID von fish.audio/bookmarks)."}`
+        : detail
+          ? `Fish Audio: ${detail}`
+          : "Fish Audio: Ungültige Anfrage — reference_id in Settings prüfen.",
     };
   }
 

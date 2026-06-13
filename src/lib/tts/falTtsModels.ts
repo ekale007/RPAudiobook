@@ -32,7 +32,7 @@ export const FAL_TTS_MODEL_OPTIONS: FalTtsModelOption[] = [
   {
     id: "fal-ai/kokoro/american-english",
     label: "Kokoro — US English",
-    hint: "~$0,02/M Zeichen · schnell",
+    hint: "~$0,02 / 1k Zeichen · schnell",
     textField: "prompt",
     voiceStyle: "voice",
     maxChars: 2400,
@@ -43,7 +43,7 @@ export const FAL_TTS_MODEL_OPTIONS: FalTtsModelOption[] = [
   {
     id: "fal-ai/kokoro/british-english",
     label: "Kokoro — British English",
-    hint: "~$0,02/M Zeichen",
+    hint: "~$0,02 / 1k Zeichen",
     textField: "prompt",
     voiceStyle: "voice",
     maxChars: 2400,
