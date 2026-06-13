@@ -1,4 +1,5 @@
 import type { CharacterRow } from "@/lib/db/stories";
+import { stripRoleplayMarkupForTts } from "@/lib/tts/speakableText";
 
 const SPEAKER_TAG = /<<\s*speaker\s*:\s*[a-z0-9][a-z0-9_:-]*\s*>>/gi;
 
@@ -8,5 +9,7 @@ export function prepareTextForTts(
   _speakerSlug?: string | null,
   _cast?: CharacterRow[],
 ): string {
-  return content.replace(SPEAKER_TAG, "").trim();
+  return stripRoleplayMarkupForTts(
+    content.replace(SPEAKER_TAG, "").trim(),
+  );
 }

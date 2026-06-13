@@ -5,6 +5,7 @@ import { assistantTurnProseText } from "@/lib/chat/parseSpeakerBlocks";
 import {
   isSpeakableForTts,
   sanitizeTextForTtsRetry,
+  stripRoleplayMarkupForTts,
 } from "@/lib/tts/speakableText";
 import { voiceForSpeaker } from "@/lib/tts/defaultVoiceMap";
 import type { TtsProvider, TtsSettings } from "@/lib/storage/ttsSettings";
@@ -679,7 +680,7 @@ export function normalizeTextForTts(
   cast: CharacterRow[],
   storyLocale?: TtsStoryLocale,
 ): string {
-  let out = text
+  let out = stripRoleplayMarkupForTts(text)
     .replace(/\bnayas\b/gi, "Naya's")
     .replace(/\beliass\b/gi, "Elias's");
 
