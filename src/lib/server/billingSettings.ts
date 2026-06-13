@@ -225,6 +225,16 @@ function envFalTtsUsdPer1k(modelId?: string): number {
     const n = raw ? Number.parseFloat(raw) : 0.1;
     return Number.isFinite(n) && n >= 0 ? n : 0.1;
   }
+  if (model.includes("qwen-3-tts")) {
+    if (model.includes("0.6b")) {
+      const raw = process.env.BETA_FAL_QWEN_TTS_06B_USD_PER_1K?.trim();
+      const n = raw ? Number.parseFloat(raw) : 0.07;
+      return Number.isFinite(n) && n >= 0 ? n : 0.07;
+    }
+    const raw = process.env.BETA_FAL_QWEN_TTS_17B_USD_PER_1K?.trim();
+    const n = raw ? Number.parseFloat(raw) : 0.09;
+    return Number.isFinite(n) && n >= 0 ? n : 0.09;
+  }
   const raw = process.env.BETA_FAL_TTS_USD_PER_1K?.trim();
   const n = raw ? Number.parseFloat(raw) : 0.02;
   return Number.isFinite(n) && n >= 0 ? n : 0.02;

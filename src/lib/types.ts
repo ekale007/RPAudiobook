@@ -59,8 +59,15 @@ export const DEFAULT_OPENROUTER: Omit<OpenRouterSettings, "apiKey"> = {
 /** slug → Kokoro voice id or ElevenLabs voice id */
 export type VoiceMap = Record<string, string>;
 
+import type { TtsProvider } from "@/lib/storage/ttsSettings";
 import type { StoryPlotState } from "@/lib/memory/plotState";
 import type { StoryPin } from "@/lib/memory/storyPins";
+
+/** Per-provider cast voice maps — `local-kokoro` / `local-qwen` when provider is `local`. */
+export type VoiceMapStorageKey =
+  | TtsProvider
+  | "local-kokoro"
+  | "local-qwen";
 
 /** Qwen3-TTS voice profile per cast slug (see docs/QWEN-MASTERPLAN.md). */
 export type QwenVoiceProfile = {
@@ -82,7 +89,10 @@ export type StoryProtagonistProfile = {
 export interface StorySettings {
   recentTurnCount: number;
   loreTokenBudget: number;
+  /** Legacy single map — migrated into `voiceMaps` on save; kept for older clients. */
   voiceMap?: VoiceMap;
+  /** Cast voices per TTS provider (and local engine split). */
+  voiceMaps?: Partial<Record<VoiceMapStorageKey, VoiceMap>>;
   /** Player character — separate TTS slug `protagonist`. */
   protagonist?: StoryProtagonistProfile;
   /** Per-slug Qwen instruct + preset when provider is qwen. */

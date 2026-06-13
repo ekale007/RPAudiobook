@@ -2,6 +2,7 @@ import {
   DEFAULT_QWEN_VOICE_MAP,
   DEFAULT_WRYTOUR_VOICE_MAP,
   mergeVoiceMapForProvider,
+  resolveStoryVoiceMap,
 } from "@/lib/tts/defaultVoiceMap";
 import { ELEVEN_DEFAULT_NARRATOR } from "@/lib/tts/elevenLabsVoices";
 import { KOKORO_VOICES } from "@/lib/tts/kokoroVoices";
@@ -15,7 +16,7 @@ import {
   openRouterTtsModelMeta,
 } from "@/lib/tts/openRouterTtsModels";
 import { PROTAGONIST_SPEAKER_SLUG, type StoryContentLocale } from "@/lib/story/protagonist";
-import type { VoiceMap } from "@/lib/types";
+import type { StorySettings, VoiceMap } from "@/lib/types";
 
 export function voiceOptionsForEngine(engine: LocalTtsEngine) {
   if (engine === "qwen") {
@@ -63,14 +64,25 @@ export function resolveLocalEngine(
 /** Initial voice map for protagonist setup (protagonist defaults to narrator voice). */
 export function initialProtagonistVoiceMap(
   storyLocale: StoryContentLocale,
-  baseVoiceMap?: VoiceMap | null,
+  base?: StorySettings | VoiceMap | null,
 ): VoiceMap {
   const tts = loadTtsSettings();
-  const merged = mergeVoiceMapForProvider(
-    tts.provider,
-    storyLocale,
-    baseVoiceMap ?? undefined,
-  );
+  const engine = resolveLocalEngine(tts.provider, tts.localEngine);
+  const opts = { localEngine: engine, falTtsModel: tts.falTtsModel };
+  const merged =
+    base && typeof base === "object" && "voiceMaps" in base
+      ? resolveStoryVoiceMap(
+          base as StorySettings,
+          tts.provider,
+          storyLocale,
+          opts,
+        )
+      : mergeVoiceMapForProvider(
+          tts.provider,
+          storyLocale,
+          base as VoiceMap | null | undefined,
+          opts,
+        );
   const narrator = merged.narrator?.trim() || fallbackVoice(tts.provider, resolveLocalEngine(tts.provider, tts.localEngine));
   const protagonist =
     merged[PROTAGONIST_SPEAKER_SLUG]?.trim() || narrator;

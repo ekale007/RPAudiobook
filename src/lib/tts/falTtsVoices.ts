@@ -190,5 +190,18 @@ export function falInworldVoiceGroups(): FalTtsVoiceGroup[] {
     }));
 }
 
+/** Qwen3 CustomVoice speakers on fal (same ids as local Qwen). */
+export const FAL_QWEN_VOICES: FalTtsVoiceEntry[] = [
+  { id: "Ryan", label: "Ryan", hint: "Dynamic EN narrator" },
+  { id: "Aiden", label: "Aiden", hint: "Clear American male" },
+  { id: "Vivian", label: "Vivian", hint: "Bright, expressive" },
+  { id: "Serena", label: "Serena", hint: "Warm, gentle" },
+  { id: "Uncle_Fu", label: "Uncle Fu", hint: "Low mellow male" },
+  { id: "Dylan", label: "Dylan", hint: "Beijing male" },
+  { id: "Eric", label: "Eric", hint: "Sichuan male" },
+  { id: "Ono_Anna", label: "Ono Anna", hint: "Playful JP female" },
+  { id: "Sohee", label: "Sohee", hint: "Warm KR female" },
+];
+
 export const FAL_PREVIEW_TEXT =
   "Hello. This is a short voice preview from fal.ai.";

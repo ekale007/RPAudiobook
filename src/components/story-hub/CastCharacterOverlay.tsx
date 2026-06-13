@@ -36,7 +36,10 @@ import type {
   VoiceMap,
   StoryCharacterCard,
 } from "@/lib/types";
-import { voiceMapForStorage } from "@/lib/tts/defaultVoiceMap";
+import {
+  patchStoryVoiceMaps,
+  voiceMapForStorage,
+} from "@/lib/tts/defaultVoiceMap";
 import { emptyQwenProfile } from "@/lib/tts/qwenVoiceProfiles";
 
 type CharDraft = {
@@ -218,14 +221,26 @@ export function CastCharacterOverlay({
       const speaker = qwenMode
         ? profile.presetSpeaker?.trim() || currentVoice
         : (voiceMap[character.slug] ?? currentVoice).trim() || currentVoice;
+      const vmOpts = {
+        localEngine,
+        falTtsModel: loadTtsSettings().falTtsModel,
+      };
+      const mapWithSpeaker = { ...voiceMap, [character.slug]: speaker };
       const nextVoiceMap = voiceMapForStorage(
         ttsProvider,
         storyLocale,
-        { ...voiceMap, [character.slug]: speaker },
+        mapWithSpeaker,
+        vmOpts,
       );
       onVoiceMapChange(nextVoiceMap);
       const settingsPatch: Parameters<typeof updateStorySettings>[1] = {
-        voiceMap: nextVoiceMap,
+        ...patchStoryVoiceMaps(
+          storySettings,
+          ttsProvider,
+          storyLocale,
+          mapWithSpeaker,
+          vmOpts,
+        ),
         voiceEnabledSlugs,
       };
       if (qwenMode && onQwenProfileChange) {

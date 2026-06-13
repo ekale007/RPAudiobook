@@ -8,7 +8,10 @@ import {
 } from "@/components/story-hub/ProtagonistSetupFields";
 import { updateStorySettings } from "@/lib/db/stories";
 import { loadTtsSettings } from "@/lib/storage/ttsSettings";
-import { voiceMapForStorage } from "@/lib/tts/defaultVoiceMap";
+import {
+  patchStoryVoiceMaps,
+  resolveStoryVoiceMap,
+} from "@/lib/tts/defaultVoiceMap";
 import { isQwenTtsMode } from "@/lib/tts/qwenTtsMode";
 import {
   fallbackVoice,
@@ -49,7 +52,13 @@ export function ProtagonistSetupModal({
   } = useProtagonistSetupState(
     locale,
     storySettings.protagonist,
-    storySettings.voiceMap,
+    resolveStoryVoiceMap(storySettings, loadTtsSettings().provider, locale, {
+      localEngine: resolveLocalEngine(
+        loadTtsSettings().provider,
+        loadTtsSettings().localEngine,
+      ),
+      falTtsModel: loadTtsSettings().falTtsModel,
+    }),
   );
 
   const [busy, setBusy] = useState(false);
@@ -72,13 +81,23 @@ export function ProtagonistSetupModal({
           voiceMap[PROTAGONIST_SPEAKER_SLUG] ||
           fallbackVoice(tts.provider, engine)
         : (voiceMap[PROTAGONIST_SPEAKER_SLUG] ?? fallbackVoice(tts.provider, engine)).trim();
-      const nextVoiceMap = voiceMapForStorage(tts.provider, locale, {
+      const vmOpts = {
+        localEngine: engine,
+        falTtsModel: tts.falTtsModel,
+      };
+      const mapWithSpeaker = {
         ...voiceMap,
         [PROTAGONIST_SPEAKER_SLUG]: speaker,
-      });
+      };
       const patch: Parameters<typeof updateStorySettings>[1] = {
         protagonist,
-        voiceMap: nextVoiceMap,
+        ...patchStoryVoiceMaps(
+          storySettings,
+          tts.provider,
+          locale,
+          mapWithSpeaker,
+          vmOpts,
+        ),
       };
       if (qwenMode) {
         patch.qwenVoiceProfiles = {

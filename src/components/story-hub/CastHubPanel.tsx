@@ -12,7 +12,9 @@ import {
   DEFAULT_QWEN_VOICE_MAP,
   DEFAULT_WRYTOUR_VOICE_MAP,
   mergeVoiceMapForProvider,
-  voiceMapForStorage,
+  patchStoryVoiceMaps,
+  resolveStoryVoiceMap,
+  voiceMapStorageKey,
 } from "@/lib/tts/defaultVoiceMap";
 import { ELEVEN_DEFAULT_NARRATOR } from "@/lib/tts/elevenLabsVoices";
 import { KOKORO_VOICES } from "@/lib/tts/kokoroVoices";
@@ -116,9 +118,13 @@ export function CastHubPanel({
         : "kokoro",
   );
 
-  const [voiceMap, setVoiceMap] = useState<VoiceMap>(() =>
-    mergeVoiceMapForProvider(tts.provider, storyLocale, storySettings.voiceMap),
-  );
+  const [voiceMap, setVoiceMap] = useState<VoiceMap>(() => {
+    const tts = loadTtsSettings();
+    return resolveStoryVoiceMap(storySettings, tts.provider, storyLocale, {
+      localEngine: tts.localEngine,
+      falTtsModel: tts.falTtsModel,
+    });
+  });
   const [voiceEnabledSlugs, setVoiceEnabledSlugs] = useState<string[]>(
     storySettings.voiceEnabledSlugs ?? defaultEnabledCastSlugs(cast),
   );
@@ -145,9 +151,29 @@ export function CastHubPanel({
         : "kokoro";
   const qwen = isQwenTtsMode(ttsProvider, engine);
 
+  const voiceMapOpts = useMemo(
+    () => ({
+      localEngine: engine,
+      falTtsModel: loadTtsSettings().falTtsModel,
+    }),
+    [engine],
+  );
+
   const serverVoiceMapKey = useMemo(
-    () => JSON.stringify(storySettings.voiceMap ?? {}),
-    [storySettings.voiceMap],
+    () =>
+      JSON.stringify(
+        storySettings.voiceMaps?.[
+          voiceMapStorageKey(ttsProvider, localEngine)
+        ] ??
+          storySettings.voiceMap ??
+          {},
+      ),
+    [
+      storySettings.voiceMaps,
+      storySettings.voiceMap,
+      ttsProvider,
+      localEngine,
+    ],
   );
   const serverVoiceEnabledKey = useMemo(
     () => JSON.stringify(storySettings.voiceEnabledSlugs ?? []),
@@ -182,10 +208,11 @@ export function CastHubPanel({
     if (voiceEditsDirtyRef.current) return;
     voiceRepairRanRef.current = true;
 
-    const base = mergeVoiceMapForProvider(
+    const base = resolveStoryVoiceMap(
+      storySettings,
       ttsProvider,
       storyLocale,
-      storySettings.voiceMap,
+      voiceMapOpts,
     );
     void repairStoryElevenVoiceMap(base, storyLocale).then(({ map, changed }) => {
       if (!changed.length) return;
@@ -198,7 +225,13 @@ export function CastHubPanel({
             ? "Erzähler"
             : slug;
       void updateStorySettings(storyId, {
-        voiceMap: voiceMapForStorage(ttsProvider, storyLocale, map),
+        ...patchStoryVoiceMaps(
+          storySettings,
+          ttsProvider,
+          storyLocale,
+          map,
+          voiceMapOpts,
+        ),
         voiceEnabledSlugs,
       }).then(() => {
         voiceEditsDirtyRef.current = false;
@@ -212,7 +245,8 @@ export function CastHubPanel({
     ttsProvider,
     storyId,
     storyLocale,
-    storySettings.voiceMap,
+    storySettings,
+    voiceMapOpts,
     voiceEnabledSlugs,
     onSaved,
   ]);
@@ -220,7 +254,12 @@ export function CastHubPanel({
   useEffect(() => {
     if (voiceEditsDirtyRef.current) return;
     setVoiceMap(
-      mergeVoiceMapForProvider(ttsProvider, storyLocale, storySettings.voiceMap),
+      resolveStoryVoiceMap(
+        storySettings,
+        ttsProvider,
+        storyLocale,
+        voiceMapOpts,
+      ),
     );
     setVoiceEnabledSlugs(
       storySettings.voiceEnabledSlugs ?? defaultEnabledCastSlugs(cast),
@@ -235,8 +274,8 @@ export function CastHubPanel({
     serverQwenProfilesKey,
     storyLocale,
     ttsProvider,
+    voiceMapOpts,
     castSlugsForVoices,
-    storySettings,
   ]);
 
   const setVoiceMapTracked = useCallback((map: VoiceMap) => {
@@ -425,7 +464,13 @@ export function CastHubPanel({
               setQwenSceneInstruct(on);
               void updateStorySettings(storyId, {
                 qwenSceneInstructEnabled: on,
-                voiceMap: voiceMapForStorage(ttsProvider, storyLocale, voiceMap),
+                ...patchStoryVoiceMaps(
+                  storySettings,
+                  ttsProvider,
+                  storyLocale,
+                  voiceMap,
+                  voiceMapOpts,
+                ),
                 voiceEnabledSlugs,
                 qwenVoiceProfiles: qwenProfiles,
               }).then(() => handleCastSaved());

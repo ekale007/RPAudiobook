@@ -9,7 +9,10 @@ import { QwenVoiceEditor } from "@/components/QwenVoiceEditor";
 import { OverlayPanel } from "@/components/ui/OverlayPanel";
 import { updateStorySettings } from "@/lib/db/stories";
 import { formatUnknownError } from "@/lib/util/formatUnknownError";
-import { voiceMapForStorage } from "@/lib/tts/defaultVoiceMap";
+import {
+  patchStoryVoiceMaps,
+  voiceMapForStorage,
+} from "@/lib/tts/defaultVoiceMap";
 import { emptyQwenProfile } from "@/lib/tts/qwenVoiceProfiles";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
 import { loadTtsSettings, saveFishAudioPinnedIds, type TtsProvider } from "@/lib/storage/ttsSettings";
@@ -132,15 +135,31 @@ export function ProtagonistCastOverlay({
         ? profile.presetSpeaker?.trim() || currentVoice
         : (voiceMap[PROTAGONIST_SPEAKER_SLUG] ?? currentVoice).trim() ||
           currentVoice;
-      const nextVoiceMap = voiceMapForStorage(ttsProvider, storyLocale, {
+      const vmOpts = {
+        localEngine,
+        falTtsModel: loadTtsSettings().falTtsModel,
+      };
+      const mapWithSpeaker = {
         ...voiceMap,
         [PROTAGONIST_SPEAKER_SLUG]: speaker,
-      });
+      };
+      const nextVoiceMap = voiceMapForStorage(
+        ttsProvider,
+        storyLocale,
+        mapWithSpeaker,
+        vmOpts,
+      );
       onVoiceMapChange(nextVoiceMap);
 
       const patch: Parameters<typeof updateStorySettings>[1] = {
         protagonist,
-        voiceMap: nextVoiceMap,
+        ...patchStoryVoiceMaps(
+          storySettings,
+          ttsProvider,
+          storyLocale,
+          mapWithSpeaker,
+          vmOpts,
+        ),
         voiceEnabledSlugs,
       };
       if (qwenMode && onQwenProfileChange) {

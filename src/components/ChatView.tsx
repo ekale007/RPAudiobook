@@ -96,7 +96,7 @@ import {
   updateTurnContent,
 } from "@/lib/db/turns";
 import { createClient } from "@/lib/supabase/client";
-import { mergeVoiceMapForProvider } from "@/lib/tts/defaultVoiceMap";
+import { resolveStoryVoiceMap } from "@/lib/tts/defaultVoiceMap";
 import { isTtsReady, loadTtsSettings } from "@/lib/storage/ttsSettings";
 import { subscribeServerCapabilities } from "@/lib/server/serverCapabilities";
 import type { MessageAudioPlayerHandle } from "@/lib/tts/messageAudioPlayerHandle";
@@ -163,10 +163,14 @@ export function ChatView({
   storyLocale?: string;
 }) {
   const ttsSettings = loadTtsSettings();
-  const voiceMap: VoiceMap = mergeVoiceMapForProvider(
+  const voiceMap: VoiceMap = resolveStoryVoiceMap(
+    storySettings,
     ttsSettings.provider,
     storyLocale,
-    storySettings.voiceMap,
+    {
+      localEngine: ttsSettings.localEngine,
+      falTtsModel: ttsSettings.falTtsModel,
+    },
   );
   const voiceEnabledSlugs = storySettings.voiceEnabledSlugs;
 

@@ -1,4 +1,4 @@
-import type { VoiceMap } from "@/lib/types";
+import type { VoiceMap, StorySettings, VoiceMapStorageKey } from "@/lib/types";
 import {
   isCastVoiceActive,
   normalizeVoiceSlug,
@@ -10,6 +10,7 @@ import {
   mergeElevenVoiceMap,
 } from "@/lib/tts/elevenLabsVoices";
 import type { TtsProvider } from "@/lib/storage/ttsSettings";
+import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
 import {
   DEFAULT_FISH_AUDIO_REFERENCE_ID,
   coerceFishReferenceId,
@@ -53,6 +54,34 @@ export const DEFAULT_QWEN_VOICE_MAP: VoiceMap = {
   "tess-roth": "Vivian",
 };
 
+export type VoiceMapMergeOptions = {
+  localEngine?: LocalTtsEngine | null;
+  falTtsModel?: string | null;
+};
+
+export function voiceMapStorageKey(
+  provider: TtsProvider,
+  localEngine?: LocalTtsEngine | null,
+): VoiceMapStorageKey {
+  if (provider === "local") {
+    return localEngine === "qwen" ? "local-qwen" : "local-kokoro";
+  }
+  return provider;
+}
+
+function sanitizeFalVoiceMap(
+  map: VoiceMap,
+  falTtsModel?: string | null,
+): VoiceMap {
+  const model = falTtsModel ?? DEFAULT_FAL_TTS_MODEL;
+  const out: VoiceMap = {};
+  for (const [slug, voice] of Object.entries(map)) {
+    if (!voice?.trim()) continue;
+    out[slug] = normalizeFalTtsVoice(model, voice);
+  }
+  return out;
+}
+
 export function mergeVoiceMap(
   custom?: VoiceMap | null,
 ): VoiceMap {
@@ -63,11 +92,17 @@ export function mergeVoiceMapForProvider(
   provider: TtsProvider,
   locale: string | null | undefined,
   custom?: VoiceMap | null,
+  options?: VoiceMapMergeOptions,
 ): VoiceMap {
+  const localEngine = options?.localEngine;
+  const falModel = options?.falTtsModel ?? DEFAULT_FAL_TTS_MODEL;
   let map: VoiceMap;
+
   if (provider === "elevenlabs") {
     map = mergeElevenVoiceMap(normalizeStoryLocale(locale), custom);
   } else if (provider === "qwen" || provider === "qwen-cloud") {
+    map = sanitizeVoiceMapForQwen({ ...DEFAULT_QWEN_VOICE_MAP, ...custom });
+  } else if (provider === "local" && localEngine === "qwen") {
     map = sanitizeVoiceMapForQwen({ ...DEFAULT_QWEN_VOICE_MAP, ...custom });
   } else if (provider === "openrouter-tts") {
     const narrator = normalizeOpenRouterTtsVoice(
@@ -84,15 +119,27 @@ export function mergeVoiceMapForProvider(
       ),
     );
   } else if (provider === "fal-ai") {
-    const narrator = normalizeFalTtsVoice(
-      DEFAULT_FAL_TTS_MODEL,
-      custom?.narrator,
-    );
-    map = { narrator, ...custom };
+    const narrator = normalizeFalTtsVoice(falModel, custom?.narrator);
+    map = sanitizeFalVoiceMap({ narrator, ...custom }, falModel);
   } else {
     map = mergeVoiceMap(custom);
   }
   return withProtagonistVoice(map);
+}
+
+/** Read the cast voice map for the active provider (per-provider storage + legacy fallback). */
+export function resolveStoryVoiceMap(
+  settings: StorySettings,
+  provider: TtsProvider,
+  locale: string | null | undefined,
+  options?: VoiceMapMergeOptions,
+): VoiceMap {
+  const key = voiceMapStorageKey(provider, options?.localEngine);
+  const fromKey = settings.voiceMaps?.[key];
+  const hasVoiceMaps =
+    settings.voiceMaps && Object.keys(settings.voiceMaps).length > 0;
+  const custom = fromKey ?? (!hasVoiceMaps ? settings.voiceMap : undefined);
+  return mergeVoiceMapForProvider(provider, locale, custom, options);
 }
 
 /** Normalize a voice map before persisting to story settings (provider-safe IDs only). */
@@ -100,8 +147,25 @@ export function voiceMapForStorage(
   provider: TtsProvider,
   locale: string | null | undefined,
   map: VoiceMap,
+  options?: VoiceMapMergeOptions,
 ): VoiceMap {
-  return mergeVoiceMapForProvider(provider, locale, map);
+  return mergeVoiceMapForProvider(provider, locale, map, options);
+}
+
+/** Patch story settings with a normalized map for one provider without touching other providers. */
+export function patchStoryVoiceMaps(
+  settings: StorySettings,
+  provider: TtsProvider,
+  locale: string | null | undefined,
+  map: VoiceMap,
+  options?: VoiceMapMergeOptions,
+): Pick<StorySettings, "voiceMap" | "voiceMaps"> {
+  const key = voiceMapStorageKey(provider, options?.localEngine);
+  const normalized = voiceMapForStorage(provider, locale, map, options);
+  return {
+    voiceMaps: { ...(settings.voiceMaps ?? {}), [key]: normalized },
+    voiceMap: normalized,
+  };
 }
 
 export function defaultNarratorVoiceForProvider(

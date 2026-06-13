@@ -19,7 +19,8 @@ import {
   DEFAULT_QWEN_VOICE_MAP,
   DEFAULT_WRYTOUR_VOICE_MAP,
   mergeVoiceMapForProvider,
-  voiceMapForStorage,
+  patchStoryVoiceMaps,
+  resolveStoryVoiceMap,
 } from "@/lib/tts/defaultVoiceMap";
 import { ELEVEN_DEFAULT_NARRATOR } from "@/lib/tts/elevenLabsVoices";
 import { KOKORO_VOICES } from "@/lib/tts/kokoroVoices";
@@ -49,7 +50,7 @@ import {
 } from "@/lib/story/protagonist";
 import { normalizeStoryLocale } from "@/lib/tts/ttsLocaleRouting";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
-import type { QwenVoiceProfile, VoiceMap } from "@/lib/types";
+import type { QwenVoiceProfile, StorySettings, VoiceMap } from "@/lib/types";
 
 type VoiceOption = { id: string; label: string };
 
@@ -92,6 +93,10 @@ export default function StoryVoicesPage() {
   const [cast, setCast] = useState<
     Awaited<ReturnType<typeof listCharacters>>
   >([]);
+  const [storySettings, setStorySettings] = useState<StorySettings>({
+    recentTurnCount: 24,
+    loreTokenBudget: 3500,
+  });
   const [voiceMap, setVoiceMap] = useState<VoiceMap>({});
   const [qwenProfiles, setQwenProfiles] = useState<
     Record<string, QwenVoiceProfile>
@@ -139,12 +144,20 @@ export default function StoryVoicesPage() {
             const locale = normalizeStoryLocale(storyRes.data.locale as string);
             setStoryLocale(locale);
             const settings = parseStorySettings(storyRes.data.settings);
+            setStorySettings(settings);
             const castRows = chars.filter(
               (c) => c.role === "cast" || c.role === "narrator",
             );
             setCast(castRows);
+            const vmOpts = {
+              localEngine:
+                tts.localEngine === "qwen" || tts.localEngine === "kokoro"
+                  ? tts.localEngine
+                  : "kokoro",
+              falTtsModel: tts.falTtsModel,
+            };
             setVoiceMap(
-              mergeVoiceMapForProvider(tts.provider, locale, settings.voiceMap),
+              resolveStoryVoiceMap(settings, tts.provider, locale, vmOpts),
             );
             setQwenSceneInstruct(settings.qwenSceneInstructEnabled !== false);
             const slugs = castRows.map((c) => c.slug);
@@ -163,6 +176,10 @@ export default function StoryVoicesPage() {
 
   const engine =
     localEngine === "qwen" || localEngine === "kokoro" ? localEngine : "kokoro";
+  const voiceMapOpts = {
+    localEngine: engine,
+    falTtsModel,
+  };
   const qwen = isQwenMode(ttsProvider, localEngine);
   const voiceOptions = voiceOptionsForEngine(engine);
   const defaults =
@@ -217,15 +234,23 @@ export default function StoryVoicesPage() {
   const save = async () => {
     setError(null);
     try {
+      const vmOpts = voiceMapOpts;
       const patch: Parameters<typeof updateStorySettings>[1] = {
-        voiceMap: voiceMapForStorage(ttsProvider, storyLocale, voiceMap),
+        ...patchStoryVoiceMaps(
+          storySettings,
+          ttsProvider,
+          storyLocale,
+          voiceMap,
+          vmOpts,
+        ),
         voiceEnabledSlugs,
       };
       if (qwen) {
         patch.qwenVoiceProfiles = qwenProfiles;
         patch.qwenSceneInstructEnabled = qwenSceneInstruct;
       }
-      await updateStorySettings(storyId, patch);
+      const merged = await updateStorySettings(storyId, patch);
+      setStorySettings(merged);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {

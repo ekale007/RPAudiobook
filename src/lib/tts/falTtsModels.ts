@@ -5,6 +5,7 @@ import {
   FAL_KOKORO_AMERICAN_VOICES,
   FAL_KOKORO_BRITISH_VOICES,
   FAL_MINIMAX_VOICES,
+  FAL_QWEN_VOICES,
   falInworldVoiceGroups,
   type FalTtsVoiceEntry,
   type FalTtsVoiceGroup,
@@ -84,6 +85,28 @@ export const FAL_TTS_MODEL_OPTIONS: FalTtsModelOption[] = [
     voices: FAL_MINIMAX_VOICES,
     voiceGroups: [{ group: "MiniMax", voices: FAL_MINIMAX_VOICES }],
   },
+  {
+    id: "fal-ai/qwen-3-tts/text-to-speech/1.7b",
+    label: "Qwen3 TTS 1.7B",
+    hint: "~$0,09 / 1k Zeichen · prompt für Stil",
+    textField: "text",
+    voiceStyle: "voice",
+    maxChars: 2400,
+    defaultVoice: "Ryan",
+    voices: FAL_QWEN_VOICES,
+    voiceGroups: [{ group: "Qwen CustomVoice", voices: FAL_QWEN_VOICES }],
+  },
+  {
+    id: "fal-ai/qwen-3-tts/text-to-speech/0.6b",
+    label: "Qwen3 TTS 0.6B",
+    hint: "~$0,07 / 1k Zeichen · schneller",
+    textField: "text",
+    voiceStyle: "voice",
+    maxChars: 2400,
+    defaultVoice: "Ryan",
+    voices: FAL_QWEN_VOICES,
+    voiceGroups: [{ group: "Qwen CustomVoice", voices: FAL_QWEN_VOICES }],
+  },
 ];
 
 export const DEFAULT_FAL_TTS_MODEL = FAL_TTS_MODEL_OPTIONS[0]!.id;
@@ -140,6 +163,7 @@ export function buildFalTtsInput(
   model: string,
   text: string,
   voice: string,
+  options?: { prompt?: string },
 ): Record<string, unknown> {
   const meta = falTtsModelMeta(model);
   const resolvedVoice = normalizeFalTtsVoice(model, voice);
@@ -169,6 +193,17 @@ export function buildFalTtsInput(
       voice: resolvedVoice,
       sample_rate_hertz: 48000,
     };
+  }
+
+  if (model.includes("qwen-3-tts")) {
+    const body: Record<string, unknown> = {
+      text,
+      voice: resolvedVoice,
+      language: "Auto",
+    };
+    const prompt = options?.prompt?.trim();
+    if (prompt) body.prompt = prompt;
+    return body;
   }
 
   if (meta.textField === "prompt") {
