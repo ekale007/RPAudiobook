@@ -167,7 +167,7 @@ export function buildFalTtsInput(
     return {
       text,
       voice: resolvedVoice,
-      sample_rate_hertz: "48000",
+      sample_rate_hertz: 48000,
     };
   }
 
