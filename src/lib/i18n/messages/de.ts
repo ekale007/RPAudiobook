@@ -29,7 +29,7 @@ export const deMessages = {
   },
   library: {
     title: "Bibliothek",
-    hint: "Wische oder nutze die Pfeile — das Buch vorne ist aktiv.",
+    hint: "Jede Geschichte gibt es auf Deutsch und Englisch — wische oder nutze die Pfeile.",
     filterAll: "Alle",
     filterDe: "DE",
     filterEn: "EN",

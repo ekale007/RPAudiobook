@@ -116,8 +116,8 @@ export function LibraryTurntable({
   onImport: (id: LibraryTemplateId) => void;
 }) {
   const { locale: uiLocale, t } = useUiLocale();
-  const [localeFilter, setLocaleFilter] = useState<LibraryLocaleFilter>(uiLocale);
-  const templates = filterPublicLibraryTemplates(localeFilter);
+  const [localeFilter, setLocaleFilter] = useState<LibraryLocaleFilter>("all");
+  const templates = filterPublicLibraryTemplates(localeFilter, uiLocale);
   const count = templates.length;
   const angleStep = count > 0 ? 360 / count : 360;
 
@@ -127,12 +127,8 @@ export function LibraryTurntable({
   const didDragRef = useRef(false);
 
   useEffect(() => {
-    setLocaleFilter(uiLocale);
-  }, [uiLocale]);
-
-  useEffect(() => {
     setActiveIndex(0);
-  }, [localeFilter]);
+  }, [localeFilter, uiLocale]);
 
   const activeTemplate = templates[activeIndex] ?? templates[0];
   const rotation = -activeIndex * angleStep;

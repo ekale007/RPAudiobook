@@ -2,6 +2,10 @@ import type { StorySeedPack } from "@/lib/import/storySeed";
 import { brand } from "@/lib/brand";
 import { loadWhenDawnBreaksSeed } from "@/lib/import/storySeed";
 import { EXTENDED_LIBRARY_TEMPLATES } from "@/lib/story/libraryTemplatesExtra";
+import {
+  LIBRARY_LOCALE_TWIN_TEMPLATES,
+  type LibraryLocaleTwinTemplateId,
+} from "@/lib/story/libraryTemplateTwins";
 import { seedPackToStoryDraft } from "@/lib/story/seedPackDraft";
 import type { StoryDraft } from "@/lib/story/generateStoryDraft";
 import type { StoryCharacterCard, StoryLorebook } from "@/lib/types";
@@ -26,10 +30,13 @@ export type LibraryTemplateId =
   | "guild-last-light"
   | "starlit-court"
   | "hexbound-academy"
-  | "ghost-signal";
+  | "ghost-signal"
+  | LibraryLocaleTwinTemplateId;
 
 export interface LibraryTemplateDefinition {
   id: LibraryTemplateId;
+  /** Shared key for locale variants (defaults to id without -de/-en suffix). */
+  seriesId?: string;
   title: string;
   tagline: string;
   genre: string;
@@ -929,7 +936,18 @@ export const PUBLIC_LIBRARY_TEMPLATES: LibraryTemplateDefinition[] = [
     loadPack: loadTideLinePack,
   },
   ...EXTENDED_LIBRARY_TEMPLATES,
+  ...LIBRARY_LOCALE_TWIN_TEMPLATES,
 ];
+
+export function libraryTemplateSeriesId(
+  template: Pick<LibraryTemplateDefinition, "id" | "seriesId">,
+): string {
+  return template.seriesId ?? template.id.replace(/-(de|en)$/, "");
+}
+
+export function libraryTemplateSeriesIdFromId(id: string): string {
+  return id.replace(/-(de|en)$/, "");
+}
 
 export function getLibraryTemplate(
   id: LibraryTemplateId,
@@ -941,9 +959,34 @@ export type LibraryLocaleFilter = "all" | "de" | "en";
 
 export function filterPublicLibraryTemplates(
   filter: LibraryLocaleFilter,
+  uiLocale?: "de" | "en",
 ): LibraryTemplateDefinition[] {
-  if (filter === "all") return PUBLIC_LIBRARY_TEMPLATES;
-  return PUBLIC_LIBRARY_TEMPLATES.filter((t) => t.locale === filter);
+  const filtered =
+    filter === "all"
+      ? [...PUBLIC_LIBRARY_TEMPLATES]
+      : PUBLIC_LIBRARY_TEMPLATES.filter((t) => t.locale === filter);
+
+  if (filter !== "all" || !uiLocale) return filtered;
+
+  const bySeries = new Map<string, LibraryTemplateDefinition[]>();
+  for (const template of filtered) {
+    const key = libraryTemplateSeriesId(template);
+    const group = bySeries.get(key);
+    if (group) group.push(template);
+    else bySeries.set(key, [template]);
+  }
+
+  const ordered: LibraryTemplateDefinition[] = [];
+  for (const group of bySeries.values()) {
+    group.sort((a, b) => {
+      if (a.locale === b.locale) return a.id.localeCompare(b.id);
+      if (a.locale === uiLocale) return -1;
+      if (b.locale === uiLocale) return 1;
+      return a.locale === "de" ? -1 : 1;
+    });
+    ordered.push(...group);
+  }
+  return ordered;
 }
 
 export function libraryTemplateToDraft(
@@ -959,22 +1002,31 @@ export function libraryTemplateToDraft(
   });
 }
 
+function coverFromSeries(
+  templateId: string,
+  pick: (t: LibraryTemplateDefinition) => string | undefined,
+): string | null {
+  const direct = PUBLIC_LIBRARY_TEMPLATES.find((t) => t.id === templateId);
+  const directValue = direct ? pick(direct) : undefined;
+  if (directValue) return directValue;
+
+  const series = libraryTemplateSeriesIdFromId(templateId);
+  const sibling = PUBLIC_LIBRARY_TEMPLATES.find(
+    (t) => libraryTemplateSeriesId(t) === series && pick(t),
+  );
+  return sibling ? pick(sibling) ?? null : null;
+}
+
 export function getLibraryCoverImageSrc(
   templateId: LibraryTemplateId | string | null | undefined,
 ): string | null {
   if (!templateId) return null;
-  return (
-    PUBLIC_LIBRARY_TEMPLATES.find((t) => t.id === templateId)?.coverImageSrc ??
-    null
-  );
+  return coverFromSeries(templateId, (t) => t.coverImageSrc);
 }
 
 export function getLibraryCoverGradient(
   templateId: LibraryTemplateId | string | null | undefined,
 ): string | null {
   if (!templateId) return null;
-  return (
-    PUBLIC_LIBRARY_TEMPLATES.find((t) => t.id === templateId)?.coverGradient ??
-    null
-  );
+  return coverFromSeries(templateId, (t) => t.coverGradient);
 }

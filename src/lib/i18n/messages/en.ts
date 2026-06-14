@@ -31,7 +31,7 @@ export const enMessages: Messages = {
   },
   library: {
     title: "Library",
-    hint: "Swipe or use the arrows — the front book is active.",
+    hint: "Every story is available in German and English — swipe or use the arrows.",
     filterAll: "All",
     filterDe: "DE",
     filterEn: "EN",
