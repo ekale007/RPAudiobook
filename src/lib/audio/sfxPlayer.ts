@@ -4,13 +4,15 @@ type ActiveLoop = {
   id: string;
   source: AudioBufferSourceNode;
   gain: GainNode;
-  /** Base volume from catalog (restored on resume). */
   baseVolume: number;
   paused: boolean;
 };
 
+const SPEECH_DUCK_GAIN = 0.35;
+
 let ctx: AudioContext | null = null;
 const activeLoops = new Map<string, ActiveLoop>();
+let speechDucked = false;
 
 function getContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -36,6 +38,23 @@ async function ensureContextRunning(): Promise<AudioContext | null> {
     }
   }
   return audioCtx;
+}
+
+function effectiveVolume(entry: ActiveLoop): number {
+  if (entry.paused) return 0;
+  return entry.baseVolume * (speechDucked ? SPEECH_DUCK_GAIN : 1);
+}
+
+function applyLoopGain(entry: ActiveLoop): void {
+  const audioCtx = getContext();
+  if (!audioCtx) return;
+  entry.gain.gain.setValueAtTime(effectiveVolume(entry), audioCtx.currentTime);
+}
+
+function applyAllLoopGains(): void {
+  for (const active of activeLoops.values()) {
+    applyLoopGain(active);
+  }
 }
 
 async function loadBuffer(entry: SfxEntry): Promise<AudioBuffer | null> {
@@ -88,29 +107,37 @@ async function startLoop(entry: SfxEntry): Promise<void> {
 
   const source = audioCtx.createBufferSource();
   const gain = audioCtx.createGain();
-  gain.gain.value = entry.volume;
   source.buffer = buffer;
   source.loop = true;
   source.connect(gain);
   gain.connect(audioCtx.destination);
   source.start();
-  activeLoops.set(entry.id, {
+  const active: ActiveLoop = {
     id: entry.id,
     source,
     gain,
     baseVolume: entry.volume,
     paused: false,
-  });
+  };
+  activeLoops.set(entry.id, active);
+  applyLoopGain(active);
 }
 
 function resumeSfxLoop(id: string): void {
   const active = activeLoops.get(id);
-  const entry = getSfxEntry(id);
-  if (!active || !entry) return;
-  const audioCtx = getContext();
-  if (!audioCtx) return;
+  if (!active) return;
   active.paused = false;
-  active.gain.gain.setValueAtTime(active.baseVolume, audioCtx.currentTime);
+  applyLoopGain(active);
+}
+
+/** Lower ambience/music loops while narrator speech plays. */
+export function setSpeechDucking(active: boolean): void {
+  speechDucked = active;
+  applyAllLoopGains();
+}
+
+export function endSpeechDucking(): void {
+  setSpeechDucking(false);
 }
 
 /** Mute ambience loops while TTS is paused (keeps sources for seamless resume). */
@@ -151,12 +178,57 @@ export function stopAllSfx(): void {
   for (const id of [...activeLoops.keys()]) {
     stopSfxLoop(id);
   }
+  speechDucked = false;
 }
 
-/** Play tags from turn text; loops persist until stopAllSfx or pauseAllSfxLoops. */
-export async function playSfxForTags(tagIds: string[]): Promise<void> {
+/** Start/stop loop beds to match scene (ambience + music). */
+export async function syncSceneLoops(loopIds: string[]): Promise<void> {
   await ensureContextRunning();
-  for (const id of tagIds) {
-    await playSfx(id);
+  const want = new Set(loopIds);
+  for (const id of [...activeLoops.keys()]) {
+    if (!want.has(id)) stopSfxLoop(id);
   }
+  for (const id of loopIds) {
+    const entry = getSfxEntry(id);
+    if (entry?.loop) await startLoop(entry);
+  }
+}
+
+export async function playOneShots(ids: string[]): Promise<void> {
+  await ensureContextRunning();
+  for (const id of ids) {
+    const entry = getSfxEntry(id);
+    if (entry && !entry.loop) await playSfx(id);
+  }
+}
+
+/** Legacy: play tag list (loops + one-shots). Prefer syncSceneLoops + playOneShots. */
+export async function playSfxForTags(tagIds: string[]): Promise<void> {
+  const loops: string[] = [];
+  const shots: string[] = [];
+  for (const id of tagIds) {
+    const entry = getSfxEntry(id);
+    if (!entry) continue;
+    if (entry.loop) loops.push(id);
+    else shots.push(id);
+  }
+  await syncSceneLoops(loops);
+  await playOneShots(shots);
+}
+
+export async function playTurnSoundscape(args: {
+  ambient: string[];
+  music: string | null;
+  oneShots: string[];
+  resumeLoops?: boolean;
+}): Promise<void> {
+  const loops = [...args.ambient];
+  if (args.music) loops.push(args.music);
+
+  if (args.resumeLoops && hasActiveAmbienceLoops()) {
+    resumeAllSfxLoops();
+  } else {
+    await syncSceneLoops(loops);
+  }
+  await playOneShots(args.oneShots);
 }

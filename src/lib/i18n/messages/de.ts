@@ -533,7 +533,7 @@ export const deMessages = {
     addFromStory: "+ Aus Story",
     sceneStyle: "Szenen-Stil",
     sceneStyleDesc:
-      "im Chat (Plot + Absatz) — Qwen-instruct & Eleven v3 Audio-Tags.",
+      "im Chat (Plot + Absatz) — Fish [whisper]/[laughing], Eleven v3, Qwen-instruct; plus Ambience aus Ort.",
   },
 } as const;
 

@@ -43,6 +43,7 @@ import {
   normalizeOpenRouterTtsModel,
 } from "@/lib/tts/openRouterTtsModels";
 import { normalizeFalTtsModel } from "@/lib/tts/falTtsModels";
+import { supportsSceneDelivery } from "@/lib/tts/sceneDelivery";
 import { defaultEnabledCastSlugs } from "@/lib/tts/voiceActivation";
 import {
   PROTAGONIST_SPEAKER_SLUG,
@@ -181,6 +182,7 @@ export default function StoryVoicesPage() {
     falTtsModel,
   };
   const qwen = isQwenMode(ttsProvider, localEngine);
+  const sceneDelivery = supportsSceneDelivery(ttsProvider);
   const voiceOptions = voiceOptionsForEngine(engine);
   const defaults =
     ttsProvider === "elevenlabs"
@@ -245,9 +247,11 @@ export default function StoryVoicesPage() {
         ),
         voiceEnabledSlugs,
       };
+      if (sceneDelivery) {
+        patch.qwenSceneInstructEnabled = qwenSceneInstruct;
+      }
       if (qwen) {
         patch.qwenVoiceProfiles = qwenProfiles;
-        patch.qwenSceneInstructEnabled = qwenSceneInstruct;
       }
       const merged = await updateStorySettings(storyId, patch);
       setStorySettings(merged);
@@ -298,7 +302,7 @@ export default function StoryVoicesPage() {
           ) : null}
         </p>
 
-        {qwen ? (
+        {sceneDelivery ? (
           <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-surface-border bg-surface-raised px-3 py-2">
             <input
               type="checkbox"
@@ -307,9 +311,8 @@ export default function StoryVoicesPage() {
               className="mt-0.5 size-3.5 rounded border-surface-border"
             />
             <span className="text-xs text-zinc-400">
-              <strong className="text-zinc-200">Szenen-Stil</strong> aus
-              Plot-State (Ort, Bedrohungen, Threads) — kombiniert mit
-              Figuren-instruct.
+              <strong className="text-zinc-200">Dynamische Stimmung</strong> aus
+              Plot-State (Ort, Bedrohungen) — Fish-Tags / Eleven v3 / Qwen-instruct.
             </span>
           </label>
         ) : null}

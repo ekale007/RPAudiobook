@@ -16,14 +16,14 @@ import { getNarratorAudio } from "@/lib/tts/narratorTts";
 import type { CharacterRow } from "@/lib/db/stories";
 import type { VoiceMap, StorySettings } from "@/lib/types";
 import { loadTtsSettings, ttsCacheVoiceKey } from "@/lib/storage/ttsSettings";
-import { ambienceIdsFromPlot, parseSfxTags } from "@/lib/audio/sfxCatalog";
-import { isPlotStateEmpty } from "@/lib/memory/plotState";
-import { isStoryDeliveryEnabled } from "@/lib/tts/resolveStoryDelivery";
+import { resolveTurnSound } from "@/lib/audio/soundscape";
 import {
+  endSpeechDucking,
   hasActiveAmbienceLoops,
   pauseAllSfxLoops,
-  playSfxForTags,
+  playTurnSoundscape,
   resumeAllSfxLoops,
+  setSpeechDucking,
   stopAllSfx,
 } from "@/lib/audio/sfxPlayer";
 import { isServerElevenLabsAvailable, refreshServerCapabilities } from "@/lib/server/serverCapabilities";
@@ -275,7 +275,7 @@ export const MessageAudioPlayer = forwardRef<
     setDuration(0);
     blobRef.current = null;
     webAudioActiveRef.current = false;
-    stopAllSfx();
+    endSpeechDucking();
   }, [turnId, text, rawContent, cleanupUrl]);
 
   const attachAudio = (audio: HTMLAudioElement) => {
@@ -299,7 +299,7 @@ export const MessageAudioPlayer = forwardRef<
       if (Number.isFinite(audio.duration)) setDuration(audio.duration);
     };
     audio.onended = () => {
-      stopAllSfx();
+      endSpeechDucking();
       setStatus("ready");
       setCurrentTime(0);
       if (audioRef.current) audioRef.current.currentTime = 0;
@@ -479,29 +479,29 @@ export const MessageAudioPlayer = forwardRef<
     reject(error instanceof Error ? error : new Error(String(error)));
   };
 
-  const sfxIdsForTurn = useCallback((): string[] => {
-    const sfxSource = rawContent ?? text;
-    return [
-      ...parseSfxTags(sfxSource),
-      ...(isStoryDeliveryEnabled(storySettings) &&
-      !isPlotStateEmpty(storySettings?.plotState)
-        ? ambienceIdsFromPlot(storySettings?.plotState)
-        : []),
-    ].filter((id, i, arr) => arr.indexOf(id) === i);
-  }, [rawContent, text, storySettings]);
+  const soundscapeForTurn = useCallback(
+    () =>
+      resolveTurnSound({
+        rawContent,
+        text,
+        storySettings,
+      }),
+    [rawContent, text, storySettings],
+  );
 
   const runSfxBeforePlay = async (options?: { resumeAmbience?: boolean }) => {
-    const sfxIds = sfxIdsForTurn();
-    if (options?.resumeAmbience && hasActiveAmbienceLoops()) {
-      resumeAllSfxLoops();
-    } else if (sfxIds.length) {
-      await playSfxForTags(sfxIds);
-    }
+    const sound = soundscapeForTurn();
+    await playTurnSoundscape({
+      ambient: sound.ambient,
+      music: sound.music,
+      oneShots: sound.oneShots,
+      resumeLoops: options?.resumeAmbience && hasActiveAmbienceLoops(),
+    });
   };
 
   const finishWebAudioPlayback = useCallback(() => {
     webAudioActiveRef.current = false;
-    stopAllSfx();
+    endSpeechDucking();
     setStatus("ready");
     setCurrentTime(0);
     clearTtsNowPlaying();
@@ -528,6 +528,7 @@ export const MessageAudioPlayer = forwardRef<
       setStatus("playing");
       publishNowPlaying();
       setTtsMediaPlaybackState("playing");
+      setSpeechDucking(true);
       const { durationSec } = await playBlobViaWebAudio(
         blobRef.current,
         playbackRate,
@@ -539,6 +540,7 @@ export const MessageAudioPlayer = forwardRef<
 
     await runSfxBeforePlay(options);
     publishNowPlaying();
+    setSpeechDucking(true);
     await audio.play();
     setAutoplayBlocked(false);
     setStatus("playing");
@@ -607,6 +609,7 @@ export const MessageAudioPlayer = forwardRef<
         setStatus("playing");
         publishNowPlaying();
         setTtsMediaPlaybackState("playing");
+        setSpeechDucking(true);
         resumeWebAudioPlayback();
         syncTimesFromAudio();
       } catch (error) {

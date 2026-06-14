@@ -1,6 +1,8 @@
-/** Built-in SFX catalog — add matching OGG files under public/sfx/ (see docs/SFX.md). */
+/** Built-in SFX catalog — add matching OGG/WAV under public/sfx/ (see docs/SFX.md). */
 
 import type { StoryPlotState } from "@/lib/memory/plotState";
+
+export type SfxBus = "ambience" | "sfx" | "music";
 
 export type SfxEntry = {
   id: string;
@@ -10,6 +12,7 @@ export type SfxEntry = {
   loop: boolean;
   /** 0–1 gain when mixed under TTS */
   volume: number;
+  bus: SfxBus;
 };
 
 export const SFX_CATALOG: Record<string, SfxEntry> = {
@@ -19,6 +22,7 @@ export const SFX_CATALOG: Record<string, SfxEntry> = {
     path: "/sfx/rain.wav",
     loop: true,
     volume: 0.12,
+    bus: "ambience",
   },
   "rain-indoors": {
     id: "rain-indoors",
@@ -26,6 +30,7 @@ export const SFX_CATALOG: Record<string, SfxEntry> = {
     path: "/sfx/rain_indoors.wav",
     loop: true,
     volume: 0.1,
+    bus: "ambience",
   },
   wind: {
     id: "wind",
@@ -33,6 +38,7 @@ export const SFX_CATALOG: Record<string, SfxEntry> = {
     path: "/sfx/wind_2.wav",
     loop: true,
     volume: 0.1,
+    bus: "ambience",
   },
   city: {
     id: "city",
@@ -40,6 +46,7 @@ export const SFX_CATALOG: Record<string, SfxEntry> = {
     path: "/sfx/city.wav",
     loop: true,
     volume: 0.1,
+    bus: "ambience",
   },
   fire: {
     id: "fire",
@@ -47,6 +54,7 @@ export const SFX_CATALOG: Record<string, SfxEntry> = {
     path: "/sfx/fire-1.ogg",
     loop: true,
     volume: 0.14,
+    bus: "ambience",
   },
   door: {
     id: "door",
@@ -54,6 +62,7 @@ export const SFX_CATALOG: Record<string, SfxEntry> = {
     path: "/sfx/doorOpen_1.ogg",
     loop: false,
     volume: 0.35,
+    bus: "sfx",
   },
   "door-close": {
     id: "door-close",
@@ -61,6 +70,7 @@ export const SFX_CATALOG: Record<string, SfxEntry> = {
     path: "/sfx/doorClose_2.ogg",
     loop: false,
     volume: 0.35,
+    bus: "sfx",
   },
   footsteps: {
     id: "footsteps",
@@ -68,6 +78,7 @@ export const SFX_CATALOG: Record<string, SfxEntry> = {
     path: "/sfx/footstep01.ogg",
     loop: false,
     volume: 0.28,
+    bus: "sfx",
   },
   creak: {
     id: "creak",
@@ -75,6 +86,7 @@ export const SFX_CATALOG: Record<string, SfxEntry> = {
     path: "/sfx/creak2.ogg",
     loop: false,
     volume: 0.32,
+    bus: "sfx",
   },
   thunder: {
     id: "thunder",
@@ -82,6 +94,32 @@ export const SFX_CATALOG: Record<string, SfxEntry> = {
     path: "/sfx/thunder_2_far.wav",
     loop: false,
     volume: 0.38,
+    bus: "sfx",
+  },
+  /** Placeholder beds — replace paths with real music loops later. */
+  "music-tension": {
+    id: "music-tension",
+    label: "Musik (Spannung)",
+    path: "/sfx/wind_2.wav",
+    loop: true,
+    volume: 0.06,
+    bus: "music",
+  },
+  "music-calm": {
+    id: "music-calm",
+    label: "Musik (ruhig)",
+    path: "/sfx/city.wav",
+    loop: true,
+    volume: 0.05,
+    bus: "music",
+  },
+  "music-mystery": {
+    id: "music-mystery",
+    label: "Musik (mystisch)",
+    path: "/sfx/wind_1.wav",
+    loop: true,
+    volume: 0.055,
+    bus: "music",
   },
 };
 
@@ -165,23 +203,25 @@ export function ambienceIdsFromPlot(
       "flame",
       "brand",
       "inferno",
+      "kamin",
+      "hearth",
+      "tavern",
+      "gasthaus",
     ]) &&
     SFX_CATALOG.fire
   ) {
     ids.push("fire");
   }
-  if (
-    hayHasAmbienceToken(hay, ["gewitter", "thunder", "blitz", "lightning"]) &&
-    SFX_CATALOG.thunder
-  ) {
-    ids.push("thunder");
-  }
   return ids;
 }
 
-/** Remove sfx tags before TTS synthesis. */
+/** Remove sfx/music tags before TTS synthesis. */
 export function stripSfxTags(text: string): string {
-  return text.replace(SFX_TAG_RE, "").replace(/\s{2,}/g, " ").trim();
+  return text
+    .replace(SFX_TAG_RE, "")
+    .replace(/<<music:[a-z0-9_-]+>>/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 export function getSfxEntry(id: string): SfxEntry | null {

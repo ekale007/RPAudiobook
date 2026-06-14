@@ -28,6 +28,7 @@ import {
   buildQwenProfilesFromSettings,
 } from "@/lib/tts/qwenVoiceProfiles";
 import { isQwenTtsMode } from "@/lib/tts/qwenTtsMode";
+import { supportsSceneDelivery } from "@/lib/tts/sceneDelivery";
 import { updateStorySettings } from "@/lib/db/stories";
 import {
   needsProtagonistSetup,
@@ -152,6 +153,7 @@ export function CastHubPanel({
         ? localEngine
         : "kokoro";
   const qwen = isQwenTtsMode(ttsProvider, engine);
+  const sceneDelivery = supportsSceneDelivery(ttsProvider);
 
   const voiceMapOpts = useMemo(
     () => ({
@@ -457,7 +459,7 @@ export function CastHubPanel({
         </button>
       </div>
 
-      {qwen ? (
+      {sceneDelivery ? (
         <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-surface-border/80 bg-surface px-2.5 py-2">
           <input
             type="checkbox"

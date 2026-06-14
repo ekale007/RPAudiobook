@@ -535,6 +535,6 @@ export const enMessages: Messages = {
     addFromStory: "+ From story",
     sceneStyle: "Scene style",
     sceneStyleDesc:
-      "in chat (plot + paragraph) — Qwen instruct & Eleven v3 audio tags.",
+      "in chat (plot + paragraph) — Fish [whisper]/[laughing], Eleven v3, Qwen instruct; plus ambience from location.",
   },
 };

@@ -17,6 +17,7 @@ import {
   loadTtsSettings,
   saveFishAudioPinnedIds,
   saveTtsSettings,
+  DEFAULT_BETA_TTS_PROVIDER,
   type TtsProvider,
   isBetaTtsProvider,
 } from "@/lib/storage/ttsSettings";
@@ -138,7 +139,7 @@ export default function SettingsPage() {
     const tts = loadTtsSettings();
     let provider = tts.provider;
     if (betaMode && !isBetaTtsProvider(provider)) {
-      provider = "elevenlabs";
+      provider = DEFAULT_BETA_TTS_PROVIDER;
       saveTtsSettings({ ...tts, provider }, { sync: false });
     }
     setTtsProvider(provider);
@@ -501,9 +502,9 @@ export default function SettingsPage() {
               <div className="mb-3 flex flex-wrap gap-2">
                 {(
                   [
+                    { id: "fish-audio" as const, label: "Fish Audio" },
                     { id: "elevenlabs" as const, label: "ElevenLabs" },
                     { id: "openrouter-tts" as const, label: "OpenRouter TTS" },
-                    { id: "fish-audio" as const, label: "Fish Audio" },
                     { id: "fal-ai" as const, label: "fal.ai" },
                   ] as const
                 ).map(({ id, label }) => (

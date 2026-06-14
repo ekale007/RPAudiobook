@@ -59,6 +59,7 @@ export const DEFAULT_OPENROUTER: Omit<OpenRouterSettings, "apiKey"> = {
 /** slug → Kokoro voice id or ElevenLabs voice id */
 export type VoiceMap = Record<string, string>;
 
+import type { StorySoundscape } from "@/lib/audio/soundscape";
 import type { TtsProvider } from "@/lib/storage/ttsSettings";
 import type { StoryPlotState } from "@/lib/memory/plotState";
 import type { StoryPin } from "@/lib/memory/storyPins";
@@ -99,6 +100,8 @@ export interface StorySettings {
   qwenVoiceProfiles?: Record<string, QwenVoiceProfile>;
   /** Auto mood from plot-state (location, threats). Default on. */
   qwenSceneInstructEnabled?: boolean;
+  /** Optional per-story sound beds (ambience loops, music, one-shots). */
+  soundscape?: StorySoundscape | null;
   /** Cast slugs that use their own voice; others use narrator. Omit = all cast enabled. */
   voiceEnabledSlugs?: string[];
   /** Structured RP memory (threats, time, resolved facts) — overrides stale countdowns */

@@ -161,7 +161,7 @@ export function ChatView({
   readOnly?: boolean;
   storyLocale?: string;
 }) {
-  const { t } = useUiLocale();
+  const { t, locale } = useUiLocale();
   const ttsSettings = loadTtsSettings();
   const voiceMap: VoiceMap = resolveStoryVoiceMap(
     storySettings,
@@ -950,7 +950,7 @@ export function ChatView({
       llmCostCents = reply.llmCostCents;
     } catch (e) {
       if ((e as Error).name !== "AbortError") {
-        setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
+        setError(formatLlmLimitError(e instanceof Error ? e.message : String(e), locale));
       }
       abortRef.current = null;
       chatBusyRef.current = false;
@@ -989,7 +989,7 @@ export function ChatView({
         },
       );
     } catch (e) {
-      setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
+      setError(formatLlmLimitError(e instanceof Error ? e.message : String(e), locale));
       await load();
       chatBusyRef.current = false;
       if (!opts.background) setGenerating(false);
@@ -1081,7 +1081,7 @@ export function ChatView({
     try {
       history = await appendSteeringUserTurn(turns, userTurnContent);
     } catch (e) {
-      setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
+      setError(formatLlmLimitError(e instanceof Error ? e.message : String(e), locale));
       setGenerating(false);
       await load();
       return;
@@ -1140,7 +1140,7 @@ export function ChatView({
       setTurns(rowsAfterUser);
       await runGeneration(rowsAfterUser, {});
     } catch (e) {
-      setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
+      setError(formatLlmLimitError(e instanceof Error ? e.message : String(e), locale));
       await load();
     }
   };
@@ -1189,7 +1189,7 @@ export function ChatView({
       setInputExpanded(true);
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
-      setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
+      setError(formatLlmLimitError(e instanceof Error ? e.message : String(e), locale));
     } finally {
       beatsAbortRef.current = null;
       setBeatsLoading(false);
@@ -1465,7 +1465,7 @@ export function ChatView({
         setError((prev) => prev ?? t("chat.rerollFailed"));
       }
     } catch (e) {
-      setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
+      setError(formatLlmLimitError(e instanceof Error ? e.message : String(e), locale));
       await load();
     } finally {
       chatBusyRef.current = false;

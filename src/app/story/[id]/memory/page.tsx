@@ -24,6 +24,7 @@ import {
 import { newStoryPin, type StoryPin } from "@/lib/memory/storyPins";
 import { loadOpenRouterSettings } from "@/lib/storage/openRouterSettings";
 import { formatLlmLimitError } from "@/components/LlmUsagePanel";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import type { ChatTurn } from "@/lib/types";
 
 const THREAT_STATUSES: ThreatStatus[] = [
@@ -120,6 +121,7 @@ function turnsToChat(
 }
 
 export default function StoryMemoryPage() {
+  const { locale } = useUiLocale();
   const params = useParams();
   const router = useRouter();
   const storyId = params.id as string;
@@ -197,7 +199,7 @@ export default function StoryMemoryPage() {
       });
       setPlot(nextPlot);
     } catch (e) {
-      setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
+      setError(formatLlmLimitError(e instanceof Error ? e.message : String(e), locale));
     } finally {
       setBusy(false);
     }
@@ -242,10 +244,10 @@ export default function StoryMemoryPage() {
     } catch (e) {
       if (e instanceof PlotStateExtractError && e.rawPreview) {
         setError(
-          `${formatLlmLimitError(e.message)}\n\nKI-Ausschnitt:\n${e.rawPreview}`,
+          `${formatLlmLimitError(e.message, locale)}\n\nKI-Ausschnitt:\n${e.rawPreview}`,
         );
       } else {
-        setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
+        setError(formatLlmLimitError(e instanceof Error ? e.message : String(e), locale));
       }
     } finally {
       setBusy(false);

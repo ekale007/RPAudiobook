@@ -88,13 +88,16 @@ export const DEFAULT_TTS: TtsSettings = {
   pronunciationMap: {},
 };
 
-/** Beta server UI — cloud TTS providers. */
+/** Beta server UI — cloud TTS providers (Fish first). */
 export const BETA_TTS_PROVIDERS: TtsProvider[] = [
+  "fish-audio",
   "elevenlabs",
   "openrouter-tts",
-  "fish-audio",
   "fal-ai",
 ];
+
+/** Default cloud TTS on RP Audiobook beta. */
+export const DEFAULT_BETA_TTS_PROVIDER: TtsProvider = "fish-audio";
 
 export function isBetaTtsProvider(provider: TtsProvider): boolean {
   return BETA_TTS_PROVIDERS.includes(provider);

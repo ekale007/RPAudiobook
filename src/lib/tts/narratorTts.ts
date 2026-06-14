@@ -33,6 +33,7 @@ import {
   type TtsStoryLocale,
 } from "@/lib/tts/ttsLocaleRouting";
 import { resolveElevenLabsTtsExtras } from "@/lib/tts/elevenLabsDelivery";
+import { resolveFishAudioTtsText } from "@/lib/tts/fishAudioDelivery";
 import {
   ELEVEN_DEFAULT_MODEL,
   getElevenLabsVoiceSettings,
@@ -230,12 +231,22 @@ async function synthesizeChunkFishAudio(
   settings: TtsSettings,
   text: string,
   referenceId: string,
+  storyLocale?: TtsStoryLocale,
+  deliveryContext?: TtsChunkContext,
 ): Promise<{ blob: Blob; ttsCostCents: number }> {
+  const ttsText = resolveFishAudioTtsText(
+    text,
+    deliveryContext?.speakerSlug,
+    deliveryContext?.storySettings,
+    storyLocale,
+    { segmentText: deliveryContext?.segmentText ?? text },
+  );
+
   const res = await authFetch("/api/tts/fish", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      text,
+      text: ttsText,
       model: settings.fishAudioModel,
       referenceId: coerceFishReferenceId(
         referenceId,
@@ -396,7 +407,13 @@ async function synthesizeChunk(
     return synthesizeChunkOpenRouter(settings, text, voice);
   }
   if (settings.provider === "fish-audio") {
-    return synthesizeChunkFishAudio(settings, text, voice);
+    return synthesizeChunkFishAudio(
+      settings,
+      text,
+      voice,
+      storyLocale,
+      deliveryContext,
+    );
   }
   if (settings.provider === "fal-ai") {
     return synthesizeChunkFalAi(settings, text, voice);
