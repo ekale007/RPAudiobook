@@ -20,6 +20,8 @@ import {
   DEFAULT_BETA_TTS_PROVIDER,
   type TtsProvider,
   isBetaTtsProvider,
+  isBetaTtsProviderAvailable,
+  resolveBetaTtsProviderForCapabilities,
 } from "@/lib/storage/ttsSettings";
 import { KokoroVoicePicker } from "@/components/KokoroVoicePicker";
 import { QwenVoicePicker } from "@/components/QwenVoicePicker";
@@ -140,6 +142,18 @@ export default function SettingsPage() {
     let provider = tts.provider;
     if (betaMode && !isBetaTtsProvider(provider)) {
       provider = DEFAULT_BETA_TTS_PROVIDER;
+    }
+    if (
+      betaMode &&
+      isBetaTtsProvider(provider) &&
+      !isBetaTtsProviderAvailable(provider, serverCaps)
+    ) {
+      provider = resolveBetaTtsProviderForCapabilities(
+        serverCaps,
+        DEFAULT_BETA_TTS_PROVIDER,
+      );
+    }
+    if (provider !== tts.provider) {
       saveTtsSettings({ ...tts, provider }, { sync: false });
     }
     setTtsProvider(provider);
@@ -157,7 +171,7 @@ export default function SettingsPage() {
     setFalTtsModel(tts.falTtsModel);
     setFalTtsVoice(tts.falTtsVoice);
     setPronunciationText(serializePronunciationMap(tts.pronunciationMap ?? {}));
-  }, [betaMode]);
+  }, [betaMode, serverCaps]);
 
   useEffect(() => {
     reloadFromStorage();

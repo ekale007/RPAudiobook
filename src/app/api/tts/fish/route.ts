@@ -108,18 +108,28 @@ export async function POST(req: Request) {
   if (!upstream.ok) {
     const errText = await upstream.text().catch(() => "");
     const formatted = formatFishAudioTtsError(upstream.status, errText);
+    const clientStatus =
+      upstream.status === 401 || upstream.status === 403
+        ? 502
+        : upstream.status >= 400 && upstream.status < 600
+          ? upstream.status
+          : 502;
     return NextResponse.json(
       {
         error: formatted.message,
         code: formatted.code,
         model,
         referenceId,
+        upstreamStatus: upstream.status,
       },
       {
-        status:
-          upstream.status >= 400 && upstream.status < 600
-            ? upstream.status
-            : 502,
+        status: clientStatus,
+        headers: {
+          "X-Tts-Error-Source":
+            upstream.status === 401 || upstream.status === 403
+              ? "fish-upstream-auth"
+              : "fish-upstream",
+        },
       },
     );
   }

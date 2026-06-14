@@ -8,6 +8,7 @@ import {
   isServerOpenRouterTtsAvailable,
   isServerQwenCloudTtsAvailable,
   isServerQwenTtsAvailable,
+  type ServerCapabilities,
 } from "@/lib/server/serverCapabilities";
 import {
   DEFAULT_OPENROUTER_TTS_MODEL,
@@ -101,6 +102,43 @@ export const DEFAULT_BETA_TTS_PROVIDER: TtsProvider = "fish-audio";
 
 export function isBetaTtsProvider(provider: TtsProvider): boolean {
   return BETA_TTS_PROVIDERS.includes(provider);
+}
+
+/** Pick first beta cloud provider that the server actually exposes. */
+export function resolveBetaTtsProviderForCapabilities(
+  caps: ServerCapabilities,
+  preferred: TtsProvider = DEFAULT_BETA_TTS_PROVIDER,
+): TtsProvider {
+  const candidates = [
+    preferred,
+    "elevenlabs",
+    "openrouter-tts",
+    "fal-ai",
+    "fish-audio",
+  ] as TtsProvider[];
+  const seen = new Set<TtsProvider>();
+  for (const provider of candidates) {
+    if (seen.has(provider)) continue;
+    seen.add(provider);
+    if (provider === "fish-audio" && caps.serverFishAudioTts) return provider;
+    if (provider === "elevenlabs" && caps.serverElevenLabsTts) return provider;
+    if (provider === "openrouter-tts" && caps.serverOpenRouterTts) {
+      return provider;
+    }
+    if (provider === "fal-ai" && caps.serverFalTts) return provider;
+  }
+  return preferred;
+}
+
+export function isBetaTtsProviderAvailable(
+  provider: TtsProvider,
+  caps: ServerCapabilities,
+): boolean {
+  if (provider === "fish-audio") return caps.serverFishAudioTts;
+  if (provider === "elevenlabs") return caps.serverElevenLabsTts;
+  if (provider === "openrouter-tts") return caps.serverOpenRouterTts;
+  if (provider === "fal-ai") return caps.serverFalTts;
+  return false;
 }
 
 const STORAGE_KEY = "hoerbuchki.tts";

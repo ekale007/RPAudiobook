@@ -26,7 +26,7 @@ import {
   setSpeechDucking,
   stopAllSfx,
 } from "@/lib/audio/sfxPlayer";
-import { isServerElevenLabsAvailable, refreshServerCapabilities } from "@/lib/server/serverCapabilities";
+import { isServerElevenLabsAvailable, isServerFishAudioTtsAvailable, refreshServerCapabilities } from "@/lib/server/serverCapabilities";
 import {
   clampPlaybackRate,
   formatAudioTime,
@@ -331,6 +331,16 @@ export const MessageAudioPlayer = forwardRef<
       if (!isServerElevenLabsAvailable()) {
         setError(
           "ElevenLabs-Key in Settings eintragen oder ELEVENLABS_API_KEY auf dem Server setzen.",
+        );
+        setStatus("error");
+        return null;
+      }
+    }
+    if (settings.provider === "fish-audio") {
+      await refreshServerCapabilities();
+      if (!isServerFishAudioTtsAvailable()) {
+        setError(
+          "Fish Audio ist auf dem Server nicht aktiv — FISH_AUDIO_API_KEY in Vercel setzen oder in Einstellungen einen anderen TTS-Anbieter wählen.",
         );
         setStatus("error");
         return null;

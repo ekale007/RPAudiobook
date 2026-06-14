@@ -3,15 +3,19 @@ import { createClient } from "@/lib/supabase/client";
 export async function resolveSupabaseAccessToken(): Promise<string | null> {
   const supabase = createClient();
 
-  await supabase.auth.getUser();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (!userError && userData.user) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session?.access_token) return session.access_token;
+  }
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (session?.access_token) return session.access_token;
-
-  const { data: refreshed } = await supabase.auth.refreshSession();
-  if (refreshed.session?.access_token) return refreshed.session.access_token;
+  const { data: refreshed, error: refreshError } =
+    await supabase.auth.refreshSession();
+  if (!refreshError && refreshed.session?.access_token) {
+    return refreshed.session.access_token;
+  }
 
   return null;
 }

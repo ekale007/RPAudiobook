@@ -18,13 +18,17 @@ export async function requireUser(
       error: new Response(
         JSON.stringify({
           error: "Unauthorized",
+          code: "session_required",
           hint: hasBearer
             ? "Bearer token rejected — bitte erneut einloggen."
             : "Keine Session — gleiche URL wie beim Login nutzen (localhost vs. 127.0.0.1).",
         }),
         {
           status: 401,
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Auth-Error": "session",
+          },
         },
       ),
     };
