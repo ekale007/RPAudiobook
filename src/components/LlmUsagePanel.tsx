@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { useServerCapabilities } from "@/lib/server/useServerCapabilities";
+import { translate } from "@/lib/i18n/messages";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
+import { DEFAULT_UI_LOCALE, type UILocale } from "@/lib/i18n/types";
 
 type UsagePayload = {
   hourly: {
@@ -62,17 +65,23 @@ type UsagePayload = {
   tierLabel?: string;
 };
 
-function formatReset(resetAt: number): string {
+function formatReset(resetAt: number, locale: UILocale): string {
   const min = Math.max(1, Math.ceil((resetAt - Date.now()) / 60000));
-  return min < 60 ? `${min} Min.` : `${Math.ceil(min / 60)} Std.`;
+  if (min < 60) {
+    return translate(locale, "common.minutes", { min: String(min) });
+  }
+  return translate(locale, "common.hours", {
+    hours: String(Math.ceil(min / 60)),
+  });
 }
 
-function formatCharacters(n: number): string {
+function formatCharacters(n: number, locale: UILocale): string {
   if (n >= 10_000) return `${(n / 1000).toFixed(1)}k`;
-  return n.toLocaleString("de-DE");
+  return n.toLocaleString(locale === "de" ? "de-DE" : "en-US");
 }
 
 export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
+  const { t, locale } = useUiLocale();
   const serverCaps = useServerCapabilities();
   const [data, setData] = useState<UsagePayload | null>(null);
   const [loading, setLoading] = useState(false);
@@ -136,27 +145,30 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
     return (
       <div className="rounded-lg border border-surface-border bg-surface-raised px-3 py-2 text-xs text-zinc-400">
         <div className="flex items-center justify-between gap-2">
-          <span>Verbrauch</span>
+          <span>{t("usage.compactTitle")}</span>
           <button
             type="button"
             onClick={() => void refresh()}
             className="text-accent underline"
           >
-            {loading ? "…" : "Aktualisieren"}
+            {loading ? "…" : t("common.refresh")}
           </button>
         </div>
         {data ? (
           <p className="mt-1 text-zinc-300">
             {data.labels.spendable ?? data.labels.totalUsed ?? data.labels.used}{" "}
-            verfügbar
+            {t("common.available")}
             {data.labels.totalUsed ? (
-              <> · {data.labels.totalUsed} verbraucht</>
+              <>
+                {" "}
+                · {data.labels.totalUsed} {t("common.spent")}
+              </>
             ) : null}
             {" · "}
             {data.hourly.remaining}/{data.hourly.limit} LLM/h
           </p>
         ) : (
-          <p className="mt-1">Lade Verbrauch…</p>
+          <p className="mt-1">{t("usage.loading")}</p>
         )}
       </div>
     );
@@ -167,24 +179,21 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
           <h2 className="font-medium text-accent">
-            Verbrauch & Guthaben
+            {t("usage.title")}
             {data?.tierLabel ? (
               <span className="ml-2 font-normal text-zinc-500">
                 · {data.tierLabel}
               </span>
             ) : null}
           </h2>
-          <p className="mt-0.5 text-xs text-zinc-500">
-            LLM + TTS gegen Wallet-Guthaben. Free: 2 € Gratis pro Woche (Mo–So
-            UTC), danach Wallet.
-          </p>
+          <p className="mt-0.5 text-xs text-zinc-500">{t("usage.hint")}</p>
         </div>
         <button
           type="button"
           onClick={() => void refresh()}
           className="shrink-0 text-xs text-accent underline"
         >
-          {loading ? "…" : "Aktualisieren"}
+          {loading ? "…" : t("common.refresh")}
         </button>
       </div>
 
@@ -204,15 +213,16 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
           {data.wallet ? (
             <div className="rounded-lg border border-surface-border/80 bg-surface/50 px-3 py-2">
               <div className="flex justify-between text-xs text-zinc-400">
-                <span>Guthaben verfügbar</span>
+                <span>{t("usage.balanceAvailable")}</span>
                 <span className="tabular-nums text-zinc-100">
                   {data.labels.spendable ?? data.wallet.walletBalanceEur}
                 </span>
               </div>
               <p className="mt-1 text-[11px] text-zinc-500">
-                Wallet {data.labels.walletBalance ?? data.wallet.walletBalanceEur}
+                {t("usage.walletLabel")}{" "}
+                {data.labels.walletBalance ?? data.wallet.walletBalanceEur}
                 {data.wallet.tier === "free" && data.labels.weeklyFreeRemaining
-                  ? ` · Gratis diese Woche ${data.labels.weeklyFreeRemaining}`
+                  ? ` · ${t("usage.freeThisWeek")} ${data.labels.weeklyFreeRemaining}`
                   : null}
               </p>
             </div>
@@ -220,7 +230,7 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
           {total && total.costCents > 0 ? (
             <div>
               <div className="mb-1 flex justify-between text-xs text-zinc-400">
-                <span>Gesamt (LLM + TTS)</span>
+                <span>{t("usage.totalLlmTts")}</span>
                 <span className="tabular-nums text-zinc-200">
                   {data.labels.totalUsed}
                 </span>
@@ -259,7 +269,9 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
           {serverCaps.serverLlm ? (
             <div>
               <div className="mb-1 flex justify-between text-xs text-zinc-400">
-                <span>LLM-Verbrauch {data.monthly.periodMonth}</span>
+                <span>
+                  {t("usage.llmMonth")} {data.monthly.periodMonth}
+                </span>
                 <span>{data.labels.used}</span>
               </div>
               {!data.wallet ? (
@@ -271,9 +283,10 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
                 </div>
               ) : null}
               <p className="mt-1 text-[11px] text-zinc-500">
-                {data.monthly.requestCount} Anfragen · ca.{" "}
-                {Math.round(data.monthly.promptTokens / 1000)}k Prompt- ·{" "}
-                {Math.round(data.monthly.completionTokens / 1000)}k Antwort-Tokens
+                {data.monthly.requestCount} {t("common.requests")} · ca.{" "}
+                {Math.round(data.monthly.promptTokens / 1000)}k {t("usage.promptTokens")}{" "}
+                · {Math.round(data.monthly.completionTokens / 1000)}k{" "}
+                {t("usage.completionTokens")}
               </p>
             </div>
           ) : null}
@@ -281,22 +294,26 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
           {ttsMonthly ? (
             <div className="rounded-lg border border-surface-border/80 bg-surface/50 px-3 py-2">
               <div className="flex justify-between text-xs text-zinc-400">
-                <span>TTS (ElevenLabs)</span>
+                <span>{t("usage.ttsEleven")}</span>
                 <span className="tabular-nums text-zinc-200">
                   {data.labels.ttsUsed ?? "0,00 €"}
                 </span>
               </div>
               <p className="mt-1 text-[11px] text-zinc-500">
-                {ttsMonthly.requestCount} API-Aufrufe ·{" "}
-                {formatCharacters(ttsMonthly.characters)} Zeichen
+                {ttsMonthly.requestCount} {t("usage.apiCalls")} ·{" "}
+                {formatCharacters(ttsMonthly.characters, locale)}{" "}
+                {t("common.characters")}
                 {total && total.costCents > 0 && ttsMonthly.costCents > 0 ? (
-                  <> · {ttsSharePct}% vom Gesamtverbrauch</>
+                  <>
+                    {" "}
+                    · {ttsSharePct}% {t("usage.ofTotal")}
+                  </>
                 ) : null}
               </p>
               {data.ttsHourly ? (
                 <p className="mt-0.5 text-[11px] text-zinc-600">
-                  Diese Stunde: {data.ttsHourly.used} / {data.ttsHourly.limit}{" "}
-                  TTS-Anfragen
+                  {t("usage.thisHour")} {data.ttsHourly.used} /{" "}
+                  {data.ttsHourly.limit} {t("usage.ttsRequests")}
                 </p>
               ) : null}
             </div>
@@ -305,9 +322,9 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
           {serverCaps.serverLlm ? (
             <div>
               <div className="mb-1 flex justify-between text-xs text-zinc-400">
-                <span>LLM diese Stunde</span>
+                <span>{t("usage.llmThisHour")}</span>
                 <span>
-                  {data.hourly.used} / {data.hourly.limit} Anfragen
+                  {data.hourly.used} / {data.hourly.limit} {t("common.requests")}
                 </span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-surface">
@@ -317,8 +334,8 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
                 />
               </div>
               <p className="mt-1 text-[11px] text-zinc-500">
-                Reset in ca. {formatReset(data.hourly.resetAt)} ·{" "}
-                {data.hourly.remaining} verbleibend
+                {t("common.resetIn")} {formatReset(data.hourly.resetAt, locale)} ·{" "}
+                {data.hourly.remaining} {t("common.remaining")}
               </p>
             </div>
           ) : null}
@@ -326,37 +343,37 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
           {data.hourly.remaining <= 5 || walletLow || monthlyPct >= 85 ? (
             <p className="text-xs text-amber-200/90">
               {walletLow
-                ? "Guthaben fast/leer — Konto → Guthaben aufladen (min. 5 €)."
+                ? t("usage.warnWalletLow")
                 : monthlyPct >= 100
-                  ? "Monatsverbrauch hoch — bei leerem Guthaben pausiert der Chat."
+                  ? t("usage.warnBudgetHigh")
                   : monthlyPct >= 85
-                    ? "Hoher Verbrauch — Memory-Sync und Autoplay verbrauchen viele Zusatz-Anfragen."
-                    : "Stündliches LLM-Limit fast erreicht — kurz warten oder weniger Autoplay/Memory-Last."}
+                    ? t("usage.warnBudget85")
+                    : t("usage.warnHourly")}
             </p>
           ) : null}
         </div>
       ) : (
-        <p className="text-sm text-zinc-500">Verbrauch wird geladen…</p>
+        <p className="text-sm text-zinc-500">{t("usage.loading")}</p>
       )}
     </section>
   );
 }
 
-export function formatLlmLimitError(raw: string): string {
+export function formatLlmLimitError(
+  raw: string,
+  locale: UILocale = DEFAULT_UI_LOCALE,
+): string {
   if (/rate limit exceeded/i.test(raw)) {
-    return "Stündliches LLM-Limit erreicht — siehe Konto → Verbrauch. Kurz warten.";
+    return translate(locale, "usage.errors.rateLimit");
   }
   if (/budget/i.test(raw) || /budget_exceeded/i.test(raw)) {
-    return "Guthaben aufgebraucht — Konto → Guthaben aufladen.";
+    return translate(locale, "usage.errors.budget");
   }
   if (/insufficient_balance|guthaben/i.test(raw)) {
-    return "Guthaben aufgebraucht — Konto → Guthaben aufladen (min. 5 €).";
+    return translate(locale, "usage.errors.insufficient");
   }
   if (/guardrail|data policy|privacy|no endpoints available/i.test(raw)) {
-    return (
-      "OpenRouter blockiert das Modell (Datenschutz/Guardrails). " +
-      "In Einstellungen dasselbe Modell wie für Chat nutzen oder openrouter.ai/settings/privacy anpassen."
-    );
+    return translate(locale, "usage.errors.guardrail");
   }
   return raw.replace(/^LLM \d+: /, "");
 }

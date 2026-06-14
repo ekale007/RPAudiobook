@@ -35,6 +35,7 @@ import {
   protagonistDisplayLabel,
 } from "@/lib/story/protagonist";
 import { repairStoryElevenVoiceMap } from "@/lib/tts/elevenLabsCatalogClient";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 
 function voiceOptionsForEngine(engine: LocalTtsEngine) {
   if (engine === "qwen") {
@@ -98,6 +99,7 @@ export function CastHubPanel({
   storySettings: StorySettings;
   onSaved?: () => void;
 }) {
+  const { t } = useUiLocale();
   const characters = useMemo(
     () => cast.filter((c) => c.role === "narrator" || c.role === "cast"),
     [cast],
@@ -220,9 +222,9 @@ export function CastHubPanel({
       setVoiceMap(map);
       const label = (slug: string) =>
         slug === "protagonist"
-          ? "Protagonist"
+          ? t("cast.protagonist")
           : slug === "narrator"
-            ? "Erzähler"
+            ? t("cast.narrator")
             : slug;
       void updateStorySettings(storyId, {
         ...patchStoryVoiceMaps(
@@ -237,7 +239,7 @@ export function CastHubPanel({
         voiceEditsDirtyRef.current = false;
         onSaved?.();
         setVoiceRepairNote(
-          `Stimmen an dein ElevenLabs-Konto angepasst: ${changed.map(label).join(", ")}`,
+          t("cast.voiceRepair", { names: changed.map(label).join(", ") }),
         );
       });
     });
@@ -249,6 +251,7 @@ export function CastHubPanel({
     voiceMapOpts,
     voiceEnabledSlugs,
     onSaved,
+    t,
   ]);
 
   useEffect(() => {
@@ -334,7 +337,7 @@ export function CastHubPanel({
     const voiceDisabled =
       !isNarrator && !voiceEnabledSlugs.includes(c.slug);
     const voiceLabel = voiceDisabled
-      ? "Erzähler"
+      ? t("cast.narrator")
       : shortVoiceLabel(
           c.slug,
           voiceMap,
@@ -399,13 +402,13 @@ export function CastHubPanel({
             onClick={openProtagonist}
           />
         </div>
-        <p className="text-[11px] text-zinc-500">Noch kein NPC-Cast.</p>
+        <p className="text-[11px] text-zinc-500">{t("cast.noNpcCast")}</p>
         <button
           type="button"
           onClick={() => setDiscoverOpen(true)}
           className="rounded-xl border border-accent/30 py-2 text-xs text-accent"
         >
-          Aus Story holen
+          {t("cast.fromStory")}
         </button>
         {protagonistOverlay}
         <CastDiscoverOverlay
@@ -432,7 +435,7 @@ export function CastHubPanel({
       ) : null}
       <div className="flex items-center justify-between gap-2">
         <p className="text-[10px] leading-snug text-zinc-600">
-          Tippe eine Karte für Stimme & Stil —{" "}
+          {t("cast.cardHint")}{" "}
           <Link href="/settings" className="text-accent underline">
             TTS
           </Link>
@@ -442,7 +445,7 @@ export function CastHubPanel({
             href={`/story/${storyId}/voices`}
             className="text-accent underline"
           >
-            {storyLocale === "de" ? "alle Stimmen" : "all voices"}
+            {t("cast.allVoices")}
           </Link>
         </p>
         <button
@@ -450,7 +453,7 @@ export function CastHubPanel({
           onClick={() => setDiscoverOpen(true)}
           className="shrink-0 rounded-lg border border-accent/30 px-2 py-1 text-[10px] font-medium text-accent"
         >
-          + Aus Story
+          {t("cast.addFromStory")}
         </button>
       </div>
 
@@ -478,8 +481,8 @@ export function CastHubPanel({
             className="mt-0.5 size-3.5 rounded border-surface-border"
           />
           <span className="text-[10px] leading-snug text-zinc-500">
-            <strong className="text-zinc-300">Szenen-Stil</strong> im Chat (Plot +
-            Absatz) — Qwen-instruct &amp; Eleven v3 Audio-Tags.
+            <strong className="text-zinc-300">{t("cast.sceneStyle")}</strong>{" "}
+            {t("cast.sceneStyleDesc")}
           </span>
         </label>
       ) : null}

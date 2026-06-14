@@ -937,6 +937,15 @@ export function getLibraryTemplate(
   return PUBLIC_LIBRARY_TEMPLATES.find((t) => t.id === id);
 }
 
+export type LibraryLocaleFilter = "all" | "de" | "en";
+
+export function filterPublicLibraryTemplates(
+  filter: LibraryLocaleFilter,
+): LibraryTemplateDefinition[] {
+  if (filter === "all") return PUBLIC_LIBRARY_TEMPLATES;
+  return PUBLIC_LIBRARY_TEMPLATES.filter((t) => t.locale === filter);
+}
+
 export function libraryTemplateToDraft(
   template: LibraryTemplateDefinition,
 ): StoryDraft {

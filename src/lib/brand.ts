@@ -11,4 +11,6 @@ export const brand = {
   mediaSessionArtist: "RP Audiobook",
   openRouterAppTitle: "RP Audiobook",
   defaultSiteUrl: "https://rp-audiobook.vercel.app",
+  logoSrc: "/brand/logo.png",
+  logoAlt: "RP Audiobook — book with headphones",
 } as const;

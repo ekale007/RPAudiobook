@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { createClient } from "@/lib/supabase/client";
 import { formatAuthError } from "@/lib/auth/errors";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 
 export default function UpdatePasswordPage() {
+  const { t } = useUiLocale();
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -21,22 +23,20 @@ export default function UpdatePasswordPage() {
         setReady(true);
         return;
       }
-      setError(
-        "Reset link expired or invalid. Request a new link from Sign in → Forgot password.",
-      );
+      setError(t("auth.resetLinkExpired"));
     });
-  }, []);
+  }, [t]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError(t("auth.passwordMin"));
       return;
     }
     if (password !== confirm) {
-      setError("Passwords do not match.");
+      setError(t("auth.passwordMismatch"));
       return;
     }
 
@@ -56,15 +56,13 @@ export default function UpdatePasswordPage() {
 
   return (
     <main className="flex min-h-dvh flex-col">
-      <AppHeader title="Neues Passwort" backHref="/login" />
+      <AppHeader title={t("auth.updatePasswordTitle")} backHref="/login" />
       <div className="flex flex-1 flex-col gap-4 p-6">
-        <p className="text-sm text-zinc-400">
-          Choose a new password for your account.
-        </p>
+        <p className="text-sm text-zinc-400">{t("auth.updatePasswordHint")}</p>
 
         {ready ? (
           <form onSubmit={submit} className="flex flex-col gap-3">
-            <label className="text-sm text-zinc-400">New password</label>
+            <label className="text-sm text-zinc-400">{t("auth.newPassword")}</label>
             <input
               type="password"
               required
@@ -74,7 +72,9 @@ export default function UpdatePasswordPage() {
               className="rounded-xl border border-surface-border bg-surface-raised px-3 py-2 text-base"
               autoComplete="new-password"
             />
-            <label className="text-sm text-zinc-400">Confirm password</label>
+            <label className="text-sm text-zinc-400">
+              {t("auth.confirmPassword")}
+            </label>
             <input
               type="password"
               required
@@ -89,7 +89,7 @@ export default function UpdatePasswordPage() {
               disabled={busy}
               className="rounded-xl bg-accent py-3 text-base font-medium text-black disabled:opacity-50"
             >
-              Save password
+              {busy ? t("auth.saving") : t("auth.savePassword")}
             </button>
           </form>
         ) : null}

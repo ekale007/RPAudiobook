@@ -14,8 +14,10 @@ import {
   type ChapterRow,
 } from "@/lib/db/stories";
 import { normalizeStoryLocale } from "@/lib/tts/ttsLocaleRouting";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 
 export default function StoryHubPage() {
+  const { t } = useUiLocale();
   const params = useParams();
   const router = useRouter();
   const storyId = params.id as string;
@@ -58,7 +60,7 @@ export default function StoryHubPage() {
     const label = ch.title;
     if (
       !confirm(
-        `Kapitel „${label}“ wirklich löschen? Alle Nachrichten und Audio dieses Kapitels gehen verloren.`,
+        t("storyHub.deleteChapterConfirm", { title: label }),
       )
     ) {
       return;
@@ -85,7 +87,7 @@ export default function StoryHubPage() {
   if (error && !data) {
     return (
       <main className="flex min-h-dvh flex-col">
-        <AppHeader title="Story" backHref="/" />
+        <AppHeader title={t("pages.story")} backHref="/" />
         <p className="p-4 text-red-400">{error}</p>
       </main>
     );
@@ -94,7 +96,7 @@ export default function StoryHubPage() {
   if (!data) {
     return (
       <main className="flex min-h-dvh items-center justify-center text-zinc-400">
-        Laden …
+        {t("common.loading")}
       </main>
     );
   }

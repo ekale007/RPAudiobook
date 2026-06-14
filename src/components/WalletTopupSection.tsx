@@ -1,5 +1,6 @@
 "use client";
 
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import { useCallback, useEffect, useState } from "react";
 import { authFetch } from "@/lib/supabase/authFetch";
 
@@ -29,6 +30,11 @@ export function WalletTopupSection({
   wallet: WalletData | null;
   onRefresh?: () => void;
 }) {
+  const { locale, t } = useUiLocale();
+  const moneyFmt = new Intl.NumberFormat(locale === "de" ? "de-DE" : "en-US", {
+    style: "currency",
+    currency: "EUR",
+  });
   const [config, setConfig] = useState<BillingConfig | null>(null);
   const [amountEur, setAmountEur] = useState("5");
   const [loading, setLoading] = useState(false);
@@ -47,12 +53,12 @@ export function WalletTopupSection({
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("topup") === "success") {
-      setTopupMsg("Zahlung erfolgreich — Guthaben wird in Kürze gutgeschrieben.");
+      setTopupMsg(t("wallet.success"));
       onRefresh?.();
     } else if (params.get("topup") === "cancel") {
-      setTopupMsg("Aufladung abgebrochen.");
+      setTopupMsg(t("wallet.cancel"));
     }
-  }, [onRefresh]);
+  }, [onRefresh, t]);
 
   const startCheckout = useCallback(async () => {
     if (!config?.stripeConfigured) return;
@@ -84,47 +90,41 @@ export function WalletTopupSection({
 
   const weeklyFreeEur =
     wallet && wallet.weeklyFreeBudgetCents > 0
-      ? new Intl.NumberFormat("de-DE", {
-          style: "currency",
-          currency: "EUR",
-        }).format(wallet.weeklyFreeRemainingCents / 100)
+      ? moneyFmt.format(wallet.weeklyFreeRemainingCents / 100)
       : null;
 
   return (
     <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
-      <h2 className="font-medium text-accent">Guthaben</h2>
+      <h2 className="font-medium text-accent">{t("wallet.title")}</h2>
       <p className="mt-1 text-xs text-zinc-500">
-        LLM und TTS werden gegen Guthaben abgerechnet. Free:{" "}
-        {config?.freeWeeklyBudgetEur ?? "2,00 €"} Gratis pro Woche, danach
-        Wallet.
+        {t("wallet.hint", {
+          freeWeekly: config?.freeWeeklyBudgetEur ?? moneyFmt.format(2),
+        })}
       </p>
 
       {wallet ? (
         <dl className="mt-3 space-y-2 text-sm">
           <div className="flex justify-between gap-4">
-            <dt className="text-zinc-500">Wallet</dt>
+            <dt className="text-zinc-500">{t("wallet.wallet")}</dt>
             <dd className="font-medium tabular-nums text-zinc-100">
               {wallet.walletBalanceEur}
             </dd>
           </div>
           {wallet.tier === "free" && weeklyFreeEur ? (
             <div className="flex justify-between gap-4">
-              <dt className="text-zinc-500">Gratis diese Woche</dt>
+              <dt className="text-zinc-500">{t("wallet.freeWeek")}</dt>
               <dd className="tabular-nums text-zinc-200">{weeklyFreeEur}</dd>
             </div>
           ) : null}
           <div className="flex justify-between gap-4">
-            <dt className="text-zinc-500">Verfügbar gesamt</dt>
+            <dt className="text-zinc-500">{t("wallet.available")}</dt>
             <dd className="font-medium tabular-nums text-accent">
-              {new Intl.NumberFormat("de-DE", {
-                style: "currency",
-                currency: "EUR",
-              }).format(wallet.spendableCents / 100)}
+              {moneyFmt.format(wallet.spendableCents / 100)}
             </dd>
           </div>
         </dl>
       ) : (
-        <p className="mt-2 text-sm text-zinc-500">Guthaben wird geladen…</p>
+        <p className="mt-2 text-sm text-zinc-500">{t("wallet.loading")}</p>
       )}
 
       {topupMsg ? (
@@ -134,7 +134,7 @@ export function WalletTopupSection({
       {config?.stripeConfigured ? (
         <div className="mt-4 space-y-2">
           <label className="block text-xs text-zinc-400">
-            Aufladen (min. {config.topupMinEur})
+            {t("wallet.topupLabel", { min: config.topupMinEur })}
             <input
               type="number"
               min={config.topupMinCents / 100}
@@ -151,14 +151,11 @@ export function WalletTopupSection({
             onClick={() => void startCheckout()}
             className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-surface disabled:opacity-50"
           >
-            {loading ? "Weiterleitung…" : "Guthaben kaufen"}
+            {loading ? "…" : t("wallet.buy")}
           </button>
         </div>
       ) : (
-        <p className="mt-3 text-xs text-zinc-500">
-          Stripe-Aufladung noch nicht aktiv (STRIPE_SECRET_KEY fehlt auf dem
-          Server).
-        </p>
+        <p className="mt-3 text-xs text-zinc-500">{t("wallet.stripeOff")}</p>
       )}
 
       {error ? <p className="mt-2 text-xs text-red-400">{error}</p> : null}

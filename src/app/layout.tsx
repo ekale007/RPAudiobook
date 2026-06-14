@@ -3,6 +3,7 @@ import { PwaBootstrap } from "@/components/PwaBootstrap";
 import { ServerCapabilitiesBootstrap } from "@/components/ServerCapabilitiesBootstrap";
 import { UserPreferencesBootstrap } from "@/components/UserPreferencesBootstrap";
 import { brand } from "@/lib/brand";
+import { UiLocaleProvider } from "@/lib/i18n/UiLocaleProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -33,14 +34,16 @@ export default function RootLayout({
   return (
     <html lang="de">
       <head>
-        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/icon.svg" />
+        <link rel="icon" href={brand.logoSrc} type="image/png" />
+        <link rel="apple-touch-icon" href={brand.logoSrc} />
       </head>
       <body className="min-h-dvh antialiased">
         <PwaBootstrap />
         <ServerCapabilitiesBootstrap />
         <UserPreferencesBootstrap />
-        {children}
+        <UiLocaleProvider>
+          {children}
+        </UiLocaleProvider>
       </body>
     </html>
   );

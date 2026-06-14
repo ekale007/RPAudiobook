@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CastHubPanel } from "@/components/story-hub/CastHubPanel";
 import { StoryLocaleSection } from "@/components/story-hub/StoryLocaleSection";
 import { StoryCoverEditor } from "@/components/StoryCoverEditor";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import type { ChapterRow, CharacterRow } from "@/lib/db/stories";
 import type { StorySettings } from "@/lib/types";
 import {
@@ -13,12 +14,6 @@ import {
 } from "@/lib/memory/plotState";
 
 type HubTab = "story" | "cast" | "settings";
-
-const TABS: { id: HubTab; label: string }[] = [
-  { id: "story", label: "Story" },
-  { id: "cast", label: "Cast" },
-  { id: "settings", label: "Settings" },
-];
 
 function HubCard({
   title,
@@ -144,7 +139,17 @@ export function StoryHubView({
   onCastUpdated?: () => void;
   onLocaleUpdated?: () => void;
 }) {
+  const { t } = useUiLocale();
   const [tab, setTab] = useState<HubTab>("story");
+
+  const tabs = useMemo(
+    (): { id: HubTab; label: string }[] => [
+      { id: "story", label: t("storyHub.tabStory") },
+      { id: "cast", label: t("storyHub.tabCast") },
+      { id: "settings", label: t("storyHub.tabSettings") },
+    ],
+    [t],
+  );
 
   const chaptersNewestFirst = useMemo(
     () => [...chapters].sort((a, b) => b.index_in_band - a.index_in_band),
@@ -160,21 +165,21 @@ export function StoryHubView({
           href={`/story/${storyId}/chat?chapter=${activeChapterId}`}
           className="mx-3 mt-2 shrink-0 rounded-lg bg-accent py-2 text-center text-sm font-medium text-black sm:mx-4"
         >
-          Weiterspielen
+          {t("storyHub.continue")}
         </Link>
       ) : (
         <p className="mx-3 mt-2 shrink-0 rounded-lg border border-amber-800/40 bg-amber-950/25 px-3 py-2 text-center text-[11px] text-amber-100 sm:mx-4">
-          Kein aktives Kapitel
+          {t("storyHub.noActiveChapter")}
         </p>
       )}
 
       <nav
         className="mt-2 shrink-0 border-b border-surface-border px-3 sm:px-4"
-        aria-label="Story Hub"
+        aria-label={t("storyHub.navAria")}
         role="tablist"
       >
         <div className="flex gap-1">
-          {TABS.map(({ id, label }) => (
+          {tabs.map(({ id, label }) => (
             <button
               key={id}
               type="button"
@@ -217,14 +222,14 @@ export function StoryHubView({
             ) : null}
 
             <HubCard
-              title="Plot & Memory"
+              title={t("storyHub.plotMemory")}
               accent
               action={
                 <Link
                   href={`/story/${storyId}/memory`}
                   className="text-[10px] text-accent underline"
                 >
-                  Bearbeiten
+                  {t("common.edit")}
                 </Link>
               }
             >
@@ -240,7 +245,7 @@ export function StoryHubView({
                         : null,
                     ]
                       .filter(Boolean)
-                      .join(" · ") || "Zeit/Ort noch nicht gesetzt"}
+                      .join(" · ") || t("storyHub.timeLocationUnset")}
                   </p>
                   {plotState.threats.length ? (
                     <ul className="mt-1 space-y-0.5 text-[11px] text-zinc-300">
@@ -263,12 +268,14 @@ export function StoryHubView({
                 </>
               ) : (
                 <p className="text-[11px] text-zinc-500">
-                  Plot-State leer — im Chat generieren oder manuell pflegen.
+                  {t("storyHub.plotEmpty")}
                 </p>
               )}
               {(storySettings.pinnedNotes?.length ?? 0) > 0 ? (
                 <p className="mt-1 text-[10px] text-zinc-500">
-                  {storySettings.pinnedNotes!.length} Pinnpunkt(e)
+                  {t("storyHub.pinnedNotes", {
+                    count: String(storySettings.pinnedNotes!.length),
+                  })}
                 </p>
               ) : null}
             </HubCard>
@@ -280,15 +287,14 @@ export function StoryHubView({
                 </p>
               ) : (
                 <p className="text-[11px] text-zinc-500">
-                  Nach dem Schließen eines Kapitels wird die Band-Zusammenfassung
-                  ergänzt.
+                  {t("storyHub.bandSummaryEmpty")}
                 </p>
               )}
             </HubCard>
 
             <section>
               <h2 className="mb-1.5 text-xs font-medium text-zinc-400">
-                Kapitel
+                {t("storyHub.chapters")}
               </h2>
               <ul className="flex flex-col gap-1.5">
                 {chaptersNewestFirst.map((ch) => {
@@ -311,7 +317,9 @@ export function StoryHubView({
                           disabled={deleteBusyId === ch.id}
                           onClick={() => onDeleteChapter(ch)}
                           className="absolute right-1.5 top-1.5 z-10 px-1 text-sm text-red-400/80 disabled:opacity-40"
-                          aria-label={`${ch.title} löschen`}
+                          aria-label={t("storyHub.deleteChapterAria", {
+                            title: ch.title,
+                          })}
                         >
                           {deleteBusyId === ch.id ? "…" : "×"}
                         </button>
@@ -329,7 +337,9 @@ export function StoryHubView({
                                   : "bg-zinc-800 text-zinc-500"
                               }`}
                             >
-                              {isActive ? "Aktiv" : "Zu"}
+                              {isActive
+                                ? t("storyHub.statusActive")
+                                : t("storyHub.statusClosed")}
                             </span>
                           </div>
                           {ch.phase_hint ? (
@@ -346,7 +356,7 @@ export function StoryHubView({
                               : "border border-accent/35 bg-accent/10 text-accent"
                           }`}
                         >
-                          {isActive ? "Spielen" : "Lesen"}
+                          {isActive ? t("storyHub.play") : t("storyHub.read")}
                         </Link>
                       </div>
                       {hasSummary ? (
@@ -366,7 +376,9 @@ export function StoryHubView({
                               }
                               className="mt-0.5 text-[10px] text-accent underline"
                             >
-                              {summaryExpanded ? "Weniger" : "Mehr"}
+                              {summaryExpanded
+                                ? t("storyHub.less")
+                                : t("storyHub.more")}
                             </button>
                           ) : null}
                         </div>
@@ -401,34 +413,34 @@ export function StoryHubView({
             />
             <SettingsLink
               href={`/story/${storyId}/world`}
-              title="Welt & Lorebook"
-              description="Lore-Einträge, Keys und Weltbeschreibung pflegen"
+              title={t("storyHub.worldTitle")}
+              description={t("storyHub.worldDesc")}
             />
             <SettingsLink
               href={`/story/${storyId}/memory`}
-              title="Story-Gedächtnis"
-              description="Plot-State und Pinnpunkte pflegen"
+              title={t("storyHub.memoryTitle")}
+              description={t("storyHub.memoryDesc")}
             />
             <SettingsLink
               href={`/story/${storyId}/pronunciation`}
-              title="Aussprache-Zentrale"
-              description="Phonetische Namen testen und hinterlegen"
+              title={t("storyHub.pronunciationTitle")}
+              description={t("storyHub.pronunciationDesc")}
             />
             <SettingsLink
               href={`/story/${storyId}/chapter`}
-              title="Kapitel schließen"
-              description="Aktuelles Kapitel abschließen und nächstes starten"
+              title={t("storyHub.closeChapterTitle")}
+              description={t("storyHub.closeChapterDesc")}
             />
             <SettingsLink
               href={`/story/${storyId}/export`}
-              title="Karten & Lorebooks exportieren"
-              description="Story-JSON für Figuren und Lore herunterladen"
+              title={t("storyHub.exportTitle")}
+              description={t("storyHub.exportDesc")}
             />
             <Link
               href="/story/new"
               className="mt-2 text-center text-[10px] text-zinc-600 underline"
             >
-              Weitere Story mit KI anlegen
+              {t("storyHub.createAnother")}
             </Link>
           </div>
         ) : null}

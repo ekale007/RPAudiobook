@@ -18,12 +18,11 @@ import {
   formatSteeringReactionUserTurn,
   formatSteeringUserTurnContent,
   parseSteeringInput,
-  steeringInputPlaceholder,
   stripSteeringTurnPrefix,
   type QuickReactionId,
   type SteeringInputMode,
 } from "@/lib/chat/playerSteering";
-import { normalizeStoryContentLocale } from "@/lib/story/protagonist";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import {
   readTtsAutoplayPreference,
   TtsAutoplayToggle,
@@ -162,6 +161,7 @@ export function ChatView({
   readOnly?: boolean;
   storyLocale?: string;
 }) {
+  const { t } = useUiLocale();
   const ttsSettings = loadTtsSettings();
   const voiceMap: VoiceMap = resolveStoryVoiceMap(
     storySettings,
@@ -683,7 +683,7 @@ export function ChatView({
     async (rows: TurnRow[]) => {
       const settings = loadOpenRouterSettings();
       if (!settings) {
-        setError("OpenRouter-Key in Settings eintragen (für Kapitelübergang).");
+        setError(t("chat.openRouterKey"));
         setAutoChapterPhase(null);
         return false;
       }
@@ -702,7 +702,7 @@ export function ChatView({
           await updateChapterTitle(chapterId, currentTitle);
         }
 
-        setAutoChapterStatus("Plot-Stand wird gesichert …");
+        setAutoChapterStatus(t("chat.plotSaving"));
         const plot = await finalizeChapterPlotState({
           settings,
           storyId,
@@ -722,7 +722,7 @@ export function ChatView({
           speakerSlug: t.speaker_slug,
         }));
 
-        setAutoChapterStatus("Kapitel wird zusammengefasst …");
+        setAutoChapterStatus(t("chat.chapterSummarizing"));
         const summary = await summarizeChapter(settings, chatTurns, currentTitle);
         await updateChapterSummaries(chapterId, {
           chapter_summary: summary,
@@ -734,7 +734,7 @@ export function ChatView({
           Math.max(...bundle.chapters.map((c) => c.index_in_band), 0) + 1;
         const nextTitle = `Chapter ${nextIndex}`;
 
-        setAutoChapterStatus("Eröffnung wird geschrieben …");
+        setAutoChapterStatus(t("chat.introWriting"));
         const intro = await resolveChapterIntro("ai_bridge", {
           settings,
           priorTurns: rows,
@@ -744,7 +744,7 @@ export function ChatView({
           phaseHint: nextPhaseHint ?? null,
         });
 
-        setAutoChapterStatus("Nächstes Kapitel wird gestartet …");
+        setAutoChapterStatus(t("chat.nextChapterStarting"));
         const newChapter = await createNextChapter(
           bundle.band.id as string,
           nextIndex,
@@ -764,7 +764,7 @@ export function ChatView({
       } catch (e) {
         console.warn("Auto chapter creation failed:", e);
         setError(
-          e instanceof Error ? e.message : "Kapitelübergang fehlgeschlagen.",
+          e instanceof Error ? e.message : t("chat.chapterTransitionFailed"),
         );
         setAutoChapterPhase(null);
         return false;
@@ -911,7 +911,7 @@ export function ChatView({
   ): Promise<boolean> => {
     const settings = loadOpenRouterSettings();
     if (!settings) {
-      setError("Add your OpenRouter API key in Settings first.");
+      setError(t("chat.openRouterKeyShort"));
       return false;
     }
     const chatSettings = resolveChatModelSettings(settings);
@@ -969,7 +969,7 @@ export function ChatView({
     if (!full.trim()) {
       chatBusyRef.current = false;
       if (!opts.background) setGenerating(false);
-      setError("Leere Antwort vom Modell — bitte erneut versuchen.");
+      setError(t("chat.emptyModelReply"));
       return false;
     }
 
@@ -1043,7 +1043,6 @@ export function ChatView({
   }, []);
 
   const steeringMode = hasTts && !readOnly;
-  const contentLocale = normalizeStoryContentLocale(storyLocale);
 
   const appendSteeringUserTurn = async (
     base: TurnRow[],
@@ -1169,7 +1168,7 @@ export function ChatView({
 
     const settings = loadOpenRouterSettings();
     if (!settings) {
-      setError("Add your OpenRouter API key in Settings first.");
+      setError(t("chat.openRouterKeyShort"));
       return;
     }
     const chatSettings = resolveChatModelSettings(settings);
@@ -1271,18 +1270,18 @@ export function ChatView({
   ): boolean => {
     if (ttsResult === "blocked") {
       setError(
-        "Vorlesen blockiert (Browser). Tippe einmal auf ▶ bei der letzten Nachricht, dann starte Fahrmodus erneut.",
+        t("chat.driveBlocked"),
       );
       return false;
     }
     if (ttsResult === "no-player") {
       setError(
-        "Audio-Player nicht bereit — Seite kurz warten oder ▶ antippen, dann Fahrmodus erneut.",
+        t("chat.driveNoPlayer"),
       );
       return false;
     }
     if (ttsResult === "error") {
-      setError("TTS-Wiedergabe fehlgeschlagen — bitte erneut versuchen.");
+      setError(t("chat.driveTtsFailed"));
       return false;
     }
     return true;
@@ -1463,7 +1462,7 @@ export function ChatView({
       });
 
       if (!ok) {
-        setError((prev) => prev ?? "Neugenerierung fehlgeschlagen.");
+        setError((prev) => prev ?? t("chat.rerollFailed"));
       }
     } catch (e) {
       setError(formatLlmLimitError(e instanceof Error ? e.message : String(e)));
@@ -1527,7 +1526,7 @@ export function ChatView({
       setCopiedChatDebug(true);
       setTimeout(() => setCopiedChatDebug(false), 1500);
     } catch {
-      alert("Copy failed. Use browser copy as fallback.");
+      alert(t("chat.copyChatFailed"));
     }
   };
 
@@ -1539,22 +1538,22 @@ export function ChatView({
         : null;
     const driveTimeSuffix =
       driveMinutesLeft != null && driveMinutesLeft > 0
-        ? ` · noch ~${driveMinutesLeft} Min`
+        ? t("chat.driveMinutesLeft", { minutes: String(driveMinutesLeft) })
         : "";
     const driveBaseLabel = drivePaused
-      ? `Fahrmodus pausiert${driveTimeSuffix}`
-      : `Fahrmodus${driveTimeSuffix}`;
+      ? t("chat.drivePaused", { suffix: driveTimeSuffix })
+      : t("chat.driveMode", { suffix: driveTimeSuffix });
     const driveControls = isDriveSession
       ? {
           onCancel: cancelAutoSession,
           onPause: drivePaused ? resumeDriveMode : pauseDriveMode,
-          pauseLabel: drivePaused ? "Weiter" : "Pause",
+          pauseLabel: drivePaused ? t("chat.resume") : t("chat.pause"),
         }
       : {};
 
     if (autoChapterPhase === "running") {
       return {
-        label: autoChapterStatus ?? "Kapitelübergang …",
+        label: autoChapterStatus ?? t("chat.chapterTransition"),
         onCancel: undefined,
         onPause: undefined,
         pauseLabel: undefined,
@@ -1562,7 +1561,7 @@ export function ChatView({
     }
     if (autoChapterPhase === "prompt") {
       return {
-        label: "Kapitelübergang — Entscheidung offen",
+        label: t("chat.chapterDecision"),
         onCancel: undefined,
         onPause: undefined,
         pauseLabel: undefined,
@@ -1572,12 +1571,15 @@ export function ChatView({
       return {
         label:
           autoTotal > 0
-            ? `Erzähler schreibt – noch ${autoLeft} von ${autoTotal} …`
+            ? t("chat.narratorWriting", {
+                left: String(autoLeft),
+                total: String(autoTotal),
+              })
             : isDriveSession
-              ? `${driveBaseLabel} · schreibt …`
+              ? t("chat.driveWriting", { label: driveBaseLabel })
               : ttsQueueActive
-                ? "Geschichte wird geschrieben · TTS läuft …"
-                : "Geschichte wird geschrieben …",
+                ? t("chat.writingWithTts")
+                : t("chat.writing"),
         onCancel: isDriveSession ? cancelAutoSession : cancelWork,
         ...driveControls,
       };
@@ -1585,8 +1587,8 @@ export function ChatView({
     if (ttsQueueActive && !beatsLoading) {
       return {
         label: isDriveSession
-          ? `${driveBaseLabel} · Vorlesen …`
-          : "TTS wird abgespielt …",
+          ? t("chat.driveReading", { label: driveBaseLabel })
+          : t("chat.ttsPlayingStatus"),
         onCancel: isDriveSession ? cancelAutoSession : stopTtsAutoplay,
         ...driveControls,
       };
@@ -1600,13 +1602,16 @@ export function ChatView({
     }
     if (autoSession && autoTotal > 0) {
       return {
-        label: `Erzähler-Serie · noch ${autoLeft} von ${autoTotal}`,
+        label: t("chat.narratorSeries", {
+          left: String(autoLeft),
+          total: String(autoTotal),
+        }),
         onCancel: cancelAutoSession,
       };
     }
     if (beatsLoading) {
       return {
-        label: "Vorschläge werden gedacht …",
+        label: t("chat.beatsLoading"),
         onCancel: cancelWork,
       };
     }
@@ -1627,6 +1632,7 @@ export function ChatView({
     stopTtsAutoplay,
     autoChapterPhase,
     autoChapterStatus,
+    t,
   ]);
 
   const chapterLabel = chapterTitle ?? chapter.title;
@@ -1642,11 +1648,18 @@ export function ChatView({
     setError(null);
     try {
       const result = await exportChapterAudioFromCloud(turns, chapterLabel);
-      if (!result.ok) setError(result.error ?? "Kapitel-Export fehlgeschlagen.");
+      if (!result.ok) setError(result.error ?? t("chat.chapterExportFailed"));
     } finally {
       setChapterExportBusy(false);
     }
-  }, [chapterCloudAudio.canExport, chapterExportBusy, chapterLabel, turns]);
+  }, [chapterCloudAudio.canExport, chapterExportBusy, chapterLabel, turns, t]);
+
+  const steeringPlaceholder = useMemo(() => {
+    if (!steeringMode) return t("chat.placeholderWhatDo");
+    if (steeringInputMode === "say") return t("chat.placeholderSay");
+    if (steeringInputMode === "act") return t("chat.placeholderAct");
+    return t("chat.placeholderSteering");
+  }, [steeringMode, steeringInputMode, t]);
 
   return (
     <div
@@ -1676,7 +1689,7 @@ export function ChatView({
         >
           {loreCount > 0 ? (
             <p className="mb-2 text-center text-xs text-zinc-500">
-              {loreCount} lore entries active
+              {t("chat.loreActive", { count: String(loreCount) })}
             </p>
           ) : null}
 
@@ -1731,7 +1744,7 @@ export function ChatView({
           {generating && autoChapterPhase !== "running" ? (
             <div className="scroll-mt-3 scroll-mb-3 px-1">
               <GeneratingIndicator
-                label="Erzähler schreibt …"
+                label={t("chat.generating")}
                 onCancel={cancelWork}
               />
             </div>
@@ -1749,17 +1762,17 @@ export function ChatView({
 
       <div className="safe-bottom border-t border-surface-border bg-surface px-3 py-3">
         <MobileCollapsibleTools
-          title="TTS & Autoplay"
+          title={t("chat.toolsTitle")}
           hint={
             toolsActivity
               ? undefined
               : ttsReadOnly
-                ? "Nur lesen"
+                ? t("chat.readOnlyHint")
                 : ttsQueueActive
-                  ? "TTS läuft"
+                  ? t("chat.ttsActiveHint")
                   : ttsAutoplay
-                    ? "Autoplay an"
-                    : "Autoplay aus"
+                    ? t("chat.autoplayOnHint")
+                    : t("chat.autoplayOffHint")
           }
           activityLabel={toolsActivity?.label}
           onActivityCancel={toolsActivity?.onCancel}
@@ -1770,9 +1783,12 @@ export function ChatView({
             {ttsCloudQuota ? (
               <span
                 className="shrink-0 rounded-full border border-surface-border px-3 py-1 text-zinc-500"
-                title="Gespeicherte TTS-Aufnahmen in Supabase"
+                title={t("chat.cloudQuotaTitle")}
               >
-                Cloud: {ttsCloudQuota.used}/{ttsCloudQuota.max}
+                {t("chat.cloudQuota", {
+                  used: String(ttsCloudQuota.used),
+                  max: String(ttsCloudQuota.max),
+                })}
               </span>
             ) : null}
             {!readOnly && turns.length > 0 ? (
@@ -1786,15 +1802,21 @@ export function ChatView({
                 className="shrink-0 rounded-full border border-surface-border px-3 py-1 text-zinc-400 disabled:opacity-40"
                 title={
                   chapterCloudAudio.complete
-                    ? "Alle Erzähler-Aufnahmen aus der Cloud zu einer Datei"
-                    : `${chapterCloudAudio.cloudTurns}/${chapterCloudAudio.assistantTurns} Cloud-Aufnahmen — nur gespeicherte Teile`
+                    ? t("chat.chapterExportTitle")
+                    : t("chat.chapterExportPartial", {
+                        cloud: String(chapterCloudAudio.cloudTurns),
+                        total: String(chapterCloudAudio.assistantTurns),
+                      })
                 }
               >
                 {chapterExportBusy
-                  ? "Kapitel …"
+                  ? t("chat.chapterExportBusy")
                   : chapterCloudAudio.complete
-                    ? "Kapitel-Audio"
-                    : `Kapitel-Audio (${chapterCloudAudio.cloudTurns}/${chapterCloudAudio.assistantTurns})`}
+                    ? t("chat.chapterExport")
+                    : t("chat.chapterExportPartialBtn", {
+                        cloud: String(chapterCloudAudio.cloudTurns),
+                        total: String(chapterCloudAudio.assistantTurns),
+                      })}
               </button>
             ) : null}
             {hasTts ? (
@@ -1829,20 +1851,20 @@ export function ChatView({
               href={`/story/${storyId}`}
               className="shrink-0 rounded-full border border-surface-border px-3 py-1 text-zinc-400"
             >
-              Story
+              {t("chat.storyLink")}
             </Link>
             <Link
               href={`/story/${storyId}/voices`}
               className="shrink-0 rounded-full border border-surface-border px-3 py-1 text-zinc-400"
             >
-              Stimmen
+              {t("chat.voicesLink")}
             </Link>
             {!readOnly ? (
               <Link
                 href={`/story/${storyId}/chapter`}
                 className="shrink-0 rounded-full border border-surface-border px-3 py-1 text-zinc-400"
               >
-                Close chapter
+                {t("chat.closeChapter")}
               </Link>
             ) : null}
             <button
@@ -1850,9 +1872,9 @@ export function ChatView({
               onClick={copyCurrentChatDebug}
               disabled={turns.length === 0}
               className="shrink-0 rounded-full border border-surface-border px-3 py-1 text-zinc-400 disabled:opacity-40"
-              title="Copy full current chat with role/speaker debug metadata"
+              title={t("chat.copyChatTitle")}
             >
-              {copiedChatDebug ? "Chat copied" : "Copy full chat"}
+              {copiedChatDebug ? t("chat.copyChatCopied") : t("chat.copyChat")}
             </button>
           </div>
           {!readOnly ? (
@@ -1895,11 +1917,7 @@ export function ChatView({
               onSend={() => void sendMessage()}
               onQuickReaction={(id) => void sendQuickReaction(id)}
               onEnsureExpanded={() => setInputExpanded(true)}
-              placeholder={steeringInputPlaceholder(
-                steeringMode,
-                contentLocale,
-                steeringInputMode,
-              )}
+              placeholder={steeringPlaceholder}
               disabled={
                 autoSession || readOnly || chapterTransitionOpen || turns.length === 0
               }

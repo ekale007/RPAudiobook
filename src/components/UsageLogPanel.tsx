@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { authFetch } from "@/lib/supabase/authFetch";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
+import type { UILocale } from "@/lib/i18n/types";
 
 type LogEvent = {
   id: string;
@@ -24,9 +26,9 @@ type LogPayload = {
   error?: string;
 };
 
-function formatWhen(iso: string): string {
+function formatWhen(iso: string, locale: UILocale): string {
   try {
-    return new Intl.DateTimeFormat("de-DE", {
+    return new Intl.DateTimeFormat(locale === "de" ? "de-DE" : "en-US", {
       dateStyle: "short",
       timeStyle: "short",
     }).format(new Date(iso));
@@ -36,6 +38,7 @@ function formatWhen(iso: string): string {
 }
 
 export function UsageLogPanel() {
+  const { t, locale } = useUiLocale();
   const [data, setData] = useState<LogPayload | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -68,18 +71,15 @@ export function UsageLogPanel() {
     <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
-          <h2 className="font-medium text-accent">Verbrauchsprotokoll</h2>
-          <p className="mt-0.5 text-xs text-zinc-500">
-            LLM: OpenRouter-USD→EUR, sonst Katalog. TTS: Zeichen × Eleven-API-$/1k
-            (Flash/Standard) × Kurs — siehe Admin-Kurse.
-          </p>
+          <h2 className="font-medium text-accent">{t("usageLog.title")}</h2>
+          <p className="mt-0.5 text-xs text-zinc-500">{t("usageLog.hint")}</p>
         </div>
         <button
           type="button"
           onClick={() => void load()}
           className="shrink-0 text-xs text-accent underline"
         >
-          {loading ? "…" : "Aktualisieren"}
+          {loading ? "…" : t("common.refresh")}
         </button>
       </div>
 
@@ -89,24 +89,26 @@ export function UsageLogPanel() {
 
       {data && !loading ? (
         <p className="mb-3 text-xs text-zinc-400">
-          Summe (sichtbare Einträge): {data.summary.totalLabel} ·{" "}
-          {data.summary.count} Zeilen
+          {t("usageLog.summary")} {data.summary.totalLabel} · {data.summary.count}{" "}
+          {t("usageLog.rows")}
         </p>
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-zinc-500">Lade Protokoll…</p>
+        <p className="text-sm text-zinc-500">{t("usageLog.loading")}</p>
       ) : !data?.events.length ? (
-        <p className="text-sm text-zinc-500">Noch keine Einträge in diesem Monat.</p>
+        <p className="text-sm text-zinc-500">{t("usageLog.empty")}</p>
       ) : (
         <div className="max-h-80 overflow-y-auto rounded-lg border border-surface-border">
           <table className="w-full text-left text-xs">
             <thead className="sticky top-0 bg-surface text-zinc-500">
               <tr>
-                <th className="px-2 py-1.5 font-normal">Zeit</th>
-                <th className="px-2 py-1.5 font-normal">Art</th>
-                <th className="px-2 py-1.5 font-normal">Details</th>
-                <th className="px-2 py-1.5 text-right font-normal">Kosten</th>
+                <th className="px-2 py-1.5 font-normal">{t("usageLog.colTime")}</th>
+                <th className="px-2 py-1.5 font-normal">{t("usageLog.colKind")}</th>
+                <th className="px-2 py-1.5 font-normal">{t("usageLog.colDetails")}</th>
+                <th className="px-2 py-1.5 text-right font-normal">
+                  {t("usageLog.colCost")}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -116,7 +118,7 @@ export function UsageLogPanel() {
                   className="border-t border-surface-border/60 text-zinc-300"
                 >
                   <td className="whitespace-nowrap px-2 py-1.5 text-zinc-500">
-                    {formatWhen(ev.createdAt)}
+                    {formatWhen(ev.createdAt, locale)}
                   </td>
                   <td className="px-2 py-1.5 uppercase text-zinc-500">
                     {ev.kind}
@@ -127,9 +129,9 @@ export function UsageLogPanel() {
                       <span className="block truncate text-[10px] text-zinc-600">
                         {ev.modelId}
                         {ev.kind === "llm"
-                          ? ` · ${ev.promptTokens}+${ev.completionTokens} tok`
+                          ? ` · ${ev.promptTokens}+${ev.completionTokens} ${t("common.tokens")}`
                           : ev.characters
-                            ? ` · ${ev.characters} Zeichen`
+                            ? ` · ${ev.characters} ${t("common.characters")}`
                             : ""}
                       </span>
                     ) : null}

@@ -5,17 +5,17 @@ import type {
   QuickReactionId,
   SteeringInputMode,
 } from "@/lib/chat/playerSteering";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import { normalizeStoryContentLocale } from "@/lib/story/protagonist";
 
 const REACTIONS: Array<{
   id: QuickReactionId;
+  labelKey: "steering.laugh" | "steering.cry" | "steering.smile";
   emoji: string;
-  labelDe: string;
-  labelEn: string;
 }> = [
-  { id: "laugh", emoji: "😂", labelDe: "Lachen", labelEn: "Laugh" },
-  { id: "cry", emoji: "😢", labelDe: "Weinen", labelEn: "Cry" },
-  { id: "smile", emoji: "😊", labelDe: "Lächeln", labelEn: "Smile" },
+  { id: "laugh", emoji: "😂", labelKey: "steering.laugh" },
+  { id: "cry", emoji: "😢", labelKey: "steering.cry" },
+  { id: "smile", emoji: "😊", labelKey: "steering.smile" },
 ];
 
 export function ChatSteeringBar({
@@ -55,6 +55,7 @@ export function ChatSteeringBar({
   steeringInputMode?: SteeringInputMode;
   onSteeringInputModeChange?: (mode: SteeringInputMode) => void;
 }) {
+  const { t } = useUiLocale();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingDialogueCursor = useRef<number | null>(null);
   const contentLocale = normalizeStoryContentLocale(locale);
@@ -121,7 +122,7 @@ export function ChatSteeringBar({
         aria-expanded={expanded}
       >
         <span className="text-sm font-medium text-zinc-200">
-          {de ? "Eingabe" : "Input"}
+          {t("steering.input")}
         </span>
         <span className="shrink-0 text-[10px] text-zinc-500" aria-hidden>
           {expanded ? "▲" : "▼"}
@@ -144,15 +145,13 @@ export function ChatSteeringBar({
               disabled={disabled || generating}
               onClick={() => onQuickReaction(r.id)}
               className="flex items-center gap-1 rounded-xl border border-surface-border bg-surface-raised px-3 py-2 text-sm transition hover:border-accent/40 disabled:opacity-40"
-              title={de ? r.labelDe : r.labelEn}
-              aria-label={de ? r.labelDe : r.labelEn}
+              title={t(r.labelKey)}
+              aria-label={t(r.labelKey)}
             >
               <span className="text-lg leading-none" aria-hidden>
                 {r.emoji}
               </span>
-              <span className="text-xs text-zinc-400">
-                {de ? r.labelDe : r.labelEn}
-              </span>
+              <span className="text-xs text-zinc-400">{t(r.labelKey)}</span>
             </button>
           ))}
           <button
@@ -160,20 +159,20 @@ export function ChatSteeringBar({
             disabled={disabled || generating}
             onClick={handleSay}
             className={modeBtnClass("say")}
-            title={de ? "Gesprochene Zeile (Anführungszeichen)" : "Spoken line (quotes)"}
+            title={t("steering.sayTitle")}
           >
             <span aria-hidden>💬</span>
-            <span>{de ? "Sagen" : "Say"}</span>
+            <span>{t("steering.say")}</span>
           </button>
           <button
             type="button"
             disabled={disabled || generating}
             onClick={handleAct}
             className={modeBtnClass("act")}
-            title={de ? "Handlung beschreiben" : "Describe an action"}
+            title={t("steering.actTitle")}
           >
             <span aria-hidden>⚡</span>
-            <span>{de ? "Tun" : "Act"}</span>
+            <span>{t("steering.act")}</span>
           </button>
         </div>
 
@@ -201,7 +200,7 @@ export function ChatSteeringBar({
               onClick={onCancel}
               className="shrink-0 rounded-xl border border-red-500/50 bg-red-500/15 px-4 py-2 text-sm font-medium text-red-300"
             >
-              {de ? "Stopp" : "Stop"}
+              {t("steering.stop")}
             </button>
           ) : (
             <button
@@ -210,15 +209,13 @@ export function ChatSteeringBar({
               disabled={disabled || !input.trim()}
               className="shrink-0 rounded-xl bg-accent px-4 py-2 text-sm font-medium text-black disabled:opacity-40"
             >
-              {steeringMode ? (de ? "Lenken" : "Steer") : de ? "Senden" : "Send"}
+              {steeringMode ? t("steering.steer") : t("steering.send")}
             </button>
           )}
         </div>
         {steeringMode ? (
           <p className="text-center text-[10px] leading-snug text-zinc-600">
-            {de
-              ? 'Handlung und „Dialog" beliebig kombinieren — 💬 setzt Anführungszeichen, ⚡ eine Handlung.'
-              : 'Mix action and "dialogue" freely — 💬 inserts quotes, ⚡ an action beat.'}
+            {t("steering.hint")}
           </p>
         ) : null}
       </div>

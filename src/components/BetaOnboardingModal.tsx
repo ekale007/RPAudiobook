@@ -4,10 +4,12 @@ import { brand } from "@/lib/brand";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { OverlayPanel } from "@/components/ui/OverlayPanel";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 
 const STORAGE_KEY = "hoerbuchki_onboarding_v1";
 
 export function BetaOnboardingModal({ openGate }: { openGate: boolean }) {
+  const { t } = useUiLocale();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -33,38 +35,32 @@ export function BetaOnboardingModal({ openGate }: { openGate: boolean }) {
     <OverlayPanel
       open={open}
       onClose={dismiss}
-      title={`Willkommen bei ${brand.productName}`}
+      title={t("onboarding.title", { product: brand.productName })}
       wide
     >
-      <p className="mb-4 text-sm text-zinc-400">
-        Kurz die wichtigsten Schritte — danach kannst du direkt loslegen.
-      </p>
+      <p className="mb-4 text-sm text-zinc-400">{t("onboarding.intro")}</p>
       <ol className="mb-4 list-decimal space-y-2 pl-5 text-sm text-zinc-300">
         <li>
-          <strong className="text-zinc-200">Bibliothek:</strong> Vorlage wählen,
-          Protagonist und Stimme festlegen.
+          <strong className="text-zinc-200">{t("onboarding.stepLibrary")}</strong>{" "}
+          {t("onboarding.stepLibraryText")}
         </li>
         <li>
-          <strong className="text-zinc-200">Chat:</strong> Geschichte schreiben;
-          Kopfhörer für TTS. Eingabe unten aufklappen für Say & Reaktionen.
+          <strong className="text-zinc-200">{t("onboarding.stepChat")}</strong>{" "}
+          {t("onboarding.stepChatText")}
         </li>
         <li>
-          <strong className="text-zinc-200">Story-Hub:</strong> Cast für Stimmen,
-          Gedächtnis & Welt bearbeiten.
+          <strong className="text-zinc-200">{t("onboarding.stepHub")}</strong>{" "}
+          {t("onboarding.stepHubText")}
         </li>
       </ol>
-      <p className="mb-4 text-xs text-zinc-500">
-        KI-Antworten und Sprache werden über Drittanbieter erzeugt (OpenRouter,
-        TTS). Limits siehst du unter Account. Nur Inhalte nutzen, für die du Rechte
-        hast. Betreiber: Eyüp Kale.
-      </p>
+      <p className="mb-4 text-xs text-zinc-500">{t("onboarding.disclaimer")}</p>
       <p className="mb-4 text-xs text-zinc-500">
         <Link href="/legal/datenschutz" className="text-accent underline">
-          Datenschutz
+          {t("legal.privacy")}
         </Link>
         {" · "}
         <Link href="/legal/nutzungsbedingungen" className="text-accent underline">
-          Nutzungsbedingungen
+          {t("legal.terms")}
         </Link>
       </p>
       <button
@@ -72,7 +68,7 @@ export function BetaOnboardingModal({ openGate }: { openGate: boolean }) {
         onClick={dismiss}
         className="w-full rounded-xl bg-accent py-2.5 text-sm font-medium text-zinc-950"
       >
-        Verstanden — los geht&apos;s
+        {t("onboarding.dismiss")}
       </button>
     </OverlayPanel>
   );

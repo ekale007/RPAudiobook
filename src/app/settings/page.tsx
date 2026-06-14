@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import { DecimalStepInput } from "@/components/DecimalStepInput";
 import {
   clearOpenRouterApiKey,
@@ -71,6 +73,7 @@ const MAX_TOKENS_MIN = 256;
 const MAX_TOKENS_MAX = 8192;
 
 export default function SettingsPage() {
+  const { t } = useUiLocale();
   const serverCaps = useServerCapabilities();
   const serverLlm = serverCaps.serverLlm;
   const serverElevenLabsTts = serverCaps.serverElevenLabsTts;
@@ -377,13 +380,12 @@ export default function SettingsPage() {
 
   return (
     <main className="flex min-h-dvh flex-col">
-      <AppHeader title="Einstellungen" backHref="/" />
+      <AppHeader title={t("settings.title")} backHref="/" />
       <div className="flex flex-col gap-5 p-4">
+        <LanguageSwitcher />
         {loggedIn ? (
           <p className="rounded-lg border border-surface-border bg-surface-raised px-3 py-2 text-xs text-zinc-400">
-            Modell, Temperatur und Erzähler-Stimme werden mit deinem Account
-            synchronisiert (Handy ↔ Desktop). Hintergrund- und Erzähler-Modell
-            getrennt — spart Budget bei Memory-Sync.
+            {t("settings.syncBanner")}
           </p>
         ) : null}
 
@@ -392,18 +394,14 @@ export default function SettingsPage() {
             <LlmUsagePanel />
 
             <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
-              <h2 className="mb-1 font-medium text-accent">LLM — Modelle</h2>
-              <p className="mb-3 text-xs text-zinc-500">
-                <strong>Hintergrund</strong> für Memory, Zusammenfassungen und
-                JSON — <strong>Erzähler</strong> für Story-Chat und
-                Beat-Vorschläge. Kosten pro Modell auf dein Monatsbudget.
-              </p>
+              <h2 className="mb-1 font-medium text-accent">{t("settings.llmTitle")}</h2>
+              <p className="mb-3 text-xs text-zinc-500">{t("settings.llmHint")}</p>
 
               <label className="mb-1 block text-xs text-zinc-400">
-                Hintergrund-Modell
+                {t("settings.bgModel")}
               </label>
               {modelsLoading && !llmModels.length ? (
-                <p className="mb-3 text-sm text-zinc-500">Modelle laden…</p>
+                <p className="mb-3 text-sm text-zinc-500">{t("settings.modelsLoading")}</p>
               ) : (
                 <select
                   value={pickAllowedModel(model, llmModels)}
@@ -424,17 +422,17 @@ export default function SettingsPage() {
               ) : null}
 
               <label className="mb-1 block text-xs text-zinc-400">
-                Erzähler-Modell (Story-Chat)
+                {t("settings.narratorModel")}
               </label>
               {modelsLoading && !llmModels.length ? (
-                <p className="mb-3 text-sm text-zinc-500">Modelle laden…</p>
+                <p className="mb-3 text-sm text-zinc-500">{t("settings.modelsLoading")}</p>
               ) : (
                 <select
                   value={narratorModel}
                   onChange={(e) => setNarratorModel(e.target.value)}
                   className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm text-zinc-100"
                 >
-                  <option value="">— gleich wie Hintergrund —</option>
+                  <option value="">{t("settings.sameAsBg")}</option>
                   {llmModels.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.label}
@@ -448,14 +446,14 @@ export default function SettingsPage() {
                 </p>
               ) : (
                 <p className="mb-3 text-[11px] text-zinc-600">
-                  Ohne Auswahl nutzt der Chat das Hintergrund-Modell.
+                  {t("settings.narratorFallback")}
                 </p>
               )}
 
               <div className="mb-3 grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs text-zinc-400">
-                    Max. Tokens
+                    {t("settings.maxTokens")}
                   </label>
                   <input
                     type="number"
@@ -468,10 +466,10 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-zinc-400">
-                    Temperatur
+                    {t("settings.temperature")}
                   </label>
                   <DecimalStepInput
-                    ariaLabel="Temperatur"
+                    ariaLabel={t("settings.temperature")}
                     value={temperature}
                     min={0}
                     max={2}
@@ -487,26 +485,18 @@ export default function SettingsPage() {
                 onClick={saveLlm}
                 className="w-full rounded-lg bg-accent py-2 text-sm font-medium text-black"
               >
-                LLM-Einstellungen speichern
+                {t("settings.saveLlm")}
               </button>
               {saved ? (
                 <p className="mt-2 text-center text-xs text-green-400">
-                  Gespeichert
+                  {t("settings.saved")}
                 </p>
               ) : null}
             </section>
 
             <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
-              <h2 className="mb-1 font-medium text-accent">Sprachausgabe (TTS)</h2>
-              <p className="mb-3 text-xs text-zinc-500">
-                <strong>ElevenLabs</strong> = Premium.{" "}
-                <strong>OpenRouter TTS</strong> = günstige Cloud-Modelle
-                (Gemini, Kokoro, Voxtral).{" "}
-                <strong>Fish Audio</strong> = S2-Pro mit Emotion-Tags wie{" "}
-                <code className="text-zinc-400">[whisper]</code>.{" "}
-                <strong>fal.ai</strong> = Kokoro, Inworld, Eleven v3, MiniMax.
-                Cast-Stimmen pro Story unter Figuren-Stimmen.
-              </p>
+              <h2 className="mb-1 font-medium text-accent">{t("settings.ttsTitle")}</h2>
+              <p className="mb-3 text-xs text-zinc-500">{t("settings.ttsHint")}</p>
 
               <div className="mb-3 flex flex-wrap gap-2">
                 {(
@@ -572,7 +562,7 @@ export default function SettingsPage() {
                         elVoiceId: id,
                       });
                     }}
-                    label="Erzähler-Stimme"
+                    label={t("settings.narratorVoice")}
                   />
                   <p className="mb-2 text-[11px] text-zinc-600">
                     Stimme wird beim Auswählen automatisch gespeichert.
@@ -721,7 +711,7 @@ export default function SettingsPage() {
                       setFishPinnedIds(ids);
                       saveFishAudioPinnedIds(ids);
                     }}
-                    label="Erzähler-Stimme"
+                    label={t("settings.narratorVoice")}
                   />
                 </>
               ) : (
@@ -798,11 +788,11 @@ export default function SettingsPage() {
                 onClick={saveBetaTts}
                 className="mt-3 w-full rounded-lg bg-accent py-2 text-sm font-medium text-black"
               >
-                TTS-Einstellungen speichern
+                {t("settings.saveTts")}
               </button>
               {ttsSaved ? (
                 <p className="mt-2 text-center text-xs text-green-400">
-                  Gespeichert
+                  {t("settings.saved")}
                 </p>
               ) : null}
             </section>

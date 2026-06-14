@@ -1,18 +1,27 @@
+"use client";
+
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import Link from "next/link";
 
-const links = [
-  { href: "/legal/impressum", label: "Impressum" },
-  { href: "/legal/datenschutz", label: "Datenschutz" },
-  { href: "/legal/nutzungsbedingungen", label: "Nutzungsbedingungen" },
+const linkKeys = [
+  { href: "/legal/impressum", key: "legal.impressum" },
+  { href: "/legal/datenschutz", key: "legal.privacy" },
+  { href: "/legal/nutzungsbedingungen", key: "legal.terms" },
 ] as const;
 
-export function LegalDocNav({ current }: { current: (typeof links)[number]["href"] }) {
+export function LegalDocNav({
+  current,
+}: {
+  current: (typeof linkKeys)[number]["href"];
+}) {
+  const { t } = useUiLocale();
+
   return (
     <nav
       className="mb-6 flex flex-wrap gap-2 border-b border-surface-border pb-4 text-xs"
-      aria-label="Rechtliche Informationen"
+      aria-label={t("legal.navAria")}
     >
-      {links.map((l) => (
+      {linkKeys.map((l) => (
         <Link
           key={l.href}
           href={l.href}
@@ -22,7 +31,7 @@ export function LegalDocNav({ current }: { current: (typeof links)[number]["href
               : "rounded-lg px-2.5 py-1 text-zinc-400 hover:text-zinc-200"
           }
         >
-          {l.label}
+          {t(l.key)}
         </Link>
       ))}
     </nav>

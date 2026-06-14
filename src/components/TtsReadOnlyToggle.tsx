@@ -1,5 +1,6 @@
 "use client";
 
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import { saveTtsAutoplay } from "@/lib/storage/ttsPlaybackSettings";
 import { setTtsReadOnly, stopAudioSession } from "@/lib/tts/audioUnlock";
 
@@ -15,6 +16,8 @@ export function TtsReadOnlyToggle({
   /** Stop queue + autoplay when entering read-only. */
   onStopPlayback?: () => void;
 }) {
+  const { t } = useUiLocale();
+
   const toggle = () => {
     const next = !enabled;
     setTtsReadOnly(next);
@@ -36,13 +39,9 @@ export function TtsReadOnlyToggle({
           ? "border-accent/50 bg-accent/15 text-accent"
           : "border-surface-border text-zinc-400 hover:text-zinc-200"
       }`}
-      title={
-        enabled
-          ? "Nur lesen — keine App-Audio-Session, Hintergrundmusik läuft weiter"
-          : "Stumm schalten: nur Text lesen, z. B. mit eigener Musik"
-      }
+      title={enabled ? t("tts.readOnlyTitleOn") : t("tts.readOnlyTitleOff")}
     >
-      {enabled ? "Nur lesen · An" : "Nur lesen"}
+      {enabled ? t("tts.readOnlyOn") : t("tts.readOnly")}
     </button>
   );
 }

@@ -24,6 +24,7 @@ import {
   normalizeStoryContentLocale,
   PROTAGONIST_SPEAKER_SLUG,
 } from "@/lib/story/protagonist";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 
 export function ChatTurnBubble({
   turn,
@@ -79,6 +80,7 @@ export function ChatTurnBubble({
   onCloudQuotaChange?: () => void;
   onTtsCostCents?: (cents: number) => void;
 }) {
+  const { t } = useUiLocale();
   const llmCents = turn.llm_cost_cents ?? null;
   const ttsCents = turn.tts_cost_cents ?? null;
   const [editing, setEditing] = useState(false);
@@ -169,11 +171,7 @@ export function ChatTurnBubble({
   };
 
   const actRewind = async (fn: () => Promise<void>) => {
-    if (
-      !confirm(
-        "Ab hier löschen? Diese Nachricht und alles danach werden entfernt.",
-      )
-    ) {
+    if (!confirm(t("chat.confirmRewind"))) {
       return;
     }
     setBusy(true);
@@ -185,7 +183,7 @@ export function ChatTurnBubble({
   };
 
   const actReroll = async (fn: () => Promise<void>) => {
-    if (!confirm("Neue Version dieser Erzählung generieren?")) {
+    if (!confirm(t("chat.regenerateConfirm"))) {
       return;
     }
     setBusy(true);
@@ -229,9 +227,25 @@ export function ChatTurnBubble({
       setCopiedRaw(true);
       setTimeout(() => setCopiedRaw(false), 1500);
     } catch {
-      alert("Copy failed. Use Edit and copy manually.");
+      alert(t("chat.copyFailed"));
     }
   };
+
+  const steeringLabel = (() => {
+    if (
+      displayContent.includes("⚡") &&
+      (displayContent.includes("„") || displayContent.includes('"'))
+    ) {
+      return t("chat.steeringBoth");
+    }
+    if (displayContent.trim().startsWith("⚡")) {
+      return t("chat.steeringAction");
+    }
+    if (displayContent.includes("„") || displayContent.includes('"')) {
+      return t("chat.steeringDialogue");
+    }
+    return t("chat.steering");
+  })();
 
   return (
     <div
@@ -254,37 +268,26 @@ export function ChatTurnBubble({
           <p className="mb-1 text-xs font-medium text-accent">
             {speakerDisplayName(turn.speaker_slug, cast)}
             {ttsPlaying ? (
-              <span className="ml-2 font-normal text-accent/80">· läuft</span>
+              <span className="ml-2 font-normal text-accent/80">
+                {t("chat.ttsPlaying")}
+              </span>
             ) : ttsQueued ? (
-              <span className="ml-2 font-normal text-zinc-500">· in Warteschlange</span>
+              <span className="ml-2 font-normal text-zinc-500">
+                {t("chat.ttsQueued")}
+              </span>
             ) : null}
           </p>
         ) : turn.role === "user" && steeringTurn ? (
           <p className="mb-1 text-xs font-medium text-violet-300/90">
-            {displayContent.includes("⚡") &&
-            (displayContent.includes("„") || displayContent.includes('"'))
-              ? contentLocale === "de"
-                ? "Steuerung · Handlung + Dialog"
-                : "Steering · action + dialogue"
-              : displayContent.trim().startsWith("⚡")
-                ? contentLocale === "de"
-                  ? "Steuerung · Handlung"
-                  : "Steering · action"
-                : displayContent.includes("„") || displayContent.includes('"')
-                  ? contentLocale === "de"
-                    ? "Steuerung · Dialog"
-                    : "Steering · dialogue"
-                  : contentLocale === "de"
-                    ? "Steuerung"
-                    : "Steering"}
+            {steeringLabel}
           </p>
         ) : turn.role === "assistant" ? (
           <p className="mb-1 text-xs font-medium text-zinc-500">
-            Narrator
+            {t("common.narrator")}
             {!ttsReadOnly && ttsPlaying ? (
-              <span className="ml-2 text-accent/80">· läuft</span>
+              <span className="ml-2 text-accent/80">{t("chat.ttsPlaying")}</span>
             ) : !ttsReadOnly && ttsQueued ? (
-              <span className="ml-2">· in Warteschlange</span>
+              <span className="ml-2">{t("chat.ttsQueued")}</span>
             ) : null}
           </p>
         ) : null}
@@ -305,6 +308,8 @@ export function ChatTurnBubble({
               cast,
               voiceMap,
               voiceEnabledSlugs,
+              dialogueTitle: (name) => t("chat.dialogueTitle", { name }),
+              speakerTitle: (name) => t("chat.speakerTitle", { name }),
             })}
           </div>
         ) : (
@@ -346,7 +351,11 @@ export function ChatTurnBubble({
         ) : null}
 
         {turn.role === "assistant" && !turn.id.startsWith("tmp-") ? (
-          <TurnCostFooter llmCents={llmCents} ttsCents={ttsCents} />
+          <TurnCostFooter
+            llmCents={llmCents}
+            ttsCents={ttsCents}
+            t={t}
+          />
         ) : null}
 
         {!readOnly && !turn.id.startsWith("tmp-") ? (
@@ -354,7 +363,7 @@ export function ChatTurnBubble({
             {editing ? (
               <>
                 <ActionBtn
-                  ariaLabel="Speichern"
+                  ariaLabel={t("common.save")}
                   disabled={busy}
                   onClick={saveEdit}
                   accent
@@ -362,7 +371,7 @@ export function ChatTurnBubble({
                   <IconCheck />
                 </ActionBtn>
                 <ActionBtn
-                  ariaLabel="Abbrechen"
+                  ariaLabel={t("common.cancel")}
                   disabled={busy}
                   onClick={() => {
                     setDraft(turn.content);
@@ -375,7 +384,7 @@ export function ChatTurnBubble({
             ) : (
               <>
                 <ActionBtn
-                  ariaLabel="Bearbeiten"
+                  ariaLabel={t("common.edit")}
                   disabled={busy}
                   onClick={() => {
                     setDraft(
@@ -389,7 +398,7 @@ export function ChatTurnBubble({
                   <IconPencil />
                 </ActionBtn>
                 <ActionBtn
-                  ariaLabel="Ab hier löschen"
+                  ariaLabel={t("chat.rewindAria")}
                   disabled={busy}
                   onClick={() => actRewind(() => onRewind(turn.id))}
                 >
@@ -397,7 +406,7 @@ export function ChatTurnBubble({
                 </ActionBtn>
                 {turn.role === "assistant" && onReroll ? (
                   <ActionBtn
-                    ariaLabel="Neu generieren"
+                    ariaLabel={t("chat.regenerate")}
                     disabled={busy}
                     onClick={() => actReroll(() => onReroll(turn.id))}
                   >
@@ -406,7 +415,7 @@ export function ChatTurnBubble({
                 ) : null}
                 {turn.role === "assistant" ? (
                   <ActionBtn
-                    ariaLabel={copiedRaw ? "Kopiert" : "Rohdaten kopieren"}
+                    ariaLabel={copiedRaw ? t("chat.copied") : t("chat.copyRaw")}
                     disabled={busy}
                     onClick={copyRaw}
                   >
@@ -436,9 +445,19 @@ function renderInlineMarkedContent(args: {
   cast: CharacterRow[];
   voiceMap: VoiceMap;
   voiceEnabledSlugs?: VoiceEnabledSlugs;
+  dialogueTitle: (name: string) => string;
+  speakerTitle: (name: string) => string;
 }) {
-  const { text, snippets, selectedBySnippet, cast, voiceMap, voiceEnabledSlugs } =
-    args;
+  const {
+    text,
+    snippets,
+    selectedBySnippet,
+    cast,
+    voiceMap,
+    voiceEnabledSlugs,
+    dialogueTitle,
+    speakerTitle,
+  } = args;
   const ranges = buildHighlightRanges(
     text,
     snippets,
@@ -467,7 +486,7 @@ function renderInlineMarkedContent(args: {
             backgroundColor: `${color}33`,
             borderBottom: `2px solid ${color}`,
           }}
-          title={`Dialog · ${displayNameForSpeakerSlug(range.slug, cast)}`}
+          title={dialogueTitle(displayNameForSpeakerSlug(range.slug, cast))}
         >
           {slice}
         </span>,
@@ -481,7 +500,7 @@ function renderInlineMarkedContent(args: {
             color,
             backgroundColor: `${color}28`,
           }}
-          title={`Sprecher · ${displayNameForSpeakerSlug(range.slug, cast)}`}
+          title={speakerTitle(displayNameForSpeakerSlug(range.slug, cast))}
         >
           {slice}
         </span>,
@@ -648,9 +667,11 @@ function escapeRegex(s: string): string {
 function TurnCostFooter({
   llmCents,
   ttsCents,
+  t,
 }: {
   llmCents: number | null;
   ttsCents: number | null;
+  t: (key: string, vars?: Record<string, string>) => string;
 }) {
   const chat = llmCents != null && llmCents > 0 ? llmCents : 0;
   const tts = ttsCents != null && ttsCents > 0 ? ttsCents : 0;
@@ -658,10 +679,12 @@ function TurnCostFooter({
   const total = chat + tts;
   return (
     <p className="mt-2 text-right text-[10px] leading-relaxed tabular-nums text-zinc-500">
-      {chat > 0 ? <span>Chat: {chat} ct</span> : null}
+      {chat > 0 ? <span>{t("chat.costChat", { cents: String(chat) })}</span> : null}
       {chat > 0 && tts > 0 ? <span> · </span> : null}
-      {tts > 0 ? <span>TTS: {tts} ct</span> : null}
-      {total > 0 ? <span> · Σ {total} ct</span> : null}
+      {tts > 0 ? <span>{t("chat.costTts", { cents: String(tts) })}</span> : null}
+      {total > 0 ? (
+        <span> · {t("chat.costTotal", { total: String(total) })}</span>
+      ) : null}
     </p>
   );
 }

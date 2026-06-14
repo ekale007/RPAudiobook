@@ -1,5 +1,6 @@
 "use client";
 
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import {
   loadTtsAutoplay,
   saveTtsAutoplay,
@@ -21,6 +22,8 @@ export function TtsAutoplayToggle({
   disabled?: boolean;
   queueActive?: boolean;
 }) {
+  const { t } = useUiLocale();
+
   const toggle = () => {
     if (isTtsReadOnly()) return;
     const next = !enabled;
@@ -46,12 +49,10 @@ export function TtsAutoplayToggle({
           : "border-surface-border text-zinc-400 hover:text-zinc-200"
       }`}
       title={
-        enabled
-          ? "Neue Erzähler-Nachrichten werden automatisch vorgelesen"
-          : "TTS-Autoplay aus — nur manuell ▶"
+        enabled ? t("tts.autoplayTitleOn") : t("tts.autoplayTitleOff")
       }
     >
-      TTS-Autoplay {enabled ? "An" : "Aus"}
+      {enabled ? t("tts.autoplayOn") : t("tts.autoplayOff")}
       {queueActive ? " · …" : ""}
     </button>
   );

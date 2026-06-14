@@ -7,6 +7,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { LegalFooter } from "@/components/legal/LegalFooter";
 import { createClient } from "@/lib/supabase/client";
 import { formatAuthError } from "@/lib/auth/errors";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import {
   getPasswordResetRedirectUrl,
   isLocalhostOrigin,
@@ -22,6 +23,7 @@ import {
 type LoginView = "sign-in" | "forgot-password";
 
 function LoginForm() {
+  const { t, locale } = useUiLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [view, setView] = useState<LoginView>("sign-in");
@@ -40,9 +42,9 @@ function LoginForm() {
     const err = searchParams.get("error");
     if (err) setError(decodeURIComponent(err));
     if (searchParams.get("reset") === "sent") {
-      setInfo("If that email exists, we sent a password reset link.");
+      setInfo(t("login.resetParamSent"));
     }
-  }, [searchParams]);
+  }, [searchParams, t]);
 
   const signInPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +61,7 @@ function LoginForm() {
       router.push("/");
       router.refresh();
     } catch (err) {
-      setError(formatAuthError(err));
+      setError(formatAuthError(err, locale));
     } finally {
       setBusy(false);
     }
@@ -69,7 +71,7 @@ function LoginForm() {
     setError(null);
     setInfo(null);
     if (password.length < 8) {
-      setError("Passwort muss mindestens 8 Zeichen haben.");
+      setError(t("login.passwordMin"));
       return;
     }
     setBusy(true);
@@ -85,11 +87,9 @@ function LoginForm() {
         router.refresh();
         return;
       }
-      setInfo(
-        "Account erstellt. Wenn du nicht automatisch angemeldet wirst: In Supabase unter Auth → Providers → Email „Confirm email“ deaktivieren oder die Bestätigungs-Mail öffnen.",
-      );
+      setInfo(t("login.accountCreated"));
     } catch (err) {
-      setError(formatAuthError(err));
+      setError(formatAuthError(err, locale));
     } finally {
       setBusy(false);
     }
@@ -105,9 +105,7 @@ function LoginForm() {
     const origin = getAuthRedirectOrigin();
 
     if (isLocalhostOrigin(origin)) {
-      setError(
-        "Redirect is localhost — on your phone set App URL to http://<PC-IP>:3000 below, then try again.",
-      );
+      setError(t("login.redirectLocalhost"));
       return;
     }
 
@@ -120,11 +118,9 @@ function LoginForm() {
       );
       if (err) throw err;
       setResetSent(true);
-      setInfo(
-        "If an account exists for this email, you will receive a reset link shortly.",
-      );
+      setInfo(t("login.resetSent"));
     } catch (err) {
-      setError(formatAuthError(err));
+      setError(formatAuthError(err, locale));
     } finally {
       setBusy(false);
     }
@@ -141,7 +137,7 @@ function LoginForm() {
       router.refresh();
     } catch (err) {
       setError(
-        `${formatAuthError(err)} Enable Anonymous sign-ins in Supabase → Authentication → Providers.`,
+        `${formatAuthError(err, locale)} ${t("authErrors.anonymousHint")}`,
       );
     } finally {
       setBusy(false);
@@ -154,17 +150,12 @@ function LoginForm() {
         <form onSubmit={signInPassword} className="flex flex-col gap-3">
           {inviteOnly ? (
             <p className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-xs leading-relaxed text-violet-200">
-              Beta — Zugang nur mit Einladung. Hast du eine E-Mail von uns
-              bekommen, nutze den Link darin oder melde dich mit deinem
-              Passwort an.
+              {t("login.betaPitch")}
             </p>
           ) : (
-            <p className="text-xs text-zinc-500">
-              Mit E-Mail und Passwort anmelden oder registrieren — am Handy und
-              am PC.
-            </p>
+            <p className="text-xs text-zinc-500">{t("login.signInPitch")}</p>
           )}
-          <label className="text-sm text-zinc-400">E-Mail</label>
+          <label className="text-sm text-zinc-400">{t("login.email")}</label>
           <input
             type="email"
             required
@@ -173,7 +164,7 @@ function LoginForm() {
             className="rounded-xl border border-surface-border bg-surface-raised px-3 py-2 text-base"
             autoComplete="email"
           />
-          <label className="text-sm text-zinc-400">Passwort</label>
+          <label className="text-sm text-zinc-400">{t("login.password")}</label>
           <input
             type="password"
             required
@@ -192,14 +183,14 @@ function LoginForm() {
             }}
             className="self-start text-xs text-accent underline"
           >
-            Passwort vergessen?
+            {t("login.forgot")}
           </button>
           <button
             type="submit"
             disabled={busy}
             className="rounded-xl bg-accent py-3 text-base font-medium text-black disabled:opacity-50"
           >
-            Anmelden
+            {t("login.signIn")}
           </button>
           {!inviteOnly ? (
             <button
@@ -208,16 +199,13 @@ function LoginForm() {
               onClick={signUpPassword}
               className="rounded-xl border border-surface-border py-3 text-sm text-zinc-300 disabled:opacity-50"
             >
-              Account erstellen
+              {t("login.createAccount")}
             </button>
           ) : null}
         </form>
       ) : (
         <form onSubmit={sendPasswordReset} className="flex flex-col gap-3">
-          <p className="text-xs text-zinc-500">
-            We will email you a link to set a new password. Open the link on the
-            same device you use for this app.
-          </p>
+          <p className="text-xs text-zinc-500">{t("login.resetPitch")}</p>
           <button
             type="button"
             onClick={() => {
@@ -227,11 +215,9 @@ function LoginForm() {
             }}
             className="self-start text-xs text-zinc-500 underline"
           >
-            Back to sign in
+            {t("login.backToSignIn")}
           </button>
-          <label className="text-sm text-zinc-400">
-            App URL (phone: your PC IP)
-          </label>
+          <label className="text-sm text-zinc-400">{t("login.appUrlLabel")}</label>
           <input
             value={originOverride}
             onChange={(e) => setOriginOverride(e.target.value)}
@@ -239,14 +225,14 @@ function LoginForm() {
             placeholder="http://192.168.1.42:3000"
           />
           <p className="text-xs text-zinc-600">
-            Reset redirect:{" "}
+            {t("login.resetRedirect")}{" "}
             <span className="break-all font-mono text-zinc-500">
               {typeof window !== "undefined"
                 ? getPasswordResetRedirectUrl()
                 : "…"}
             </span>
           </p>
-          <label className="text-sm text-zinc-400">Email</label>
+          <label className="text-sm text-zinc-400">{t("login.email")}</label>
           <input
             type="email"
             required
@@ -262,7 +248,7 @@ function LoginForm() {
               disabled={busy}
               className="rounded-xl bg-accent py-3 text-base font-medium text-black disabled:opacity-50"
             >
-              Send reset link
+              {t("login.sendResetLink")}
             </button>
           ) : null}
         </form>
@@ -276,10 +262,10 @@ function LoginForm() {
             onClick={signInAnonymous}
             className="w-full rounded-xl border border-dashed border-zinc-600 py-2 text-xs text-zinc-500"
           >
-            Dev: continue without email (anonymous)
+            {t("login.devAnonymous")}
           </button>
           <p className="mt-2 text-center text-xs text-zinc-600">
-            Enable in Supabase → Authentication → Providers → Anonymous
+            {t("login.devAnonymousHint")}
           </p>
         </div>
       ) : null}
@@ -290,16 +276,24 @@ function LoginForm() {
   );
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
+  const { t } = useUiLocale();
+
   return (
     <main className="flex min-h-dvh flex-col">
-      <AppHeader title="Anmelden" backHref="/" />
+      <AppHeader title={t("login.title")} backHref="/" />
       <Suspense
-        fallback={<p className="p-6 text-center text-zinc-500">Loading…</p>}
+        fallback={
+          <p className="p-6 text-center text-zinc-500">{t("login.loading")}</p>
+        }
       >
         <LoginForm />
       </Suspense>
       <LegalFooter className="mt-auto" />
     </main>
   );
+}
+
+export default function LoginPage() {
+  return <LoginPageContent />;
 }

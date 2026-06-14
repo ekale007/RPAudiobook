@@ -18,6 +18,7 @@ import {
 } from "@/lib/tts/protagonistVoiceUi";
 import { loadTtsSettings } from "@/lib/storage/ttsSettings";
 import { PROTAGONIST_SPEAKER_SLUG } from "@/lib/story/protagonist";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import type { StoryProtagonistProfile } from "@/lib/types";
 
 export function LibraryImportProtagonistModal({
@@ -33,6 +34,7 @@ export function LibraryImportProtagonistModal({
   onClose: () => void;
   onConfirm: (setup: StoryProtagonistImportSetup) => void;
 }) {
+  const { t } = useUiLocale();
   const template = getLibraryTemplate(templateId);
   const storyLocale = normalizeStoryContentLocale(template?.locale);
   const baseMap = template
@@ -95,14 +97,16 @@ export function LibraryImportProtagonistModal({
       open={open}
       onClose={busy ? () => undefined : onClose}
       blocking
-      title={storyLocale === "de" ? "Protagonist für Import" : "Protagonist for import"}
+      title={t("import.protagonistTitle")}
       wide
     >
       <p className="mb-1 text-sm font-medium text-zinc-200">{template.title}</p>
-      <p className="mb-4 text-sm text-zinc-400">
+      <p className="mb-1 text-xs text-zinc-500">
         {storyLocale === "de"
-          ? "Name, Anrede und Stimme für deine Dialogzeilen — einmal festlegen, dann startet die Story."
-          : "Name, pronouns, and voice for your lines — set once, then the story begins."}
+          ? t("library.storyLocaleDe")
+          : t("library.storyLocaleEn")}
+      </p>
+      <p className="mb-4 text-sm text-zinc-400">{t("import.protagonistHint")}
       </p>
 
       <ProtagonistSetupFields
@@ -126,7 +130,7 @@ export function LibraryImportProtagonistModal({
           onClick={onClose}
           className="flex-1 rounded-xl border border-surface-border py-2.5 text-sm text-zinc-300 disabled:opacity-50"
         >
-          {storyLocale === "de" ? "Abbrechen" : "Cancel"}
+          {t("import.cancel")}
         </button>
         <button
           type="button"
@@ -134,13 +138,7 @@ export function LibraryImportProtagonistModal({
           onClick={() => onConfirm(buildSetup())}
           className="flex-1 rounded-xl bg-accent py-2.5 text-sm font-medium text-zinc-950 disabled:opacity-50"
         >
-          {busy
-            ? storyLocale === "de"
-              ? "Importiere…"
-              : "Importing…"
-            : storyLocale === "de"
-              ? "Story importieren"
-              : "Import story"}
+          {busy ? t("library.importing") : t("import.confirm")}
         </button>
       </div>
     </OverlayPanel>

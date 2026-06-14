@@ -1,4 +1,10 @@
-export function formatAuthError(err: unknown): string {
+import { translate } from "@/lib/i18n/messages";
+import { DEFAULT_UI_LOCALE, type UILocale } from "@/lib/i18n/types";
+
+export function formatAuthError(
+  err: unknown,
+  locale: UILocale = DEFAULT_UI_LOCALE,
+): string {
   const msg =
     err instanceof Error
       ? err.message
@@ -7,20 +13,15 @@ export function formatAuthError(err: unknown): string {
         : String(err);
 
   if (/rate limit/i.test(msg)) {
-    return (
-      "Supabase email limit reached for this project (only a few auth emails per hour " +
-      "on the free plan). Wait about an hour or configure custom SMTP in Supabase."
-    );
+    return translate(locale, "authErrors.rateLimit");
   }
 
   if (/invalid login credentials/i.test(msg)) {
-    return "Wrong email or password. Use Sign up if you have no account yet.";
+    return translate(locale, "authErrors.invalidCredentials");
   }
 
   if (/email not confirmed/i.test(msg)) {
-    return (
-      "Email not confirmed. In Supabase disable “Confirm email” for dev, or confirm via mail."
-    );
+    return translate(locale, "authErrors.emailNotConfirmed");
   }
 
   return msg;

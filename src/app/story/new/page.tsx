@@ -39,6 +39,7 @@ import {
   loadTemplateDraft,
   type StoryTemplateId,
 } from "@/lib/story/storyTemplates";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 
 type StepKey =
   | "meta"
@@ -51,6 +52,7 @@ type StepKey =
   | "remix";
 
 export default function NewStoryEditorPage() {
+  const { t } = useUiLocale();
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [concept, setConcept] = useState("");
@@ -94,7 +96,7 @@ export default function NewStoryEditorPage() {
   const requireSettings = (): ReturnType<typeof loadOpenRouterSettings> => {
     const settings = loadOpenRouterSettings();
     if (!settings) {
-      setError("OpenRouter API-Key fehlt — bitte unter Einstellungen hinterlegen.");
+      setError(t("storyNew.openRouterMissing"));
       return null;
     }
     return settings;
@@ -102,7 +104,7 @@ export default function NewStoryEditorPage() {
 
   const requireConcept = (): boolean => {
     if (!concept.trim()) {
-      setError("Bitte zuerst eine Kurzbeschreibung / Idee eingeben.");
+      setError(t("storyNew.conceptRequired"));
       return false;
     }
     return true;
@@ -163,7 +165,7 @@ export default function NewStoryEditorPage() {
         const result = await generateStoryDraft(settings, input);
         setDraft(result);
         syncRawFromDraft(result);
-        setMessage("Komplett-Entwurf erstellt — Felder einzeln mit 🎲 verfeinern.");
+        setMessage(t("storyNew.fullDraftDone"));
         return;
       }
 
@@ -175,19 +177,19 @@ export default function NewStoryEditorPage() {
         const merged = mergeDraftMeta(base, meta);
         setDraft(merged);
         syncRawFromDraft(merged);
-        setMessage("Meta-Titel generiert.");
+        setMessage(t("storyNew.metaDone"));
       } else if (step === "lore") {
         const worldLorebook = await generateWorldLorebookOnly(settings, ctx);
         const merged = { ...base, worldLorebook };
         setDraft(merged);
         syncRawFromDraft(merged);
-        setMessage("Lorebook generiert — pro Eintrag 🎲 nutzen.");
+        setMessage(t("storyNew.loreDone"));
       } else if (step === "characters") {
         const characters = await generateCharactersOnly(settings, ctx);
         const merged = { ...base, characters };
         setDraft(merged);
         syncRawFromDraft(merged);
-        setMessage("Figuren generiert — Karten pro Feld mit 🎲 anpassen.");
+        setMessage(t("storyNew.charactersDone"));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -214,7 +216,7 @@ export default function NewStoryEditorPage() {
     setTone(payload.tone);
     syncRawFromDraft(payload.draft);
     setRemixAspects({ ...DEFAULT_REMIX_ASPECTS });
-    setMessage(`Vorlage „${payload.templateLabel}“ geladen — Anpassungen wählen.`);
+    setMessage(t("storyNew.templateLoaded", { label: payload.templateLabel }));
     setError(null);
   };
 
@@ -228,25 +230,23 @@ export default function NewStoryEditorPage() {
     setTemplateBase(base);
     setTemplateLabel(template.label);
     syncRawFromDraft(d);
-    setMessage("Vorlage zurückgesetzt.");
+    setMessage(t("storyNew.templateReset"));
   };
 
   const handleRemixSelected = async () => {
     if (!templateBase || !draft) {
-      setError("Zuerst eine Vorlage wählen.");
+      setError(t("storyNew.templateRequired"));
       return;
     }
     const aspects = (Object.keys(remixAspects) as TemplateRemixAspect[]).filter(
       (k) => remixAspects[k],
     );
     if (!aspects.length) {
-      setError("Mindestens einen Bereich zum Anpassen auswählen.");
+      setError(t("storyNew.remixRequired"));
       return;
     }
     if (!concept.trim()) {
-      setError(
-        "Bitte Konzept anpassen (was soll anders sein als die Vorlage?).",
-      );
+      setError(t("storyNew.conceptRemixRequired"));
       return;
     }
     const settings = requireSettings();
@@ -264,7 +264,9 @@ export default function NewStoryEditorPage() {
       if (newTone) setTone(newTone);
       syncRawFromDraft(next);
       setMessage(
-        `Angepasst: ${aspects.map((a) => TEMPLATE_REMIX_LABELS[a]).join(", ")}`,
+        t("storyNew.remixDone", {
+          aspects: aspects.map((a) => TEMPLATE_REMIX_LABELS[a]).join(", "),
+        }),
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -278,7 +280,7 @@ export default function NewStoryEditorPage() {
       const parsed = parseStoryDraftJson(rawJson, locale);
       setDraft(parsed);
       setError(null);
-      setMessage("JSON übernommen.");
+      setMessage(t("storyNew.jsonApplied"));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -287,16 +289,16 @@ export default function NewStoryEditorPage() {
   const handleCreate = async () => {
     if (!userId || !draft) return;
     if (!draft.storyTitle.trim()) {
-      setError("Story-Titel fehlt.");
+      setError(t("storyNew.titleMissing"));
       return;
     }
     const narrators = draft.characters.filter((c) => c.role === "narrator");
     if (narrators.length !== 1) {
-      setError("Genau ein Narrator ist nötig (Schritt „Figuren“ oder Komplett-Entwurf).");
+      setError(t("storyNew.narratorRequired"));
       return;
     }
     if (!draft.worldLorebook.entries.length) {
-      setError("Mindestens ein Lore-Eintrag nötig.");
+      setError(t("storyNew.loreRequired"));
       return;
     }
 
@@ -331,16 +333,14 @@ export default function NewStoryEditorPage() {
 
   return (
     <main className="flex min-h-dvh flex-col">
-      <AppHeader title="Story-Editor" backHref="/" />
+      <AppHeader title={t("storyNew.title")} backHref="/" />
       <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-4 pb-10">
-        <p className="text-sm text-zinc-400">
-          Schrittweise per KI bauen oder alles auf einmal — jedes Feld hat einen
-          🎲-Randomizer. Die fertige Story wird nur auf diesem Gerät gespeichert
-          (nicht in der Cloud).
-        </p>
+        <p className="text-sm text-zinc-400">{t("storyNew.intro")}</p>
 
         <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
-          <h2 className="mb-3 text-sm font-medium text-accent">1. Idee</h2>
+          <h2 className="mb-3 text-sm font-medium text-accent">
+            {t("storyNew.stepIdea")}
+          </h2>
 
           <StoryTemplateSection
             templateId={templateId}
@@ -363,26 +363,26 @@ export default function NewStoryEditorPage() {
 
           <div className="mb-3 flex flex-col gap-3">
             <AiField
-              label="Konzept"
+              label={t("storyNew.concept")}
               value={concept}
               onChange={setConcept}
               multiline
               rows={5}
-              placeholder="Setting, Protagonist, Konflikt, Stimmung …"
+              placeholder={t("storyNew.conceptPlaceholder")}
               busy={busyStep === "concept"}
               onRandomize={() => randomizeConcept("concept")}
             />
             <div className="grid grid-cols-2 gap-3">
               <AiField
-                label="Genre"
+                label={t("storyNew.genre")}
                 value={genre}
                 onChange={setGenre}
-                placeholder="Sci-Fi, Romance …"
+                placeholder={t("storyNew.genrePlaceholder")}
                 busy={busyStep === "genre"}
                 onRandomize={() => randomizeConcept("genre")}
               />
               <label className="block text-xs text-zinc-400">
-                Sprache
+                {t("storyNew.language")}
                 <select
                   value={locale}
                   onChange={(e) =>
@@ -390,22 +390,22 @@ export default function NewStoryEditorPage() {
                   }
                   className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-2 text-sm"
                 >
-                  <option value="de">Deutsch</option>
-                  <option value="en">English</option>
+                  <option value="de">{t("lang.de")}</option>
+                  <option value="en">{t("lang.en")}</option>
                 </select>
               </label>
             </div>
             <AiField
-              label="Ton"
+              label={t("storyNew.tone")}
               value={tone}
               onChange={setTone}
-              placeholder="düster, humorvoll …"
+              placeholder={t("storyNew.tonePlaceholder")}
               busy={busyStep === "tone"}
               onRandomize={() => randomizeConcept("tone")}
             />
           </div>
 
-          <p className="mb-2 text-xs text-zinc-500">KI-Schritte (einzeln)</p>
+          <p className="mb-2 text-xs text-zinc-500">{t("storyNew.aiSteps")}</p>
           <div className="mb-2 grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -413,7 +413,7 @@ export default function NewStoryEditorPage() {
               onClick={() => runStep("meta")}
               className="rounded-lg border border-zinc-700 py-2 text-xs text-zinc-200 disabled:opacity-50"
             >
-              {busyStep === "meta" ? "…" : "① Meta-Titel"}
+              {busyStep === "meta" ? "…" : t("storyNew.stepMeta")}
             </button>
             <button
               type="button"
@@ -421,7 +421,7 @@ export default function NewStoryEditorPage() {
               onClick={() => runStep("lore")}
               className="rounded-lg border border-zinc-700 py-2 text-xs text-zinc-200 disabled:opacity-50"
             >
-              {busyStep === "lore" ? "…" : "② Lorebook"}
+              {busyStep === "lore" ? "…" : t("storyNew.stepLore")}
             </button>
             <button
               type="button"
@@ -429,7 +429,7 @@ export default function NewStoryEditorPage() {
               onClick={() => runStep("characters")}
               className="rounded-lg border border-zinc-700 py-2 text-xs text-zinc-200 disabled:opacity-50"
             >
-              {busyStep === "characters" ? "…" : "③ Figuren"}
+              {busyStep === "characters" ? "…" : t("storyNew.stepCharacters")}
             </button>
             <button
               type="button"
@@ -437,7 +437,7 @@ export default function NewStoryEditorPage() {
               onClick={() => runStep("full")}
               className="rounded-lg bg-accent py-2 text-xs font-medium text-black disabled:opacity-50"
             >
-              {busyStep === "full" ? "…" : "Alles entwerfen"}
+              {busyStep === "full" ? "…" : t("storyNew.stepFull")}
             </button>
           </div>
           <button
@@ -445,28 +445,31 @@ export default function NewStoryEditorPage() {
             disabled={stepBusy}
             onClick={() => {
               setDraft(emptyStoryDraft(locale));
-              setMessage("Leerer Entwurf — Felder manuell oder mit 🎲 füllen.");
+              setMessage(t("storyNew.emptyDraftStarted"));
             }}
             className="w-full rounded-lg border border-dashed border-zinc-700 py-2 text-xs text-zinc-500"
           >
-            Leeren Entwurf starten (ohne KI)
+            {t("storyNew.emptyDraft")}
           </button>
           <Link
             href="/settings"
             className="mt-2 block text-center text-xs text-zinc-500 underline"
           >
-            OpenRouter-Einstellungen
+            {t("storyNew.openRouterSettings")}
           </Link>
         </section>
 
         {draft ? (
           <section className="rounded-xl border border-accent/30 bg-accent/5 p-4">
             <h2 className="mb-1 text-sm font-medium text-accent">
-              2. Entwurf bearbeiten
+              {t("storyNew.stepDraft")}
             </h2>
             <p className="mb-4 text-xs text-zinc-400">
-              {draft.characters.length} Figuren ({castCount} Cast) ·{" "}
-              {draft.worldLorebook.entries.length} Lore-Einträge · 🎲 pro Feld
+              {t("storyNew.draftStats", {
+                characters: String(draft.characters.length),
+                cast: String(castCount),
+                lore: String(draft.worldLorebook.entries.length),
+              })}
             </p>
 
             <StoryDraftEditor
@@ -487,7 +490,7 @@ export default function NewStoryEditorPage() {
               }}
               className="mt-4 text-xs text-accent underline"
             >
-              {showRaw ? "JSON ausblenden" : "JSON (fortgeschritten)"}
+              {showRaw ? t("storyNew.hideJson") : t("storyNew.showJson")}
             </button>
             {showRaw ? (
               <div className="mt-2">
@@ -502,7 +505,7 @@ export default function NewStoryEditorPage() {
                   onClick={applyRawJson}
                   className="mt-2 rounded-lg border border-zinc-600 px-3 py-1 text-xs text-zinc-300"
                 >
-                  JSON übernehmen
+                  {t("storyNew.applyJson")}
                 </button>
               </div>
             ) : null}
@@ -513,21 +516,19 @@ export default function NewStoryEditorPage() {
               onClick={handleCreate}
               className="mt-4 w-full rounded-xl border border-accent/50 bg-accent/20 py-3 text-sm font-medium text-accent disabled:opacity-50"
             >
-              {creating ? "Speichern …" : "Story erstellen & öffnen"}
+              {creating ? t("storyNew.creating") : t("storyNew.create")}
             </button>
           </section>
         ) : null}
 
         <section className="rounded-xl border border-surface-border p-4 text-center">
-          <p className="mb-2 text-xs text-zinc-500">
-            Oder EPUB / Bibliothek
-          </p>
+          <p className="mb-2 text-xs text-zinc-500">{t("storyNew.orEpub")}</p>
           <div className="flex flex-col gap-2">
             <Link href="/story/import" className="text-sm text-accent underline">
-              Aus EPUB importieren →
+              {t("storyNew.importEpub")}
             </Link>
             <Link href="/" className="text-sm text-zinc-500 underline">
-              Zur Startseite → Bibliothek
+              {t("storyNew.backHome")}
             </Link>
           </div>
         </section>

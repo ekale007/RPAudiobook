@@ -4,6 +4,8 @@ import {
 } from "@/lib/story/libraryTemplates";
 import type { StoryCharacterCard } from "@/lib/types";
 
+import type { UILocale } from "@/lib/i18n/types";
+
 export type StoryOrigin = "personal" | "library" | "editor" | "epub";
 
 export function getStoryOrigin(settings: unknown): StoryOrigin {
@@ -23,19 +25,23 @@ export function getLibraryTemplateId(settings: unknown): string | null {
   return typeof o.libraryTemplateId === "string" ? o.libraryTemplateId : null;
 }
 
-export function storyOriginLabel(origin: StoryOrigin): string {
-  switch (origin) {
-    case "library":
-      return "Bibliothek";
-    case "editor":
-      return "Editor";
-    case "epub":
-      return "EPUB · lokal";
-    case "editor":
-      return "Editor · lokal";
-    default:
-      return "Eigene";
-  }
+export function storyOriginLabel(
+  origin: StoryOrigin,
+  uiLocale: UILocale = "de",
+): string {
+  const de: Record<StoryOrigin, string> = {
+    library: "Bibliothek",
+    editor: "Editor",
+    epub: "EPUB",
+    personal: "Eigene",
+  };
+  const en: Record<StoryOrigin, string> = {
+    library: "Library",
+    editor: "Editor",
+    epub: "EPUB",
+    personal: "Personal",
+  };
+  return (uiLocale === "en" ? en : de)[origin];
 }
 
 /** Story pitch / concept for hub summary (stored or inferred). */

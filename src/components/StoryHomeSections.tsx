@@ -4,6 +4,11 @@ import Link from "next/link";
 import { LibraryTurntable } from "@/components/LibraryTurntable";
 import type { LibraryTemplateId } from "@/lib/story/libraryTemplates";
 import { StoryCover } from "@/components/StoryCover";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
+import {
+  getStoryOrigin,
+  storyOriginLabel,
+} from "@/lib/story/storyOrigin";
 
 export function StoryLibraryShelf({
   importingId,
@@ -18,7 +23,7 @@ export function StoryLibraryShelf({
 export function StoryListCard({
   story,
   libraryTemplateId,
-  originLabel,
+  storySettings,
   busy,
   renaming,
   renameDraft,
@@ -32,7 +37,7 @@ export function StoryListCard({
 }: {
   story: { id: string; title: string; cover_storage_path?: string | null };
   libraryTemplateId: string | null;
-  originLabel: string;
+  storySettings: unknown;
   busy: boolean;
   renaming: boolean;
   renameDraft: string;
@@ -44,6 +49,9 @@ export function StoryListCard({
   onDelete: () => void;
   isArchived: boolean;
 }) {
+  const { locale, t } = useUiLocale();
+  const originLabel = storyOriginLabel(getStoryOrigin(storySettings), locale);
+
   return (
     <div className="overflow-hidden rounded-lg border border-surface-border bg-surface-raised">
       <div className="flex gap-2 p-2">
@@ -71,14 +79,14 @@ export function StoryListCard({
                   onClick={onSaveRename}
                   className="rounded-md bg-accent px-2 py-0.5 text-xs font-medium text-black disabled:opacity-50"
                 >
-                  Speichern
+                  {t("story.save")}
                 </button>
                 <button
                   type="button"
                   onClick={onCancelRename}
                   className="rounded-md border border-zinc-700 px-2 py-0.5 text-xs text-zinc-400"
                 >
-                  Abbrechen
+                  {t("story.cancel")}
                 </button>
               </div>
             </div>
@@ -101,7 +109,7 @@ export function StoryListCard({
             className="rounded-md border border-zinc-700/80 px-1.5 py-0.5 text-[10px] text-zinc-400"
             onClick={onStartRename}
           >
-            Umbenennen
+            {t("story.rename")}
           </button>
           <button
             type="button"
@@ -109,7 +117,7 @@ export function StoryListCard({
             className="rounded-md border border-zinc-700/80 px-1.5 py-0.5 text-[10px] text-zinc-400 disabled:opacity-50"
             onClick={onArchive}
           >
-            {isArchived ? "Restore" : "Archive"}
+            {isArchived ? t("story.restore") : t("story.archive")}
           </button>
           <button
             type="button"
@@ -117,7 +125,7 @@ export function StoryListCard({
             className="rounded-md border border-red-900/50 px-1.5 py-0.5 text-[10px] text-red-400/90 disabled:opacity-50"
             onClick={onDelete}
           >
-            Delete
+            {t("story.delete")}
           </button>
         </div>
       )}

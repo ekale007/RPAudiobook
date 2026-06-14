@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  PUBLIC_LIBRARY_TEMPLATES,
+  filterPublicLibraryTemplates,
+  type LibraryLocaleFilter,
   type LibraryTemplateId,
+  type LibraryTemplateDefinition,
 } from "@/lib/story/libraryTemplates";
 import { StoryCover } from "@/components/StoryCover";
-
-type LibraryTemplate = (typeof PUBLIC_LIBRARY_TEMPLATES)[number];
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 
 function mod(n: number, m: number): number {
   return ((n % m) + m) % m;
@@ -17,11 +18,15 @@ function LibraryBookPanel({
   template,
   importing,
   onImport,
+  localeLabel,
 }: {
-  template: LibraryTemplate;
+  template: LibraryTemplateDefinition;
   importing: boolean;
   onImport: () => void;
+  localeLabel: string;
 }) {
+  const { t } = useUiLocale();
+
   return (
     <div className="flex overflow-hidden rounded-lg border border-surface-border bg-surface-raised/95 shadow-xl shadow-black/50 backdrop-blur-sm">
       <StoryCover
@@ -32,9 +37,14 @@ function LibraryBookPanel({
         className="rounded-none border-0"
       />
       <div className="flex min-w-0 flex-1 flex-col p-3">
-        <h3 className="text-sm font-semibold leading-snug text-zinc-100">
-          {template.title}
-        </h3>
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-sm font-semibold leading-snug text-zinc-100">
+            {template.title}
+          </h3>
+          <span className="shrink-0 rounded border border-zinc-700/80 px-1.5 py-0.5 text-[10px] font-medium uppercase text-zinc-400">
+            {localeLabel}
+          </span>
+        </div>
         <p className="mt-0.5 text-xs leading-snug text-zinc-500">
           {template.tagline}
         </p>
@@ -47,7 +57,7 @@ function LibraryBookPanel({
           onClick={onImport}
           className="mt-2 w-full touch-manipulation rounded-md border border-accent/40 bg-accent/15 py-2 text-xs font-medium text-accent disabled:opacity-50"
         >
-          {importing ? "Importiert …" : "Importieren"}
+          {importing ? t("library.importing") : t("library.import")}
         </button>
       </div>
     </div>
@@ -59,7 +69,7 @@ function TurntableSpine({
   active,
   onSelect,
 }: {
-  template: LibraryTemplate;
+  template: LibraryTemplateDefinition;
   active: boolean;
   onSelect: () => void;
 }) {
@@ -70,7 +80,7 @@ function TurntableSpine({
       type="button"
       onClick={onSelect}
       aria-current={active ? "true" : undefined}
-      aria-label={`${template.title}${active ? " — ausgewählt" : ""}`}
+      aria-label={`${template.title}${active ? " — selected" : ""}`}
       className={`library-book-spine relative flex h-[9.5rem] w-[2.875rem] touch-manipulation flex-col items-center justify-center overflow-hidden rounded-sm border border-black/40 px-0.5 py-3 shadow-md sm:h-[10.5rem] sm:w-[3.125rem] ${
         active
           ? "z-10 scale-110 ring-2 ring-accent/70 brightness-110"
@@ -105,22 +115,35 @@ export function LibraryTurntable({
   importingId: LibraryTemplateId | null;
   onImport: (id: LibraryTemplateId) => void;
 }) {
-  const count = PUBLIC_LIBRARY_TEMPLATES.length;
-  const angleStep = 360 / count;
+  const { locale: uiLocale, t } = useUiLocale();
+  const [localeFilter, setLocaleFilter] = useState<LibraryLocaleFilter>(uiLocale);
+  const templates = filterPublicLibraryTemplates(localeFilter);
+  const count = templates.length;
+  const angleStep = count > 0 ? 360 / count : 360;
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [dragging, setDragging] = useState(false);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const didDragRef = useRef(false);
 
-  const activeTemplate = PUBLIC_LIBRARY_TEMPLATES[activeIndex];
+  useEffect(() => {
+    setLocaleFilter(uiLocale);
+  }, [uiLocale]);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [localeFilter]);
+
+  const activeTemplate = templates[activeIndex] ?? templates[0];
   const rotation = -activeIndex * angleStep;
 
   const goNext = useCallback(() => {
+    if (count < 2) return;
     setActiveIndex((i) => mod(i + 1, count));
   }, [count]);
 
   const goPrev = useCallback(() => {
+    if (count < 2) return;
     setActiveIndex((i) => mod(i - 1, count));
   }, [count]);
 
@@ -163,13 +186,49 @@ export function LibraryTurntable({
     setDragging(false);
   };
 
+  const filterBtn = (id: LibraryLocaleFilter, label: string) => (
+    <button
+      key={id}
+      type="button"
+      onClick={() => setLocaleFilter(id)}
+      aria-pressed={localeFilter === id}
+      className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${
+        localeFilter === id
+          ? "bg-accent/20 text-accent"
+          : "border border-zinc-700/80 text-zinc-500"
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  if (!activeTemplate) {
+    return (
+      <section className="mt-6 px-1 text-xs text-zinc-500">
+        {t("library.title")} — no templates for this filter.
+      </section>
+    );
+  }
+
+  const localeLabel =
+    activeTemplate.locale === "de"
+      ? t("library.filterDe")
+      : t("library.filterEn");
+
   return (
     <section className="mt-6 flex flex-col gap-3">
       <div className="px-1">
-        <h2 className="text-sm font-medium text-zinc-200">Bibliothek</h2>
-        <p className="mt-0.5 text-xs text-zinc-500">
-          Wische oder nutze die Pfeile — das Buch vorne ist aktiv.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-medium text-zinc-200">
+            {t("library.title")}
+          </h2>
+          <div className="flex gap-1">
+            {filterBtn("all", t("library.filterAll"))}
+            {filterBtn("de", t("library.filterDe"))}
+            {filterBtn("en", t("library.filterEn"))}
+          </div>
+        </div>
+        <p className="mt-0.5 text-xs text-zinc-500">{t("library.hint")}</p>
       </div>
 
       <div className="library-turntable mx-auto w-full max-w-md px-2">
@@ -177,8 +236,9 @@ export function LibraryTurntable({
           <button
             type="button"
             onClick={goPrev}
-            aria-label="Vorheriges Buch"
-            className="library-turntable-nav z-20 shrink-0 touch-manipulation rounded-full border border-zinc-700/80 bg-surface-raised/90 p-2 text-zinc-300 hover:border-accent/40 hover:text-accent"
+            disabled={count < 2}
+            aria-label={t("library.prevBook")}
+            className="library-turntable-nav z-20 shrink-0 touch-manipulation rounded-full border border-zinc-700/80 bg-surface-raised/90 p-2 text-zinc-300 hover:border-accent/40 hover:text-accent disabled:opacity-40"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path
@@ -198,8 +258,8 @@ export function LibraryTurntable({
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerCancel}
             role="region"
-            aria-roledescription="Karussell"
-            aria-label={`Bibliothek, Buch ${activeIndex + 1} von ${count}`}
+            aria-roledescription="carousel"
+            aria-label={`${t("library.carousel")}, ${activeIndex + 1} / ${count}`}
           >
             <div
               className="library-turntable-disc pointer-events-none absolute bottom-2 left-1/2 z-0 h-8 w-[88%] rounded-[50%] sm:bottom-3 sm:h-9"
@@ -218,7 +278,7 @@ export function LibraryTurntable({
                   : "transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)",
               }}
             >
-              {PUBLIC_LIBRARY_TEMPLATES.map((template, i) => (
+              {templates.map((template, i) => (
                 <div
                   key={template.id}
                   className="library-turntable-cell absolute bottom-6 left-1/2 sm:bottom-7"
@@ -239,8 +299,9 @@ export function LibraryTurntable({
           <button
             type="button"
             onClick={goNext}
-            aria-label="Nächstes Buch"
-            className="library-turntable-nav z-20 shrink-0 touch-manipulation rounded-full border border-zinc-700/80 bg-surface-raised/90 p-2 text-zinc-300 hover:border-accent/40 hover:text-accent"
+            disabled={count < 2}
+            aria-label={t("library.nextBook")}
+            className="library-turntable-nav z-20 shrink-0 touch-manipulation rounded-full border border-zinc-700/80 bg-surface-raised/90 p-2 text-zinc-300 hover:border-accent/40 hover:text-accent disabled:opacity-40"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path
@@ -255,7 +316,7 @@ export function LibraryTurntable({
         </div>
 
         <p className="mt-1 text-center text-[11px] tabular-nums text-zinc-500">
-          {activeIndex + 1} / {count} · {activeTemplate.genre}
+          {activeIndex + 1} / {count} · {activeTemplate.genre} · {localeLabel}
         </p>
 
         <div className="mt-3 px-1">
@@ -263,6 +324,7 @@ export function LibraryTurntable({
             template={activeTemplate}
             importing={importingId === activeTemplate.id}
             onImport={() => onImport(activeTemplate.id)}
+            localeLabel={localeLabel}
           />
         </div>
       </div>

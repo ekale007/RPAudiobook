@@ -1,6 +1,6 @@
 "use client";
 
-import { brand } from "@/lib/brand";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
@@ -25,12 +25,11 @@ import {
 import type { LibraryTemplateId } from "@/lib/story/libraryTemplates";
 import {
   getLibraryTemplateId,
-  getStoryOrigin,
-  storyOriginLabel,
 } from "@/lib/story/storyOrigin";
 import type { User } from "@supabase/supabase-js";
 
 export default function HomePage() {
+  const { t } = useUiLocale();
   const [user, setUser] = useState<User | null>(null);
   const [stories, setStories] = useState<StoryRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,15 +106,11 @@ export default function HomePage() {
   if (!supabaseOk) {
     return (
       <main className="flex min-h-dvh flex-col">
-        <AppHeader title={brand.productName} />
+        <AppHeader title="" showBrand />
         <div className="flex flex-1 flex-col justify-center gap-4 p-6 text-center">
-          <p className="text-zinc-300">
-            Copy <code className="text-accent">.env.example</code> to{" "}
-            <code className="text-accent">.env.local</code> and add your
-            Supabase URL + anon key.
-          </p>
+          <p className="text-zinc-300">{t("home.supabaseHint")}</p>
           <Link href="/settings" className="text-accent underline">
-            Einstellungen
+            {t("nav.settings")}
           </Link>
         </div>
         <LegalFooter className="mt-auto" />
@@ -126,7 +121,7 @@ export default function HomePage() {
   if (loading) {
     return (
       <main className="flex min-h-dvh items-center justify-center text-zinc-400">
-        Loading…
+        {t("common.loading")}
       </main>
     );
   }
@@ -134,18 +129,16 @@ export default function HomePage() {
   if (!user) {
     return (
       <main className="flex min-h-dvh flex-col">
-        <AppHeader title={brand.productName} />
+        <AppHeader title="" showBrand />
         <div className="flex flex-1 flex-col justify-center gap-6 p-6">
           <p className="text-center text-sm leading-relaxed text-zinc-300">
-            Melde dich an, um Geschichten zu speichern und auf Handy oder PC
-            weiterzuhören. Chat, Stimmen und Verbrauch laufen über {brand.productName}
-            — kein eigener API-Key nötig.
+            {t("home.guestPitch")}
           </p>
           <Link
             href="/login"
             className="rounded-xl bg-accent py-3 text-center font-medium text-black"
           >
-            Anmelden
+            {t("home.signIn")}
           </Link>
         </div>
         <LegalFooter className="mt-auto" />
@@ -156,30 +149,33 @@ export default function HomePage() {
   return (
     <main className="flex min-h-dvh flex-col">
       <AppHeader
-        title={brand.productName}
+        title=""
+        showBrand
         centerSlot={
           <div className="flex items-center gap-1.5">
             <Link
               href="/story/import"
               className="whitespace-nowrap rounded-full border border-surface-border px-2.5 py-1.5 text-[10px] font-medium text-zinc-300 sm:px-3 sm:text-[11px]"
             >
-              EPUB
+              {t("home.epub")}
             </Link>
             <Link
               href="/story/new"
               className="whitespace-nowrap rounded-full bg-accent px-3 py-1.5 text-[11px] font-semibold text-black shadow-sm sm:px-4 sm:text-xs"
             >
-              + Neue Story
+              {t("home.newStory")}
             </Link>
           </div>
         }
       />
       <div className="flex flex-1 flex-col overflow-y-auto px-3 pb-8 pt-3 sm:px-4">
         <div className="mb-1 px-1">
-          <p className="text-xs text-zinc-500">{brand.tagline}</p>
+          <p className="text-xs text-zinc-500">{t("brand.tagline")}</p>
         </div>
         <div className="mb-2 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-medium text-zinc-200">Deine Geschichten</h2>
+          <h2 className="text-sm font-medium text-zinc-200">
+            {t("home.yourStories")}
+          </h2>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-1.5 text-[10px] text-zinc-500">
               <input
@@ -188,7 +184,7 @@ export default function HomePage() {
                 onChange={(e) => setShowArchived(e.target.checked)}
                 className="scale-90"
               />
-              Archiv
+              {t("home.archive")}
             </label>
             <button
               type="button"
@@ -200,7 +196,7 @@ export default function HomePage() {
               }}
               className="text-[10px] text-zinc-600 hover:text-zinc-400"
             >
-              Sign out
+              {t("home.signOut")}
             </button>
           </div>
         </div>
@@ -214,8 +210,8 @@ export default function HomePage() {
             <li key={s.id}>
               <StoryListCard
                 story={s}
+                storySettings={s.settings}
                 libraryTemplateId={getLibraryTemplateId(s.settings)}
-                originLabel={storyOriginLabel(getStoryOrigin(s.settings))}
                 busy={busyStoryId === s.id}
                 renaming={renamingId === s.id}
                 renameDraft={renameDraft}
@@ -253,7 +249,7 @@ export default function HomePage() {
                 }}
                 onDelete={async () => {
                   const ok = window.confirm(
-                    `Delete story "${s.title}" permanently? This cannot be undone.`,
+                    t("story.deleteConfirm", { title: s.title }),
                   );
                   if (!ok) return;
                   setBusyStoryId(s.id);
@@ -275,9 +271,7 @@ export default function HomePage() {
 
         {stories.length === 0 ? (
           <p className="py-4 text-center text-xs text-zinc-500">
-            Noch keine Geschichten — tippe oben auf{" "}
-            <strong className="font-medium text-zinc-400">+ Neue Story</strong>{" "}
-            oder wähle unten aus der Bibliothek.
+            {t("home.emptyStories")}
           </p>
         ) : null}
 
