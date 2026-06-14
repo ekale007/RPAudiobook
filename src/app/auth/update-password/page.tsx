@@ -56,7 +56,7 @@ export default function UpdatePasswordPage() {
 
   return (
     <main className="flex min-h-dvh flex-col">
-      <AppHeader title="New password" backHref="/login" />
+      <AppHeader title="Neues Passwort" backHref="/login" />
       <div className="flex flex-1 flex-col gap-4 p-6">
         <p className="text-sm text-zinc-400">
           Choose a new password for your account.

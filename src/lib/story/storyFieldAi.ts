@@ -1,3 +1,4 @@
+import { brand } from "@/lib/brand";
 import { completeOpenRouter } from "@/lib/llm/openrouter";
 import type { StoryDraft, StoryDraftInput } from "@/lib/story/generateStoryDraft";
 import { parseStoryDraftJson } from "@/lib/story/generateStoryDraft";
@@ -294,7 +295,7 @@ export async function randomizeStoryField(
     [
       {
         role: "system",
-        content: `You help author interactive audiobook story bibles (HörbuchKI story format).
+        content: `You help author interactive audiobook story bibles (${brand.productName} story format).
 ${instruction}
 Stay consistent with the story concept and existing draft.
 Be creative when randomizing — surprise the author but keep internal logic.

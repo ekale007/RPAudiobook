@@ -2,16 +2,17 @@ import type { Metadata, Viewport } from "next";
 import { PwaBootstrap } from "@/components/PwaBootstrap";
 import { ServerCapabilitiesBootstrap } from "@/components/ServerCapabilitiesBootstrap";
 import { UserPreferencesBootstrap } from "@/components/UserPreferencesBootstrap";
+import { brand } from "@/lib/brand";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "HörbuchKI",
-  description: "Interactive story roleplay with cloud saves",
+  title: brand.productName,
+  description: brand.tagline,
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "HörbuchKI",
+    title: brand.shortName,
   },
 };
 

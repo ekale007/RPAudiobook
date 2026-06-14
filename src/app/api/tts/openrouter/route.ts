@@ -1,3 +1,4 @@
+import { brand } from "@/lib/brand";
 import { NextResponse } from "next/server";
 import { TTS_COST_HEADER } from "@/lib/llm/openRouterCompletion";
 import { estimateOpenRouterTtsCostCents } from "@/lib/server/billingSettings";
@@ -11,6 +12,7 @@ import { requireUser } from "@/lib/server/requireUser";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 import { getTtsHourlyLimitForUser } from "@/lib/server/userTier";
 import { insertUsageEvent } from "@/lib/server/usageEvents";
+import { applyUsageCharge, requireSpendableBalance } from "@/lib/server/wallet";
 import {
   normalizeOpenRouterTtsModel,
   normalizeOpenRouterTtsVoice,
@@ -32,6 +34,9 @@ export async function POST(req: Request) {
   if ("error" in auth) return auth.error;
 
   const supabase = await createServerSupabaseFromRequest(req);
+  const balanceErr = await requireSpendableBalance(supabase, auth.user.id, 1);
+  if (balanceErr) return balanceErr;
+
   const ttsPerHour = await getTtsHourlyLimitForUser(supabase, auth.user.id);
   const limit = checkRateLimit(`tts-openrouter:${auth.user.id}`, ttsPerHour);
   if (!limit.ok) {
@@ -84,8 +89,8 @@ export async function POST(req: Request) {
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://hoerbuchki.app",
-      "X-Title": "HörbuchKI",
+      "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL?.trim() || brand.defaultSiteUrl,
+      "X-Title": brand.openRouterAppTitle,
     },
     body: JSON.stringify({
       model,
@@ -122,6 +127,7 @@ export async function POST(req: Request) {
     characters: text.length,
     costCents: ttsCostCents,
   });
+  void applyUsageCharge(supabase, ttsCostCents);
 
   const audio = await upstream.arrayBuffer();
   return new NextResponse(audio, {

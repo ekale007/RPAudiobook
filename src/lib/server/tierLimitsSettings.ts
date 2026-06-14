@@ -53,7 +53,7 @@ function parseFreeModelIdsFromEnv(): string[] {
 export function tierLimitsFromEnv(): TierLimitsMap {
   return {
     free: {
-      llmBudgetCents: envInt("BETA_TIER_FREE_LLM_BUDGET_CENTS", 500),
+      llmBudgetCents: envInt("BETA_TIER_FREE_LLM_BUDGET_CENTS", 200),
       llmPerHour: envInt("BETA_TIER_FREE_LLM_HOUR", 40),
       ttsPerHour: envInt("BETA_TIER_FREE_TTS_HOUR", 80),
       ttsStorageMax: envInt("BETA_TIER_FREE_TTS_STORAGE", 25),

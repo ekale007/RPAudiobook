@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { LlmUsagePanel } from "@/components/LlmUsagePanel";
+import { WalletTopupSection } from "@/components/WalletTopupSection";
 import { UsageLogPanel } from "@/components/UsageLogPanel";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
@@ -22,6 +23,17 @@ type AccountPayload = {
     ttsStorageMax: number;
     modelRestricted: boolean;
   };
+  wallet?: {
+    walletBalanceEur: string;
+    walletBalanceCents: number;
+    weeklyFreeRemainingCents: number;
+    weeklyFreeBudgetCents: number;
+    spendableCents: number;
+    tier: string;
+    periodWeek: string;
+  } | null;
+  walletWarning?: string;
+  stripeConfigured?: boolean;
   ttsCloud: { used: number; max: number; remaining: number };
   monthlyWarning?: string;
 };
@@ -72,10 +84,10 @@ export default function AccountPage() {
 
   return (
     <main className="flex min-h-dvh flex-col">
-      <AppHeader title="Account" backHref="/" />
+      <AppHeader title="Konto" backHref="/" />
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 pb-10">
         {loading ? (
-          <p className="text-sm text-zinc-500">Lade Account…</p>
+          <p className="text-sm text-zinc-500">Lade Konto…</p>
         ) : error ? (
           <p className="text-sm text-red-400">{error}</p>
         ) : data ? (
@@ -94,15 +106,20 @@ export default function AccountPage() {
               </dl>
               {inviteOnly ? (
                 <p className="mt-3 text-xs text-zinc-500">
-                  Beta — Zugang per Einladung. Tarif-Upgrade nur durch Admin.
+                  Beta — Zugang per Einladung. Upgrade nur durch Admin.
                 </p>
               ) : null}
             </section>
 
+            <WalletTopupSection wallet={data.wallet ?? null} onRefresh={() => void load()} />
+
+            {data.walletWarning ? (
+              <p className="text-xs text-amber-300">{data.walletWarning}</p>
+            ) : null}
+
             <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
               <h2 className="font-medium text-accent">Limits (dieser Tarif)</h2>
               <ul className="mt-2 space-y-1 text-sm text-zinc-300">
-                <li>LLM-Monatsbudget: {data.limits.llmBudgetEur}</li>
                 <li>LLM: {data.limits.llmPerHour} Anfragen / Stunde</li>
                 <li>TTS: {data.limits.ttsPerHour} Anfragen / Stunde</li>
                 <li>
@@ -157,7 +174,7 @@ export default function AccountPage() {
             <p className="text-center text-xs text-zinc-600">
               Technische Einstellungen (Stimmen, Modelle):{" "}
               <Link href="/settings" className="text-accent underline">
-                Settings
+                Einstellungen
               </Link>
             </p>
           </>

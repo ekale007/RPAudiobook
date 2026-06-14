@@ -7,11 +7,12 @@ import {
   LegalP,
   LegalUl,
 } from "@/components/legal/LegalTypography";
+import { brand } from "@/lib/brand";
 import { siteLegal } from "@/lib/legal/siteLegal";
 
 export const metadata = {
-  title: "Impressum — HörbuchKI",
-  description: "Anbieterkennzeichnung nach § 5 DDG für HörbuchKI",
+  title: `Impressum — ${siteLegal.productName}`,
+  description: `Anbieterkennzeichnung nach § 5 DDG für ${siteLegal.productName}`,
 };
 
 export default function ImpressumPage() {

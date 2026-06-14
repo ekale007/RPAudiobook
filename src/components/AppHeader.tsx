@@ -1,3 +1,4 @@
+import { brand } from "@/lib/brand";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -39,13 +40,13 @@ export function AppHeader({
             href="/account"
             className="shrink-0 text-xs text-zinc-400 sm:text-sm"
           >
-            Account
+            Konto
           </Link>
           <Link
             href="/settings"
             className="shrink-0 text-xs text-zinc-400 sm:text-sm"
           >
-            Settings
+            Einstellungen
           </Link>
         </div>
       </div>

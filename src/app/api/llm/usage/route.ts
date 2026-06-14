@@ -11,6 +11,7 @@ import { requireUser } from "@/lib/server/requireUser";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 import { fetchUserTierLimits } from "@/lib/server/userTier";
 import { fetchMonthlyTtsUsage } from "@/lib/server/usageEvents";
+import { fetchWalletSnapshot } from "@/lib/server/wallet";
 
 export async function GET(req: Request) {
   const auth = await requireUser(req);
@@ -46,6 +47,15 @@ export async function GET(req: Request) {
         : "TTS-Verbrauch nicht verfügbar — Migration 010 ausführen";
   }
 
+  let wallet = null;
+  let walletWarning: string | undefined;
+  try {
+    wallet = await fetchWalletSnapshot(supabase, auth.user.id);
+  } catch (e) {
+    walletWarning =
+      e instanceof Error ? e.message : "Wallet nicht verfügbar";
+  }
+
   try {
     const monthly = await fetchMonthlyUsage(supabase, auth.user.id);
     const totalCostCents = monthly.costCents + ttsMonthly.costCents;
@@ -73,7 +83,16 @@ export async function GET(req: Request) {
         remaining: formatCentsDe(monthly.budgetRemainingCents),
         ttsUsed: formatCentsDe(ttsMonthly.costCents),
         totalUsed: formatCentsDe(totalCostCents),
+        walletBalance: wallet?.walletBalanceEur,
+        spendable: wallet
+          ? formatCentsDe(wallet.spendableCents)
+          : undefined,
+        weeklyFreeRemaining: wallet
+          ? formatCentsDe(wallet.weeklyFreeRemainingCents)
+          : undefined,
       },
+      wallet,
+      walletWarning,
       ttsWarning,
     });
   } catch (e) {
@@ -106,7 +125,14 @@ export async function GET(req: Request) {
         remaining: formatCentsDe(budgetCents),
         ttsUsed: formatCentsDe(ttsMonthly.costCents),
         totalUsed: formatCentsDe(totalCostCents),
+        walletBalance: wallet?.walletBalanceEur,
+        spendable: wallet ? formatCentsDe(wallet.spendableCents) : undefined,
+        weeklyFreeRemaining: wallet
+          ? formatCentsDe(wallet.weeklyFreeRemainingCents)
+          : undefined,
       },
+      wallet,
+      walletWarning,
       warning:
         e instanceof Error
           ? e.message

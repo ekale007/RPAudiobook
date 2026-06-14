@@ -43,7 +43,19 @@ type UsagePayload = {
     remaining: string;
     ttsUsed?: string;
     totalUsed?: string;
+    walletBalance?: string;
+    spendable?: string;
+    weeklyFreeRemaining?: string;
   };
+  wallet?: {
+    walletBalanceEur: string;
+    spendableCents: number;
+    weeklyFreeRemainingCents: number;
+    weeklyFreeBudgetCents: number;
+    tier: string;
+    periodWeek: string;
+  };
+  walletWarning?: string;
   warning?: string;
   ttsWarning?: string;
   tier?: string;
@@ -94,9 +106,13 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
   const monthlyPct = data
     ? Math.min(
         100,
-        Math.round((data.monthly.costCents / data.monthly.budgetCents) * 100),
+        Math.round(
+          (data.monthly.costCents / Math.max(data.monthly.budgetCents, 1)) * 100,
+        ),
       )
     : 0;
+  const walletLow = data?.wallet ? data.wallet.spendableCents < 50 : false;
+  const budgetPct = data?.wallet ? (walletLow ? 95 : 30) : monthlyPct;
   const hourlyPct = data
     ? Math.min(
         100,
@@ -105,9 +121,9 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
     : 0;
 
   const barClass =
-    monthlyPct >= 90
+    budgetPct >= 90
       ? "bg-red-500"
-      : monthlyPct >= 70
+      : budgetPct >= 70
         ? "bg-amber-400"
         : "bg-accent";
 
@@ -131,9 +147,10 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
         </div>
         {data ? (
           <p className="mt-1 text-zinc-300">
-            {data.labels.totalUsed ?? data.labels.used} gesamt
-            {ttsMonthly && ttsMonthly.costCents > 0 ? (
-              <> · TTS {data.labels.ttsUsed} ({ttsSharePct}%)</>
+            {data.labels.spendable ?? data.labels.totalUsed ?? data.labels.used}{" "}
+            verfügbar
+            {data.labels.totalUsed ? (
+              <> · {data.labels.totalUsed} verbraucht</>
             ) : null}
             {" · "}
             {data.hourly.remaining}/{data.hourly.limit} LLM/h
@@ -150,7 +167,7 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
           <h2 className="font-medium text-accent">
-            Monatsverbrauch
+            Verbrauch & Guthaben
             {data?.tierLabel ? (
               <span className="ml-2 font-normal text-zinc-500">
                 · {data.tierLabel}
@@ -158,8 +175,8 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
             ) : null}
           </h2>
           <p className="mt-0.5 text-xs text-zinc-500">
-            LLM (OpenRouter) + TTS (ElevenLabs) — geschätzt in EUR. LLM zählt
-            gegen dein Monatsbudget.
+            LLM + TTS gegen Wallet-Guthaben. Free: 2 € Gratis pro Woche (Mo–So
+            UTC), danach Wallet.
           </p>
         </div>
         <button
@@ -178,8 +195,28 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
         <p className="mb-2 text-xs text-amber-300">{data.ttsWarning}</p>
       ) : null}
 
+      {data?.walletWarning ? (
+        <p className="mb-2 text-xs text-amber-300">{data.walletWarning}</p>
+      ) : null}
+
       {data ? (
         <div className="space-y-4">
+          {data.wallet ? (
+            <div className="rounded-lg border border-surface-border/80 bg-surface/50 px-3 py-2">
+              <div className="flex justify-between text-xs text-zinc-400">
+                <span>Guthaben verfügbar</span>
+                <span className="tabular-nums text-zinc-100">
+                  {data.labels.spendable ?? data.wallet.walletBalanceEur}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] text-zinc-500">
+                Wallet {data.labels.walletBalance ?? data.wallet.walletBalanceEur}
+                {data.wallet.tier === "free" && data.labels.weeklyFreeRemaining
+                  ? ` · Gratis diese Woche ${data.labels.weeklyFreeRemaining}`
+                  : null}
+              </p>
+            </div>
+          ) : null}
           {total && total.costCents > 0 ? (
             <div>
               <div className="mb-1 flex justify-between text-xs text-zinc-400">
@@ -222,18 +259,17 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
           {serverCaps.serverLlm ? (
             <div>
               <div className="mb-1 flex justify-between text-xs text-zinc-400">
-                <span>LLM-Budget {data.monthly.periodMonth}</span>
-                <span>
-                  {data.labels.used} von {data.labels.budget} (
-                  {data.labels.remaining} übrig)
-                </span>
+                <span>LLM-Verbrauch {data.monthly.periodMonth}</span>
+                <span>{data.labels.used}</span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-surface">
-                <div
-                  className={`h-full transition-all ${barClass}`}
-                  style={{ width: `${monthlyPct}%` }}
-                />
-              </div>
+              {!data.wallet ? (
+                <div className="h-2 overflow-hidden rounded-full bg-surface">
+                  <div
+                    className={`h-full transition-all ${barClass}`}
+                    style={{ width: `${budgetPct}%` }}
+                  />
+                </div>
+              ) : null}
               <p className="mt-1 text-[11px] text-zinc-500">
                 {data.monthly.requestCount} Anfragen · ca.{" "}
                 {Math.round(data.monthly.promptTokens / 1000)}k Prompt- ·{" "}
@@ -287,13 +323,15 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
             </div>
           ) : null}
 
-          {data.hourly.remaining <= 5 || monthlyPct >= 85 ? (
+          {data.hourly.remaining <= 5 || walletLow || monthlyPct >= 85 ? (
             <p className="text-xs text-amber-200/90">
-              {monthlyPct >= 100
-                ? "Monatsbudget erreicht — Chat pausiert bis zum nächsten Monat."
-                : monthlyPct >= 85
-                  ? "LLM-Budget fast aufgebraucht. Memory-Sync und Autoplay verbrauchen viele Zusatz-Anfragen."
-                  : "Stündliches LLM-Limit fast erreicht — kurz warten oder weniger Autoplay/Memory-Last."}
+              {walletLow
+                ? "Guthaben fast/leer — Konto → Guthaben aufladen (min. 5 €)."
+                : monthlyPct >= 100
+                  ? "Monatsverbrauch hoch — bei leerem Guthaben pausiert der Chat."
+                  : monthlyPct >= 85
+                    ? "Hoher Verbrauch — Memory-Sync und Autoplay verbrauchen viele Zusatz-Anfragen."
+                    : "Stündliches LLM-Limit fast erreicht — kurz warten oder weniger Autoplay/Memory-Last."}
             </p>
           ) : null}
         </div>
@@ -306,15 +344,18 @@ export function LlmUsagePanel({ compact = false }: { compact?: boolean }) {
 
 export function formatLlmLimitError(raw: string): string {
   if (/rate limit exceeded/i.test(raw)) {
-    return "Stündliches LLM-Limit erreicht — siehe Account → Monatsverbrauch. Kurz warten.";
+    return "Stündliches LLM-Limit erreicht — siehe Konto → Verbrauch. Kurz warten.";
   }
   if (/budget/i.test(raw) || /budget_exceeded/i.test(raw)) {
-    return "Monatliches Beta-Budget erreicht — siehe Account → Verbrauch.";
+    return "Guthaben aufgebraucht — Konto → Guthaben aufladen.";
+  }
+  if (/insufficient_balance|guthaben/i.test(raw)) {
+    return "Guthaben aufgebraucht — Konto → Guthaben aufladen (min. 5 €).";
   }
   if (/guardrail|data policy|privacy|no endpoints available/i.test(raw)) {
     return (
       "OpenRouter blockiert das Modell (Datenschutz/Guardrails). " +
-      "In Settings dasselbe Modell wie für Chat nutzen oder openrouter.ai/settings/privacy anpassen."
+      "In Einstellungen dasselbe Modell wie für Chat nutzen oder openrouter.ai/settings/privacy anpassen."
     );
   }
   return raw.replace(/^LLM \d+: /, "");

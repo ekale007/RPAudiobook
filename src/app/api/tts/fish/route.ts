@@ -10,6 +10,7 @@ import { requireUser } from "@/lib/server/requireUser";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 import { getTtsHourlyLimitForUser } from "@/lib/server/userTier";
 import { insertUsageEvent } from "@/lib/server/usageEvents";
+import { applyUsageCharge, requireSpendableBalance } from "@/lib/server/wallet";
 import {
   looksLikeFishReferenceId,
   normalizeFishAudioModel,
@@ -31,6 +32,9 @@ export async function POST(req: Request) {
   if ("error" in auth) return auth.error;
 
   const supabase = await createServerSupabaseFromRequest(req);
+  const balanceErr = await requireSpendableBalance(supabase, auth.user.id, 1);
+  if (balanceErr) return balanceErr;
+
   const ttsPerHour = await getTtsHourlyLimitForUser(supabase, auth.user.id);
   const limit = checkRateLimit(`tts-fish:${auth.user.id}`, ttsPerHour);
   if (!limit.ok) {
@@ -129,6 +133,7 @@ export async function POST(req: Request) {
     characters: text.length,
     costCents: ttsCostCents,
   });
+  void applyUsageCharge(supabase, ttsCostCents);
 
   const audio = await upstream.arrayBuffer();
   return new NextResponse(audio, {

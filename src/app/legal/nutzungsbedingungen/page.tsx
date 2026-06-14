@@ -8,11 +8,12 @@ import {
   LegalP,
   LegalUl,
 } from "@/components/legal/LegalTypography";
+import { brand } from "@/lib/brand";
 import { siteLegal } from "@/lib/legal/siteLegal";
 
 export const metadata = {
-  title: "Nutzungsbedingungen — HörbuchKI",
-  description: "Nutzungsbedingungen für die HörbuchKI Beta",
+  title: `Nutzungsbedingungen — ${siteLegal.productName}`,
+  description: `Nutzungsbedingungen für ${siteLegal.productName}`,
 };
 
 export default function NutzungsbedingungenPage() {
@@ -78,9 +79,9 @@ export default function NutzungsbedingungenPage() {
         Wir können Inhalte oder Accounts bei Verstößen sperren oder löschen.
       </LegalP>
 
-      <LegalH2>5. Bibliothek (HörbuchKI Library)</LegalH2>
+      <LegalH2>5. Bibliothek ({brand.libraryName})</LegalH2>
       <LegalP>
-        Die in der App bereitgestellten Story-Vorlagen („HörbuchKI Library“) sind vom
+        Die in der App bereitgestellten Story-Vorlagen („{brand.libraryName}“) sind vom
         Betreiber erstellt. Sie dürfen sie innerhalb der App für private Beta-Nutzung
         verwenden und remixen. Eine Weiterverbreitung, Veröffentlichung oder
         kommerzielle Nutzung außerhalb der App bedarf der vorherigen Zustimmung des

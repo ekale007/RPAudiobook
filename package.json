@@ -34,7 +34,8 @@
     "covers:list-missing": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-covers.ps1 --list-missing",
     "covers:missing": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-covers.ps1 --missing",
     "covers:generate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-covers.ps1",
-    "images:server": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-image-server.ps1"
+    "image-studio": "cd image-studio && npm run dev",
+    "agentmemory:seed": "node scripts/seed-agentmemory.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
@@ -42,7 +43,8 @@
     "jszip": "^3.10.1",
     "next": "^15.2.4",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "stripe": "^22.2.1"
   },
   "eslintConfig": {
     "extends": "next/core-web-vitals"

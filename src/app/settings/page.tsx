@@ -377,7 +377,7 @@ export default function SettingsPage() {
 
   return (
     <main className="flex min-h-dvh flex-col">
-      <AppHeader title="Settings" backHref="/" />
+      <AppHeader title="Einstellungen" backHref="/" />
       <div className="flex flex-col gap-5 p-4">
         {loggedIn ? (
           <p className="rounded-lg border border-surface-border bg-surface-raised px-3 py-2 text-xs text-zinc-400">

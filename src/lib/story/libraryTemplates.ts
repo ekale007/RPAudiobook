@@ -1,4 +1,5 @@
 import type { StorySeedPack } from "@/lib/import/storySeed";
+import { brand } from "@/lib/brand";
 import { loadWhenDawnBreaksSeed } from "@/lib/import/storySeed";
 import { EXTENDED_LIBRARY_TEMPLATES } from "@/lib/story/libraryTemplatesExtra";
 import { seedPackToStoryDraft } from "@/lib/story/seedPackDraft";
@@ -62,13 +63,13 @@ function narrator(
     scenario: card.scenario ?? "",
     first_mes: card.first_mes,
     mes_example: "",
-    creator_notes: "HörbuchKI Bibliotheks-Vorlage — frei remixbar.",
+    creator_notes: brand.libraryCreatorNotes,
     system_prompt: card.system_prompt,
     post_history_instructions:
       card.post_history_instructions ??
       "Schreibe in der zweiten Person. Beende jede Antwort an einer natürlichen Pause.",
     tags: card.tags ?? ["interactive story", "narrator"],
-    creator: "HörbuchKI Library",
+    creator: brand.libraryName,
     character_version: "library-v1",
     extensions: {},
   };
@@ -88,7 +89,7 @@ function castCard(
     creator_notes: card.creator_notes ?? "",
     system_prompt: card.system_prompt ?? "",
     tags: card.tags ?? [],
-    creator: "HörbuchKI Library",
+    creator: brand.libraryName,
     character_version: "library-v1",
     extensions: {},
   };

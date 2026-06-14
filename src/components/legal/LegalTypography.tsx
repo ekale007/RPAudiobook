@@ -26,10 +26,12 @@ export function LegalOl({ children }: { children: ReactNode }) {
   return <ol className="mt-2 list-decimal space-y-1 pl-5 leading-relaxed">{children}</ol>;
 }
 
+import { siteLegal } from "@/lib/legal/siteLegal";
+
 export function LegalDisclaimer() {
   return (
     <p className="mt-10 border-t border-surface-border pt-4 text-xs text-zinc-600">
-      Diese Texte sind für die Beta von HörbuchKI erstellt und ersetzen keine individuelle
+      Diese Texte sind für {siteLegal.productName} erstellt und ersetzen keine individuelle
       Rechtsberatung. Bei geschäftlicher Ausweitung oder Zahlungsverkehr empfiehlt sich eine
       Prüfung durch eine Fachperson (z. B. IT-Recht / Datenschutz).
     </p>

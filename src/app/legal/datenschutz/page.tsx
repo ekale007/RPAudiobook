@@ -10,8 +10,8 @@ import {
 import { siteLegal, thirdPartyLegal } from "@/lib/legal/siteLegal";
 
 export const metadata = {
-  title: "Datenschutz — HörbuchKI",
-  description: "Datenschutzerklärung für HörbuchKI (DSGVO)",
+  title: `Datenschutz — ${siteLegal.productName}`,
+  description: `Datenschutzerklärung für ${siteLegal.productName} (DSGVO)`,
 };
 
 export default function DatenschutzPage() {

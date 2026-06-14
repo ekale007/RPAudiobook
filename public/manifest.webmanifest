@@ -1,7 +1,7 @@
 {
-  "name": "HörbuchKI",
-  "short_name": "HörbuchKI",
-  "description": "Interaktives Hörspiel mit KI-Erzähler",
+  "name": "RP Audiobook",
+  "short_name": "RP Audiobook",
+  "description": "Interaktive Geschichten zum Anhören",
   "lang": "de",
   "scope": "/",
   "start_url": "/",

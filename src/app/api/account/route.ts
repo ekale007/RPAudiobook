@@ -9,6 +9,8 @@ import { requireUser } from "@/lib/server/requireUser";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 import { countUserTtsRecordings } from "@/lib/server/ttsStorageQuota";
 import { fetchTierLimitsMap } from "@/lib/server/tierLimitsSettings";
+import { fetchWalletSnapshot } from "@/lib/server/wallet";
+import { isStripeConfigured } from "@/lib/server/stripe";
 import {
   ensureUserProfile,
   resolveTierLimits,
@@ -69,6 +71,15 @@ export async function GET(req: Request) {
     limits.ttsPerHour,
   );
 
+  let wallet = null;
+  let walletWarning: string | undefined;
+  try {
+    wallet = await fetchWalletSnapshot(supabase, auth.user.id);
+  } catch (e) {
+    walletWarning =
+      e instanceof Error ? e.message : "Wallet nicht verfügbar — Migration 016";
+  }
+
   return NextResponse.json({
     email: user?.email ?? null,
     userId: auth.user.id,
@@ -98,5 +109,8 @@ export async function GET(req: Request) {
       llmPerHour: getRateLimitLlmPerHour(),
       ttsPerHour: getRateLimitTtsPerHour(),
     },
+    wallet,
+    walletWarning,
+    stripeConfigured: isStripeConfigured(),
   });
 }

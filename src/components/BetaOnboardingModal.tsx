@@ -1,5 +1,6 @@
 "use client";
 
+import { brand } from "@/lib/brand";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { OverlayPanel } from "@/components/ui/OverlayPanel";
@@ -32,7 +33,7 @@ export function BetaOnboardingModal({ openGate }: { openGate: boolean }) {
     <OverlayPanel
       open={open}
       onClose={dismiss}
-      title="Willkommen in der Beta"
+      title={`Willkommen bei ${brand.productName}`}
       wide
     >
       <p className="mb-4 text-sm text-zinc-400">

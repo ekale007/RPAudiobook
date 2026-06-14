@@ -1,9 +1,11 @@
+import { brand } from "@/lib/brand";
+
 /**
- * Legal identity for HörbuchKI (override via .env.local if needed).
+ * Legal identity for RP Audiobook (override via .env.local if needed).
  * @see https://www.gesetze-im-internet.de/ddg/__5.html (Impressum)
  */
 export const siteLegal = {
-  productName: "HörbuchKI",
+  productName: brand.productName,
   operatorName:
     process.env.NEXT_PUBLIC_LEGAL_OPERATOR_NAME?.trim() || "Eyüp Kale",
   contactEmail:
@@ -12,12 +14,12 @@ export const siteLegal = {
   postalAddress: process.env.NEXT_PUBLIC_LEGAL_ADDRESS?.trim() || "",
   country: "Deutschland",
   serviceDescription:
-    "Interaktive Story-App im Browser mit KI-Texten und optionaler Sprachausgabe (geschlossene Beta).",
+    "Interaktive Rollenspiel-Geschichten im Browser mit KI-Erzähler und optionaler Sprachausgabe (geschlossener Test).",
   lastUpdated: "3. Juni 2026",
   /** Production URL for legal references */
   websiteUrl:
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    "https://rp-audiobook.vercel.app",
+    brand.defaultSiteUrl,
 } as const;
 
 export const thirdPartyLegal = {

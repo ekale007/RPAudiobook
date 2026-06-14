@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/server/adminAuth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { currentUsageMonthUtc } from "@/lib/server/llmUsage";
 import { fetchTierLimitsMap } from "@/lib/server/tierLimitsSettings";
+import { grantBetaWelcomeCreditIfNeeded } from "@/lib/server/wallet";
 import {
   resolveTierLimits,
   type UserTier,
@@ -165,5 +166,14 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, userId, patch });
+  let betaWelcomeGranted = false;
+  if (body.tier === "beta") {
+    try {
+      betaWelcomeGranted = await grantBetaWelcomeCreditIfNeeded(admin, userId);
+    } catch (e) {
+      console.error("grantBetaWelcomeCreditIfNeeded:", e);
+    }
+  }
+
+  return NextResponse.json({ ok: true, userId, patch, betaWelcomeGranted });
 }

@@ -1,3 +1,5 @@
+import { brand } from "@/lib/brand";
+
 /**
  * Lock screen & CarPlay (Now Playing) via Media Session + HTML <audio>.
  * Web Audio output does not chain reliably when the screen is locked on iOS.
@@ -69,7 +71,7 @@ export function setTtsNowPlaying(meta: TtsNowPlayingMeta): void {
   try {
     session.metadata = new MediaMetadata({
       title: meta.title,
-      artist: meta.artist ?? "HörbuchKI",
+      artist: meta.artist ?? brand.mediaSessionArtist,
       album: meta.album,
       artwork: [
         {

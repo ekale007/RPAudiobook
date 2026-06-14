@@ -1,5 +1,6 @@
 "use client";
 
+import { brand } from "@/lib/brand";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
@@ -106,7 +107,7 @@ export default function HomePage() {
   if (!supabaseOk) {
     return (
       <main className="flex min-h-dvh flex-col">
-        <AppHeader title="HörbuchKI" />
+        <AppHeader title={brand.productName} />
         <div className="flex flex-1 flex-col justify-center gap-4 p-6 text-center">
           <p className="text-zinc-300">
             Copy <code className="text-accent">.env.example</code> to{" "}
@@ -114,7 +115,7 @@ export default function HomePage() {
             Supabase URL + anon key.
           </p>
           <Link href="/settings" className="text-accent underline">
-            Settings
+            Einstellungen
           </Link>
         </div>
         <LegalFooter className="mt-auto" />
@@ -133,12 +134,12 @@ export default function HomePage() {
   if (!user) {
     return (
       <main className="flex min-h-dvh flex-col">
-        <AppHeader title="HörbuchKI" />
+        <AppHeader title={brand.productName} />
         <div className="flex flex-1 flex-col justify-center gap-6 p-6">
           <p className="text-center text-sm leading-relaxed text-zinc-300">
             Melde dich an, um Geschichten zu speichern und auf Handy oder PC
-            weiterzuhören. Chat, Stimmen und Verbrauch laufen über die
-            HörbuchKI-Beta — kein eigener API-Key nötig.
+            weiterzuhören. Chat, Stimmen und Verbrauch laufen über {brand.productName}
+            — kein eigener API-Key nötig.
           </p>
           <Link
             href="/login"
@@ -155,7 +156,7 @@ export default function HomePage() {
   return (
     <main className="flex min-h-dvh flex-col">
       <AppHeader
-        title="HörbuchKI"
+        title={brand.productName}
         centerSlot={
           <div className="flex items-center gap-1.5">
             <Link
@@ -174,6 +175,9 @@ export default function HomePage() {
         }
       />
       <div className="flex flex-1 flex-col overflow-y-auto px-3 pb-8 pt-3 sm:px-4">
+        <div className="mb-1 px-1">
+          <p className="text-xs text-zinc-500">{brand.tagline}</p>
+        </div>
         <div className="mb-2 flex items-center justify-between gap-2">
           <h2 className="text-sm font-medium text-zinc-200">Deine Geschichten</h2>
           <div className="flex items-center gap-3">

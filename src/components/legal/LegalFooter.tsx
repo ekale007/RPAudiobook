@@ -1,3 +1,4 @@
+import { brand } from "@/lib/brand";
 import Link from "next/link";
 
 const links = [
@@ -18,7 +19,9 @@ export function LegalFooter({ className = "" }: { className?: string }) {
           </Link>
         ))}
       </nav>
-      <p className="mt-2 text-zinc-600">© {new Date().getFullYear()} HörbuchKI · Beta</p>
+      <p className="mt-2 text-zinc-600">
+        © {new Date().getFullYear()} {brand.productName}
+      </p>
     </footer>
   );
 }

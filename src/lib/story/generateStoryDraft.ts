@@ -1,3 +1,4 @@
+import { brand } from "@/lib/brand";
 import { completeOpenRouter } from "@/lib/llm/openrouter";
 import { slugifyCharacterName } from "@/lib/memory/characterMemory";
 import type { StorySeedPack } from "@/lib/import/storySeed";
@@ -137,7 +138,7 @@ export function parseStoryDraftJson(raw: string, locale: string): StoryDraft {
       card: {
         ...c.card,
         name: c.card.name?.trim() || slug,
-        creator: c.card.creator ?? "HörbuchKI Story Editor",
+        creator: c.card.creator ?? brand.storyEditor,
         character_version: "v1-editor",
       },
     };

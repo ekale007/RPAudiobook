@@ -1,3 +1,4 @@
+import { brand } from "@/lib/brand";
 import { NextResponse } from "next/server";
 import { resolveAllowedLlmModelForTier } from "@/lib/server/userTier";
 import { fetchUserTierLimits } from "@/lib/server/userTier";
@@ -13,7 +14,7 @@ import {
   formatOpenRouterErrorMessage,
   isOpenRouterPrivacyError,
 } from "@/lib/llm/openRouterErrors";
-import { fetchMonthlyUsage } from "@/lib/server/llmUsage";
+import { requireSpendableBalance } from "@/lib/server/wallet";
 import {
   createUsageTrackingStream,
   recordUsageFromJsonResponse,
@@ -29,7 +30,7 @@ function openRouterHeaders(apiKey: string): HeadersInit {
     Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",
     "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
-    "X-Title": "HörbuchKI",
+    "X-Title": brand.openRouterAppTitle,
   };
 }
 
@@ -46,24 +47,8 @@ export async function POST(req: Request) {
     tierLimits = null;
   }
 
-  let monthly;
-  try {
-    monthly = await fetchMonthlyUsage(supabase, auth.user.id);
-  } catch {
-    monthly = null;
-  }
-
-  if (monthly && monthly.costCents >= monthly.budgetCents) {
-    return NextResponse.json(
-      {
-        error: "Monatliches LLM-Budget erreicht",
-        code: "budget_exceeded",
-        monthly,
-        retryAfterSec: null,
-      },
-      { status: 429 },
-    );
-  }
+  const balanceErr = await requireSpendableBalance(supabase, auth.user.id, 1);
+  if (balanceErr) return balanceErr;
 
   const llmPerHour = tierLimits?.llmPerHour ?? getRateLimitLlmPerHour();
   const limit = checkRateLimit(`llm:${auth.user.id}`, llmPerHour);

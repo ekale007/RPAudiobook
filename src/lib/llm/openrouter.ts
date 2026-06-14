@@ -1,3 +1,4 @@
+import { brand } from "@/lib/brand";
 import type { OpenRouterSettings } from "@/lib/types";
 
 import { readCostCentsHeader, LLM_COST_HEADER } from "@/lib/llm/openRouterCompletion";
@@ -33,14 +34,17 @@ async function parseErrorResponse(res: Response): Promise<string> {
     if (res.status === 429) {
       const errText =
         typeof j.error === "string" ? j.error : (j.error?.message ?? "");
+      if (j.code === "insufficient_balance" || /guthaben/i.test(errText)) {
+        return "Guthaben aufgebraucht — Konto → Guthaben aufladen (min. 5 €).";
+      }
       if (j.code === "budget_exceeded" || /budget/i.test(errText)) {
-        return "Monatliches Beta-Budget erreicht — Settings → Beta LLM Verbrauch.";
+        return "Budget erreicht — Konto → Guthaben aufladen.";
       }
       if (j.retryAfterSec) {
         const min = Math.max(1, Math.ceil(j.retryAfterSec / 60));
-        return `Stündliches LLM-Limit — in ca. ${min} Min. wieder (Settings → Verbrauch).`;
+        return `Stündliches LLM-Limit — in ca. ${min} Min. wieder (Konto → Verbrauch).`;
       }
-      return "LLM-Limit erreicht — Settings → Beta LLM Verbrauch.";
+      return "LLM-Limit erreicht — Konto → Verbrauch.";
     }
     const raw =
       typeof j.error === "string"
@@ -74,7 +78,7 @@ export async function streamOpenRouterChat(
       "Content-Type": "application/json",
       "HTTP-Referer":
         typeof window !== "undefined" ? window.location.origin : "",
-      "X-Title": "HörbuchKI",
+      "X-Title": brand.openRouterAppTitle,
     },
     body: JSON.stringify({
       model: chatSettings.model,
@@ -351,7 +355,7 @@ export async function completeOpenRouterWithUsage(
       "Content-Type": "application/json",
       "HTTP-Referer":
         typeof window !== "undefined" ? window.location.origin : "",
-      "X-Title": "HörbuchKI",
+      "X-Title": brand.openRouterAppTitle,
     },
     body: JSON.stringify({
       model: settings.model,

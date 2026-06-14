@@ -11,6 +11,7 @@ import {
   openRouterUsdToEurCents,
 } from "@/lib/server/billingSettings";
 import { insertUsageEvent } from "@/lib/server/usageEvents";
+import { applyUsageCharge } from "@/lib/server/wallet";
 
 export type LlmUsageSnapshot = {
   periodMonth: string;
@@ -194,6 +195,9 @@ export async function recordLlmUsage(
     durationMs: options?.durationMs,
     storyId: options?.storyId,
   });
+  if (options?.status !== "error") {
+    await applyUsageCharge(supabase, costCents);
+  }
   return costCents;
 }
 

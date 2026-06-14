@@ -1,6 +1,6 @@
-# HörbuchKI
+# RP Audiobook
 
-Interactive story roleplay in the browser (character cards + lore), with optional narrator audio and Supabase cloud saves.
+Interaktive Rollenspiel-Geschichten im Browser mit optionaler Sprachausgabe und Cloud-Speicherung.
 
 ## Features
 
