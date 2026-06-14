@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AppHeader } from "@/components/AppHeader";
@@ -60,34 +61,6 @@ function LoginForm() {
       if (err) throw err;
       router.push("/");
       router.refresh();
-    } catch (err) {
-      setError(formatAuthError(err, locale));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const signUpPassword = async () => {
-    setError(null);
-    setInfo(null);
-    if (password.length < 8) {
-      setError(t("login.passwordMin"));
-      return;
-    }
-    setBusy(true);
-    try {
-      const supabase = createClient();
-      const { data, error: err } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-      });
-      if (err) throw err;
-      if (data.session) {
-        router.push("/");
-        router.refresh();
-        return;
-      }
-      setInfo(t("login.accountCreated"));
     } catch (err) {
       setError(formatAuthError(err, locale));
     } finally {
@@ -193,14 +166,12 @@ function LoginForm() {
             {t("login.signIn")}
           </button>
           {!inviteOnly ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={signUpPassword}
-              className="rounded-xl border border-surface-border py-3 text-sm text-zinc-300 disabled:opacity-50"
-            >
-              {t("login.createAccount")}
-            </button>
+            <p className="text-center text-sm text-zinc-500">
+              {t("login.noAccount")}{" "}
+              <Link href="/signup" className="text-accent underline">
+                {t("login.goSignUp")}
+              </Link>
+            </p>
           ) : null}
         </form>
       ) : (

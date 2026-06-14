@@ -20,6 +20,7 @@ export const enMessages: Messages = {
     guestPitch:
       "Sign in to save stories and continue on phone or desktop. Chat, voices, and usage run through RP Audiobook — no API key required.",
     signIn: "Sign in",
+    signUp: "Sign up",
     loading: "Loading…",
     yourStories: "Your stories",
     archive: "Archive",
@@ -78,7 +79,9 @@ export const enMessages: Messages = {
     betaPitch:
       "Beta — invite-only access. If you received an email from us, use the link in it or sign in with your password.",
     signInPitch:
-      "Sign in or register with email and password — on phone and desktop.",
+      "Sign in with email and password — on phone and desktop.",
+    noAccount: "No account yet?",
+    goSignUp: "Create one",
     passwordMin: "Password must be at least 8 characters.",
     accountCreated:
       "Account created. If you are not signed in automatically: disable Confirm email under Supabase Auth → Providers → Email, or open the confirmation email.",
@@ -96,6 +99,16 @@ export const enMessages: Messages = {
     resetParamSent:
       "If that email exists, we sent a password reset link.",
     loading: "Loading…",
+  },
+  signup: {
+    title: "Sign up",
+    pitch:
+      "Create an account with email and password — then save stories and continue on any device.",
+    submit: "Create account",
+    hasAccount: "Already have an account?",
+    goSignIn: "Sign in",
+    inviteOnlyPitch:
+      "The beta is invite-only. If you received an email from us, use the link in it — or sign in if you already have an account.",
   },
   account: {
     title: "Account",

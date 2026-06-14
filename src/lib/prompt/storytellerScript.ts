@@ -46,6 +46,7 @@ Regeln:
 - Szene / Erzählung → \`<<speaker:narrator>>\`
 - Gesprochene Zeilen von ${playerName} (Zweite Person „du“) → \`<<speaker:${PROTAGONIST_SPEAKER_SLUG}>>\`, nicht Cast-Slugs.
 - Zitate anderer Figuren → deren Cast-Slug, auch wenn „du“ im selben Absatz vorkommt.
+- **Nie** einen ganzen Absatz mit mehreren Sprechern unter \`<<speaker:${PROTAGONIST_SPEAKER_SLUG}>>\` — bei jedem Sprecherwechsel neues Tag (\`narrator\`, Cast oder \`guest:\`).
 - Deutsche Anführungszeichen: „…“
 - Gäste: \`<<speaker:guest:name>>\` (kleingeschrieben).
 - Nur Figuren, die **in der Szene anwesend** sind, dürfen sprechen.
@@ -78,6 +79,7 @@ Rules:
 - Scene prose → \`<<speaker:narrator>>\`
 - ${playerName}'s spoken lines (second person "you") → \`<<speaker:${PROTAGONIST_SPEAKER_SLUG}>>\`, not a cast slug.
 - Another character's quoted line uses **their** slug even if "you" appears nearby.
+- **Never** wrap a whole paragraph with multiple speakers under \`<<speaker:${PROTAGONIST_SPEAKER_SLUG}>>\` — switch tags at every speaker change (\`narrator\`, cast, or \`guest:\`).
 - Guest speakers: \`<<speaker:guest:name>>\` (lowercase after guest:).
 - Only cast who are **physically present** may speak.
 - **No** quest menus, \`[QUEST-OPTION]\`, interface text, HP/level lines, or "What do you do?" — only lived-in scene prose.

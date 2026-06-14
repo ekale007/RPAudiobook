@@ -1,7 +1,7 @@
 import type { StoryContentLocale } from "@/lib/story/protagonist";
 
 const SPEECH_VERBS_EN =
-  "said|says|asked|asks|replied|replies|whispered|whispers|muttered|mutters|shouted|shouts|added|adds|called|calls|continued|continues|offers|laughs|blinks";
+  "said|says|asked|asks|replied|replies|whispered|whispers|muttered|mutters|shouted|shouts|added|adds|called|calls|continued|continues|offers|laughs|blinks|speaks|spoke|snorts|snorted|growls|growled|grumbles|grumbled|clears|cut in|cuts in";
 
 const SPEECH_VERBS_DE =
   "sagte|sagt|sagten|fragte|fragt|flüsterte|flüstert|murmelte|murmelt|rief|ruft|antwortete|antwortet|erwiderte|erwidert|fuhr fort|fährt fort|setzte hinzu|nickte|lachte|lacht|meinte|meint|erklärte|erklärt|bestätigte|bestätigt|begann|beginnt";
@@ -32,5 +32,5 @@ export function protagonistBeatBeforePattern(
   if (locale === "de") {
     return /\bDu\s+(sagst|fragst|nickst|lächelst|lachst|blickst|siehst|drehst|zögerst|flüsterst|murmelst|rufst|antwortest|bestätigst)\b/i;
   }
-  return /\bYou\s+(shrug|say|ask|pull|look|turn|nod|smile|laugh|pause|dial|confirm|kneel|switch|glance|bounce|feel)\b/i;
+  return /\bYou\s+(shrug|say|ask|pull|look|turn|nod|smile|laugh|pause|dial|confirm|kneel|switch|glance|bounce|feel|cut in)\b/i;
 }

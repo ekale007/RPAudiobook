@@ -18,6 +18,7 @@ export const deMessages = {
     guestPitch:
       "Melde dich an, um Geschichten zu speichern und auf Handy oder PC weiterzuhören. Chat, Stimmen und Verbrauch laufen über RP Audiobook — kein eigener API-Key nötig.",
     signIn: "Anmelden",
+    signUp: "Registrieren",
     loading: "Lade…",
     yourStories: "Deine Geschichten",
     archive: "Archiv",
@@ -76,7 +77,9 @@ export const deMessages = {
     betaPitch:
       "Beta — Zugang nur mit Einladung. Hast du eine E-Mail von uns bekommen, nutze den Link darin oder melde dich mit deinem Passwort an.",
     signInPitch:
-      "Mit E-Mail und Passwort anmelden oder registrieren — am Handy und am PC.",
+      "Mit E-Mail und Passwort anmelden — am Handy und am PC.",
+    noAccount: "Noch kein Account?",
+    goSignUp: "Jetzt registrieren",
     passwordMin: "Passwort muss mindestens 8 Zeichen haben.",
     accountCreated:
       "Account erstellt. Wenn du nicht automatisch angemeldet wirst: In Supabase unter Auth → Providers → Email „Confirm email“ deaktivieren oder die Bestätigungs-Mail öffnen.",
@@ -94,6 +97,16 @@ export const deMessages = {
     resetParamSent:
       "Falls die E-Mail existiert, haben wir einen Link zum Passwort-Reset geschickt.",
     loading: "Laden…",
+  },
+  signup: {
+    title: "Registrieren",
+    pitch:
+      "Erstelle einen Account mit E-Mail und Passwort — danach kannst du Geschichten speichern und auf allen Geräten weiterhören.",
+    submit: "Account erstellen",
+    hasAccount: "Bereits einen Account?",
+    goSignIn: "Anmelden",
+    inviteOnlyPitch:
+      "Die Beta ist nur mit Einladung. Hast du eine E-Mail von uns bekommen, nutze den Link darin — oder melde dich an, falls du schon einen Account hast.",
   },
   account: {
     title: "Konto",

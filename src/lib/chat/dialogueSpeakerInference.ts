@@ -210,6 +210,21 @@ function inferSpeakerDetailed(
     };
   }
 
+  if (beforeInPara.trim().length < 48) {
+    const bridgeName = inferNameFromActionBeat(bridgeFromPrev.slice(-420));
+    if (bridgeName) {
+      const resolved = resolveNameToSlug(bridgeName, cast);
+      return {
+        slug: resolved.slug,
+        reasons: [
+          "action_beat_before_quote",
+          "bridge_context",
+          resolved.inCast ? "cast_match" : "guest_not_in_cast",
+        ],
+      };
+    }
+  }
+
   const locale = ctx.locale;
   const pronounSpeaker = inferGenderedSpeakerBeforeQuote(
     beforeInPara,
@@ -376,6 +391,9 @@ function isProtagonistDialogue(
   if (/^you\s+(mean|know|think|see|hear|remember|understand)\b/i.test(inner)) {
     return false;
   }
+  if (/^you\s+(sound|look|seem|feel)\b/i.test(inner)) {
+    return false;
+  }
   // "You're late" — someone addressing the protagonist, not "you confirm" lines.
   if (/^you(?:'re|'ve|'ll|'d)\b/i.test(inner)) return false;
   if (/^you\b/i.test(inner)) return true;
@@ -465,6 +483,7 @@ function inferNameFromActionBeat(before: string): string | null {
     /([A-Z][a-z]{2,})'s\s+(?:cheeks|hand|hands|eyes|voice|shoulders|smile)\b/i,
     /([A-Z][a-z]{2,})\s+(?:blinks|laughs|smiles|nods|shrug(?:s)?|studies|steps forward|offers|exhales|gestures|turns|watches|waits)\b/i,
     /([A-Z][a-z]{2,})\s+is\s+(?:studying|watching|looking|waiting)\b/i,
+    /([A-Z][a-z]{2,})\s+(?:speaks|spoke|snorts|snorted|growls|growled|grumbles|grumbled|clears)\b/i,
     /([A-Z][a-z]{2,})\s+said\b/i,
     /([A-Z][a-z]{2,})\s+asked\b/i,
   ];
@@ -507,6 +526,7 @@ function inferFamilyRoleNearQuote(before: string, after: string): string | null 
   if (yourRole?.[1]) return `npc:${yourRole[1]}`;
   if (/\b(?:your\s+)?mother\s+repeats\b/.test(ctx)) return "npc:mother";
   if (/\b(?:your\s+)?father\s+adds\b/.test(ctx)) return "npc:father";
+  if (/\b(?:your\s+)?father\s+clears\b/.test(ctx)) return "npc:father";
   const roleVerb = ctx.match(
     new RegExp(
       `\\b(mother|father|sister|brother|mutter|vater|schwester|bruder)\\s+(?:${speechVerbsPattern("en")})\\b`,

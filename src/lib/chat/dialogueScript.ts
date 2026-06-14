@@ -17,6 +17,7 @@ import {
   stripSpeakerTags,
 } from "@/lib/chat/parseSpeakerBlocks";
 import type { StoryContentLocale } from "@/lib/story/protagonist";
+import { PROTAGONIST_SPEAKER_SLUG } from "@/lib/story/protagonist";
 
 export { hasSpeakerTags as hasSpeakerScriptTags };
 
@@ -61,6 +62,29 @@ export function buildDialogueAttributionMap(
     const scriptSlug = block?.speakerSlug ?? "narrator";
     const heuristic = inferred.get(snippet);
 
+    if (
+      scriptSlug === PROTAGONIST_SPEAKER_SLUG &&
+      isStrongNonProtagonistInference(heuristic)
+    ) {
+      out.set(snippet, normalizeScriptSlug(heuristic!.slug, cast));
+      continue;
+    }
+
+    if (scriptSlug === PROTAGONIST_SPEAKER_SLUG) {
+      const hSlug = heuristic?.slug ?? "narrator";
+      if (
+        hSlug === PROTAGONIST_SPEAKER_SLUG ||
+        hSlug === "narrator" ||
+        heuristic?.reasons.includes("protagonist_dialogue") ||
+        heuristic?.reasons.includes("protagonist_vocative_address") ||
+        heuristic?.reasons.includes("protagonist_beat_before_quote") ||
+        heuristic?.reasons.includes("protagonist_beat_after_quote")
+      ) {
+        out.set(snippet, PROTAGONIST_SPEAKER_SLUG);
+      }
+      continue;
+    }
+
     if (scriptSlug !== "narrator") {
       out.set(snippet, normalizeScriptSlug(scriptSlug, cast));
       continue;
@@ -79,13 +103,17 @@ export function buildDialogueAttributionMap(
       const llmEntry = llm.get(snippet);
       if (!llmEntry) continue;
 
-      if (scriptSlug !== "narrator") {
-        // Explicit script tag wins over LLM for cast/guest blocks
+      if (
+        scriptSlug !== "narrator" &&
+        scriptSlug !== PROTAGONIST_SPEAKER_SLUG
+      ) {
         continue;
       }
 
       if (llmEntry.slug === "narrator") {
-        out.delete(snippet);
+        if (scriptSlug !== PROTAGONIST_SPEAKER_SLUG) {
+          out.delete(snippet);
+        }
       } else {
         out.set(snippet, normalizeScriptSlug(llmEntry.slug, cast));
       }
@@ -123,6 +151,27 @@ function findBlockForSnippet(
   return null;
 }
 
+function isStrongNonProtagonistInference(
+  heuristic?: { slug: string; reasons: string[] },
+): boolean {
+  if (!heuristic) return false;
+  if (
+    heuristic.slug === "narrator" ||
+    heuristic.slug === PROTAGONIST_SPEAKER_SLUG
+  ) {
+    return false;
+  }
+  const weakOnly = new Set([
+    "fallback_narrator",
+    "snippet_not_found",
+    "remote_dialogue_continuity",
+    "gendered_action_continuity",
+    "same_speaker_short_bridge",
+    "interrupted_speech_continuation",
+  ]);
+  return heuristic.reasons.some((r) => !weakOnly.has(r));
+}
+
 function normalizeScriptSlug(slug: string, cast: CharacterRow[]): string {
   const lower = slug.toLowerCase().trim();
   if (lower === "protagonist") return "protagonist";
@@ -157,14 +206,22 @@ export function analyzeDialogueAttribution(
       (tagged ? "narrator" : (heuristic?.slug ?? "narrator"));
 
     let reasons: string[];
-    if (llmEntry && scriptSlug === "narrator") {
+    const scriptOverride =
+      scriptSlug === PROTAGONIST_SPEAKER_SLUG &&
+      slug !== PROTAGONIST_SPEAKER_SLUG &&
+      slug !== "narrator";
+    if (llmEntry && (scriptSlug === "narrator" || scriptSlug === PROTAGONIST_SPEAKER_SLUG)) {
       reasons = [...llmEntry.reasons];
       if (slug !== "narrator") reasons.unshift("llm_override");
       else reasons.unshift("llm_narrator");
     } else if (!tagged) {
       reasons = heuristic?.reasons ?? ["fallback_narrator"];
-    } else if (scriptSlug !== "narrator") {
+    } else if (scriptOverride) {
+      reasons = ["script_protagonist_refined", ...(heuristic?.reasons ?? [])];
+    } else if (scriptSlug !== "narrator" && scriptSlug !== PROTAGONIST_SPEAKER_SLUG) {
       reasons = ["script_tag"];
+    } else if (scriptSlug === PROTAGONIST_SPEAKER_SLUG && slug === PROTAGONIST_SPEAKER_SLUG) {
+      reasons = ["script_protagonist_block", ...(heuristic?.reasons ?? [])];
     } else if (slug !== "narrator") {
       reasons = ["script_narrator_refined", ...(heuristic?.reasons ?? [])];
     } else {

@@ -134,12 +134,20 @@ export default function HomePage() {
           <p className="text-center text-sm leading-relaxed text-zinc-300">
             {t("home.guestPitch")}
           </p>
-          <Link
-            href="/login"
-            className="rounded-xl bg-accent py-3 text-center font-medium text-black"
-          >
-            {t("home.signIn")}
-          </Link>
+          <div className="flex flex-col gap-3">
+            <Link
+              href="/login"
+              className="rounded-xl bg-accent py-3 text-center font-medium text-black"
+            >
+              {t("home.signIn")}
+            </Link>
+            <Link
+              href="/signup"
+              className="rounded-xl border border-surface-border py-3 text-center text-sm font-medium text-zinc-200"
+            >
+              {t("home.signUp")}
+            </Link>
+          </div>
         </div>
         <LegalFooter className="mt-auto" />
       </main>
