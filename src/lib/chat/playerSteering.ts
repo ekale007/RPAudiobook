@@ -1,5 +1,6 @@
 import { appendLightContinuationHint } from "@/lib/chat/continuationSeam";
 import { defaultContinuePrompt } from "@/lib/chat/storyBeatSuggestions";
+import { resolveContinuationWriterTask } from "@/lib/chat/unansweredQuestion";
 import {
   parseSpeakerBlocks,
   preprocessAssistantMarkup,
@@ -414,11 +415,17 @@ export function buildContinuationTurns(
       buildSteeringContinuationPrompt(display, storyLocale);
     return [...turns, { role: "user", content: prompt }];
   }
+
+  const writerTask = resolveContinuationWriterTask(
+    turns,
+    fallback,
+    storyLocale,
+  );
   return [
     ...turns,
     {
       role: "user",
-      content: appendLightContinuationHint(fallback, turns, storyLocale),
+      content: appendLightContinuationHint(writerTask, turns, storyLocale),
     },
   ];
 }
