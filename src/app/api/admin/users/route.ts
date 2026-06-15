@@ -30,7 +30,7 @@ export async function GET(req: Request) {
   const { data: profiles, error: profileErr } = await admin
     .from("user_profiles")
     .select(
-      "user_id, tier, email, display_name, llm_budget_cents_override, llm_hourly_limit_override, tts_hourly_limit_override, tts_storage_max_override, created_at, updated_at",
+      "user_id, tier, email, display_name, wallet_balance_cents, llm_budget_cents_override, llm_hourly_limit_override, tts_hourly_limit_override, tts_storage_max_override, created_at, updated_at",
     )
     .order("updated_at", { ascending: false });
 
@@ -99,6 +99,7 @@ export async function GET(req: Request) {
         promptTokens: 0,
         completionTokens: 0,
       },
+      walletBalanceCents: Number(p.wallet_balance_cents ?? 0),
       createdAt: p.created_at,
       updatedAt: p.updated_at,
     };

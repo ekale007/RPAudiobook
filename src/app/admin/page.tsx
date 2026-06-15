@@ -28,6 +28,7 @@ type AdminUser = {
   tier: UserTier;
   limits: TierLimitDefaults;
   usage: { costCents: number; requestCount: number };
+  walletBalanceCents: number;
 };
 
 const TIERS: UserTier[] = ["free", "beta", "pro"];
@@ -117,6 +118,8 @@ export default function AdminPage() {
   const [tierLimitsDraft, setTierLimitsDraft] = useState<
     Record<UserTier, Record<keyof TierLimitDefaults, string>> | null
   >(null);
+  const [creditEur, setCreditEur] = useState("5");
+  const [creditNote, setCreditNote] = useState("");
 
   const loadBilling = useCallback(async () => {
     const res = await authFetch("/api/admin/billing-settings");
@@ -181,6 +184,8 @@ export default function AdminPage() {
   useEffect(() => {
     if (selectedId) void loadLog(selectedId);
     else setLog([]);
+    setCreditEur("5");
+    setCreditNote("");
   }, [selectedId, loadLog]);
 
   const saveBilling = async () => {
@@ -300,7 +305,12 @@ export default function AdminPage() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? `Speichern fehlgeschlagen (${res.status})`);
       }
-      setMessage(`Tarif ${tier} gespeichert.`);
+      const body = (await res.json()) as { betaWelcomeGranted?: boolean };
+      setMessage(
+        body.betaWelcomeGranted
+          ? `Tarif ${tier} gespeichert — Beta-Startguthaben (5 €) gutgeschrieben.`
+          : `Tarif ${tier} gespeichert.`,
+      );
       await loadUsers();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : String(e));
@@ -308,6 +318,60 @@ export default function AdminPage() {
       setBusy(false);
     }
   };
+
+  const grantWalletCredit = async (userId: string) => {
+    const amountEur = Number.parseFloat(creditEur.replace(",", "."));
+    if (!Number.isFinite(amountEur) || amountEur < 0.01) {
+      setMessage("Guthaben: mindestens 0,01 € eingeben.");
+      return;
+    }
+    if (amountEur > 500) {
+      setMessage("Guthaben: maximal 500 € pro Gutschrift.");
+      return;
+    }
+    const label = users.find((u) => u.userId === userId)?.email ?? userId.slice(0, 8);
+    if (
+      !window.confirm(
+        `${amountEur.toFixed(2)} € an ${label} gutschreiben?`,
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await authFetch("/api/admin/wallet-credit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          amountEur,
+          description: creditNote.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Gutschrift fehlgeschlagen (${res.status})`);
+      }
+      const body = (await res.json()) as {
+        creditedEur?: string;
+        walletBalanceEur?: string;
+      };
+      setMessage(
+        `Guthaben gutgeschrieben: +${body.creditedEur ?? ""} · neuer Stand ${body.walletBalanceEur ?? ""}.`,
+      );
+      setCreditNote("");
+      await loadUsers();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const selectedUser = selectedId
+    ? users.find((u) => u.userId === selectedId) ?? null
+    : null;
 
   if (allowed === false) {
     return (
@@ -542,6 +606,7 @@ export default function AdminPage() {
                     <tr>
                       <th className="px-2 py-1">E-Mail</th>
                       <th className="px-2 py-1">Tarif</th>
+                      <th className="px-2 py-1 text-right">Guthaben</th>
                       <th className="px-2 py-1 text-right">LLM Monat</th>
                     </tr>
                   </thead>
@@ -574,6 +639,9 @@ export default function AdminPage() {
                             <option value="beta">beta</option>
                             <option value="pro">pro</option>
                           </select>
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-zinc-300">
+                          {formatEur(u.walletBalanceCents ?? 0)}
                         </td>
                         <td className="px-2 py-1.5 text-right text-zinc-400">
                           {formatEur(u.usage.costCents)}
@@ -610,6 +678,59 @@ export default function AdminPage() {
                   </button>
                 ) : null}
               </div>
+
+              {selectedUser ? (
+                <div className="mb-3 rounded-lg border border-surface-border/60 bg-surface p-3">
+                  <h3 className="text-xs font-medium text-accent">
+                    Guthaben gutschreiben
+                  </h3>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Wallet-Stand:{" "}
+                    <span className="text-zinc-300">
+                      {formatEur(selectedUser.walletBalanceCents ?? 0)}
+                    </span>
+                    {selectedUser.tier === "free" ? (
+                      <span className="text-zinc-600">
+                        {" "}
+                        (+ 2 €/Woche Gratis, siehe Account)
+                      </span>
+                    ) : null}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-end gap-2">
+                    <label className="flex flex-col gap-1 text-xs text-zinc-400">
+                      Betrag (€)
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        disabled={busy}
+                        value={creditEur}
+                        onChange={(e) => setCreditEur(e.target.value)}
+                        className="w-24 rounded border border-surface-border bg-surface-raised px-2 py-1.5 text-zinc-200"
+                      />
+                    </label>
+                    <label className="min-w-[10rem] flex-1 flex-col gap-1 text-xs text-zinc-400 sm:flex">
+                      Notiz (optional)
+                      <input
+                        type="text"
+                        disabled={busy}
+                        value={creditNote}
+                        onChange={(e) => setCreditNote(e.target.value)}
+                        placeholder="z. B. Beta-Tester Bonus"
+                        className="rounded border border-surface-border bg-surface-raised px-2 py-1.5 text-zinc-200"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void grantWalletCredit(selectedUser.userId)}
+                      className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-surface disabled:opacity-50"
+                    >
+                      Gutschreiben
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
               {!selectedId ? (
                 <p className="text-xs text-zinc-500">
                   Nutzer in der Liste auswählen.

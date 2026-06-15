@@ -69,3 +69,4 @@ LLM + alle Server-TTS-Routen prüfen Guthaben vor der Anfrage.
 - `GET /api/billing/config` — Min/Max Aufladung, Stripe aktiv
 - `POST /api/billing/checkout` — `{ "amountCents": 500 }` → `{ "url" }`
 - `POST /api/billing/webhook` — Stripe only (raw body)
+- `POST /api/admin/wallet-credit` — Admin: `{ "userId", "amountEur" }` → Wallet-Gutschrift (auch über `/admin` UI)
