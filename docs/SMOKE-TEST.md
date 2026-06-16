@@ -45,6 +45,18 @@ Name von „Rauch aus dem Schornstein = Maschine läuft“ — hier: **5–10 Mi
 - [ ] „Schlag was vor“ → Vorschläge auf **Deutsch** (DE-Story)
 - [ ] Autoplay TTS (Mobile, wenn aktiviert)
 
+### PWA (Handy)
+
+- [ ] Install-Banner sichtbar (nicht im Standalone-Modus)
+- [ ] **Zum Startbildschirm** / Install → App-Icon öffnet Vollbild
+- [ ] Manifest-Icon korrekt (Logo, kein Platzhalter)
+
+### Admin (nur Admin-Account)
+
+- [ ] `/admin` → LLM-Tabelle: Prompt/Antwort ¢/1k + Markup % pro Modell
+- [ ] `/admin` → TTS-Tabelle: USD-Kosten + Markup % pro Anbieter
+- [ ] Speichern → Reload zeigt gleiche Werte (Migration `017_provider_pricing.sql`)
+
 ### Story bearbeiten
 
 - [ ] Story-Hub → **Welt & Lore** speichern

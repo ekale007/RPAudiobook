@@ -17,6 +17,13 @@ import {
   validateTierLimitsPayload,
   type TierLimitsMap,
 } from "@/lib/server/tierLimitsSettings";
+import {
+  defaultProviderPricing,
+  invalidateProviderPricingCache,
+  mergeProviderPricing,
+  validateProviderPricingPayload,
+  type ProviderPricingPayload,
+} from "@/lib/server/providerPricing";
 
 function toApiSettings(
   data: Record<string, unknown>,
@@ -61,6 +68,7 @@ export async function GET(req: Request) {
         ),
       },
       tierLimits: envTierLimits,
+      providerPricing: defaultProviderPricing(),
       envFallback: true,
       pricingUrl: "https://elevenlabs.io/pricing/api",
       starterPlanNote:
@@ -73,7 +81,7 @@ export async function GET(req: Request) {
   const { data, error } = await admin
     .from("beta_billing_settings")
     .select(
-      "usd_to_eur_rate, tts_cents_per_1k_chars, tts_usd_per_1k_flash, tts_usd_per_1k_standard, tier_limits, updated_at, updated_by",
+      "usd_to_eur_rate, tts_cents_per_1k_chars, tts_usd_per_1k_flash, tts_usd_per_1k_standard, tier_limits, provider_pricing, updated_at, updated_by",
     )
     .eq("id", 1)
     .maybeSingle();
@@ -97,6 +105,7 @@ export async function GET(req: Request) {
         ),
       },
       tierLimits: envTierLimits,
+      providerPricing: defaultProviderPricing(),
       envFallback: true,
       pricingUrl: "https://elevenlabs.io/pricing/api",
       warning: "Migration 012 ausführen (beta_billing_settings).",
@@ -105,9 +114,13 @@ export async function GET(req: Request) {
 
   const usdToEur = Number(data.usd_to_eur_rate);
   const tierLimits = await fetchTierLimitsMap(admin);
+  const providerPricing = mergeProviderPricing(
+    (data as Record<string, unknown>).provider_pricing,
+  );
   return NextResponse.json({
     settings: toApiSettings(data as Record<string, unknown>, usdToEur),
     tierLimits,
+    providerPricing,
     envFallback: false,
     pricingUrl: "https://elevenlabs.io/pricing/api",
     starterPlanNote:
@@ -134,6 +147,7 @@ export async function PATCH(req: Request) {
     ttsUsdPer1kFlash?: number;
     ttsUsdPer1kStandard?: number;
     tierLimits?: Partial<TierLimitsMap>;
+    providerPricing?: ProviderPricingPayload;
   };
   try {
     body = await req.json();
@@ -187,6 +201,14 @@ export async function PATCH(req: Request) {
     patch.tier_limits = validated.value;
   }
 
+  if (body.providerPricing !== undefined) {
+    const validated = validateProviderPricingPayload(body.providerPricing);
+    if (!validated.ok) {
+      return NextResponse.json({ error: validated.error }, { status: 400 });
+    }
+    patch.provider_pricing = validated.value;
+  }
+
   if (Object.keys(patch).length <= 2) {
     return NextResponse.json(
       { error: "Mindestens ein Feld angeben" },
@@ -198,7 +220,7 @@ export async function PATCH(req: Request) {
     .from("beta_billing_settings")
     .upsert({ id: 1, ...patch }, { onConflict: "id" })
     .select(
-      "usd_to_eur_rate, tts_cents_per_1k_chars, tts_usd_per_1k_flash, tts_usd_per_1k_standard, tier_limits, updated_at",
+      "usd_to_eur_rate, tts_cents_per_1k_chars, tts_usd_per_1k_flash, tts_usd_per_1k_standard, tier_limits, provider_pricing, updated_at",
     )
     .single();
 
@@ -215,13 +237,18 @@ export async function PATCH(req: Request) {
   }
 
   invalidateBillingSettingsCache();
+  invalidateProviderPricingCache();
   invalidateTierLimitsCache();
 
   const usdToEur = Number(data.usd_to_eur_rate);
   const tierLimits = await fetchTierLimitsMap(admin);
+  const providerPricing = mergeProviderPricing(
+    (data as Record<string, unknown>).provider_pricing,
+  );
   return NextResponse.json({
     ok: true,
     settings: toApiSettings(data as Record<string, unknown>, usdToEur),
     tierLimits,
+    providerPricing,
   });
 }

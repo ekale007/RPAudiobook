@@ -6,6 +6,13 @@ import {
   ELEVEN_API_USD_PER_1K_STANDARD,
   elevenTtsPriceTier,
 } from "@/lib/server/elevenLabsApiPricing";
+import {
+  applyMarkupPercent,
+  fetchProviderPricing,
+  getTtsMarkupPercent,
+  getTtsUsdCost,
+  resolveTtsPricingKey,
+} from "@/lib/server/providerPricing";
 
 export type BillingSettings = {
   usdToEurRate: number;
@@ -160,20 +167,40 @@ function falTtsBillableUnits(chars: number, modelId?: string): number {
 export function elevenUsdPer1kForModel(
   modelId: string | undefined,
   billing: BillingSettings,
+  pricingUsd?: number,
 ): number {
+  if (pricingUsd != null && pricingUsd >= 0) return pricingUsd;
   const tier = elevenTtsPriceTier(modelId);
   if (tier === "flash") return billing.ttsUsdPer1kFlash;
   return billing.ttsUsdPer1kStandard;
 }
 
-/** TTS log cost: Eleven API $/1k × USD→EUR (model-aware). */
+function chargeTtsCents(
+  usdAmount: number,
+  billing: BillingSettings,
+  markupPercent: number,
+): number {
+  const base = openRouterUsdToEurCents(usdAmount, billing.usdToEurRate, {
+    minCents: 0,
+  });
+  const charged = applyMarkupPercent(base, markupPercent);
+  return charged > 0 ? charged : 0;
+}
+
+/** TTS log cost: provider USD × USD→EUR + markup (model-aware). */
 export async function estimateTtsCostCents(
   supabase: SupabaseClient,
   characters: number,
   modelId?: string,
 ): Promise<number> {
   const billing = await fetchBillingSettings(supabase);
-  return estimateTtsCostCentsFromBilling(billing, characters, modelId);
+  const pricing = await fetchProviderPricing(supabase);
+  const key = resolveTtsPricingKey("elevenlabs", modelId);
+  const markup = getTtsMarkupPercent(pricing, key);
+  const usdPer1k = getTtsUsdCost(pricing, key);
+  const chars = Math.max(0, characters);
+  if (!chars) return 0;
+  return chargeTtsCents((chars / 1000) * usdPer1k, billing, markup);
 }
 
 export function estimateTtsCostCentsFromBilling(
@@ -196,95 +223,48 @@ export function estimateTtsCostCentsFromBilling(
   return eurCents > 0 ? eurCents : 0;
 }
 
-function envOpenRouterTtsUsdPer1k(): number {
-  const raw = process.env.BETA_OPENROUTER_TTS_USD_PER_1K?.trim();
-  const n = raw ? Number.parseFloat(raw) : 1;
-  return Number.isFinite(n) && n >= 0 ? n : 1;
-}
-
-function envFishTtsUsdPer1mBytes(): number {
-  const raw = process.env.BETA_FISH_TTS_USD_PER_1M_BYTES?.trim();
-  const n = raw ? Number.parseFloat(raw) : 15;
-  return Number.isFinite(n) && n >= 0 ? n : 15;
-}
-
-function envFalTtsUsdPer1k(modelId?: string): number {
-  const model = modelId?.trim() ?? "";
-  if (model.includes("inworld")) {
-    const raw = process.env.BETA_FAL_INWORLD_TTS_USD_PER_1K?.trim();
-    const n = raw ? Number.parseFloat(raw) : 0.01;
-    return Number.isFinite(n) && n >= 0 ? n : 0.01;
-  }
-  if (model.includes("elevenlabs")) {
-    const raw = process.env.BETA_FAL_ELEVEN_TTS_USD_PER_1K?.trim();
-    const n = raw ? Number.parseFloat(raw) : 0.1;
-    return Number.isFinite(n) && n >= 0 ? n : 0.1;
-  }
-  if (model.includes("minimax")) {
-    const raw = process.env.BETA_FAL_MINIMAX_TTS_USD_PER_1K?.trim();
-    const n = raw ? Number.parseFloat(raw) : 0.1;
-    return Number.isFinite(n) && n >= 0 ? n : 0.1;
-  }
-  if (model.includes("qwen-3-tts")) {
-    if (model.includes("0.6b")) {
-      const raw = process.env.BETA_FAL_QWEN_TTS_06B_USD_PER_1K?.trim();
-      const n = raw ? Number.parseFloat(raw) : 0.07;
-      return Number.isFinite(n) && n >= 0 ? n : 0.07;
-    }
-    const raw = process.env.BETA_FAL_QWEN_TTS_17B_USD_PER_1K?.trim();
-    const n = raw ? Number.parseFloat(raw) : 0.09;
-    return Number.isFinite(n) && n >= 0 ? n : 0.09;
-  }
-  const raw = process.env.BETA_FAL_TTS_USD_PER_1K?.trim();
-  const n = raw ? Number.parseFloat(raw) : 0.02;
-  return Number.isFinite(n) && n >= 0 ? n : 0.02;
-}
-
-/** OpenRouter speech — flat $/1k chars (override via BETA_OPENROUTER_TTS_USD_PER_1K). */
+/** OpenRouter speech — $/1k chars + markup. */
 export async function estimateOpenRouterTtsCostCents(
   supabase: SupabaseClient,
   characters: number,
 ): Promise<number> {
   const billing = await fetchBillingSettings(supabase);
+  const pricing = await fetchProviderPricing(supabase);
+  const key = "openrouter";
   const chars = Math.max(0, characters);
   if (!chars) return 0;
-  const eurCents = openRouterUsdToEurCents(
-    (chars / 1000) * envOpenRouterTtsUsdPer1k(),
-    billing.usdToEurRate,
-  );
-  return eurCents > 0 ? eurCents : 0;
+  const usd = (chars / 1000) * getTtsUsdCost(pricing, key);
+  return chargeTtsCents(usd, billing, getTtsMarkupPercent(pricing, key));
 }
 
-/** Fish Audio — $/1M UTF-8 bytes (override via BETA_FISH_TTS_USD_PER_1M_BYTES). */
+/** Fish Audio — $/1M UTF-8 bytes + markup. */
 export async function estimateFishTtsCostCents(
   supabase: SupabaseClient,
   utf8Bytes: number,
 ): Promise<number> {
   const billing = await fetchBillingSettings(supabase);
+  const pricing = await fetchProviderPricing(supabase);
+  const key = "fish";
   const bytes = Math.max(0, utf8Bytes);
   if (!bytes) return 0;
-  const eurCents = openRouterUsdToEurCents(
-    (bytes / 1_000_000) * envFishTtsUsdPer1mBytes(),
-    billing.usdToEurRate,
-  );
-  return eurCents > 0 ? eurCents : 0;
+  const usd = (bytes / 1_000_000) * getTtsUsdCost(pricing, key);
+  return chargeTtsCents(usd, billing, getTtsMarkupPercent(pricing, key));
 }
 
-/** fal.ai TTS — model-aware $/1k chars (Kokoro: pro 1000-Zeichen-Block). */
+/** fal.ai TTS — model-aware $/1k + markup. */
 export async function estimateFalTtsCostCents(
   supabase: SupabaseClient,
   characters: number,
   modelId?: string,
 ): Promise<number> {
   const billing = await fetchBillingSettings(supabase);
+  const pricing = await fetchProviderPricing(supabase);
+  const key = resolveTtsPricingKey("fal", modelId);
   const chars = Math.max(0, characters);
   if (!chars) return 0;
   const usd =
-    falTtsBillableUnits(chars, modelId) * envFalTtsUsdPer1k(modelId);
-  const eurCents = openRouterUsdToEurCents(usd, billing.usdToEurRate, {
-    minCents: 0,
-  });
-  return eurCents > 0 ? eurCents : 0;
+    falTtsBillableUnits(chars, modelId) * getTtsUsdCost(pricing, key);
+  return chargeTtsCents(usd, billing, getTtsMarkupPercent(pricing, key));
 }
 
 export function formatEurCentsHint(

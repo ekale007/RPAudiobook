@@ -10,6 +10,11 @@ import {
   fetchBillingSettings,
   openRouterUsdToEurCents,
 } from "@/lib/server/billingSettings";
+import {
+  applyMarkupPercent,
+  fetchProviderPricing,
+  getLlmMarkupPercent,
+} from "@/lib/server/providerPricing";
 import { insertUsageEvent } from "@/lib/server/usageEvents";
 import { applyUsageCharge } from "@/lib/server/wallet";
 
@@ -81,7 +86,7 @@ export function estimateLlmCostCents(
 
 export type LlmChargeSource = "openrouter" | "catalog";
 
-/** Monatsbudget & Log: OpenRouter-`usage.cost` (USD), sonst Katalog aus BETA_LLM_MODELS. */
+/** Monatsbudget & Log: OpenRouter-`usage.cost` (USD), sonst Katalog aus Admin-Preisen. */
 export async function resolveLlmChargeCents(
   supabase: SupabaseClient,
   promptTokens: number,
@@ -90,22 +95,30 @@ export async function resolveLlmChargeCents(
   providerCostUsd: number | null | undefined,
 ): Promise<{ costCents: number; source: LlmChargeSource }> {
   const billing = await fetchBillingSettings(supabase);
+  const pricing = await fetchProviderPricing(supabase);
+  const markup = getLlmMarkupPercent(pricing, modelId);
+
+  let baseCents: number;
+  let source: LlmChargeSource;
+
   if (
     providerCostUsd != null &&
     Number.isFinite(providerCostUsd) &&
     providerCostUsd > 0
   ) {
-    return {
-      costCents: openRouterUsdToEurCents(
-        providerCostUsd,
-        billing.usdToEurRate,
-      ),
-      source: "openrouter",
-    };
+    baseCents = openRouterUsdToEurCents(
+      providerCostUsd,
+      billing.usdToEurRate,
+    );
+    source = "openrouter";
+  } else {
+    baseCents = estimateLlmCostCents(promptTokens, completionTokens, modelId);
+    source = "catalog";
   }
+
   return {
-    costCents: estimateLlmCostCents(promptTokens, completionTokens, modelId),
-    source: "catalog",
+    costCents: applyMarkupPercent(baseCents, markup),
+    source,
   };
 }
 

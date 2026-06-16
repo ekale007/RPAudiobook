@@ -548,6 +548,16 @@ export const deMessages = {
     sceneStyleDesc:
       "im Chat (Plot + Absatz) — Fish [whisper]/[laughing], Eleven v3, Qwen-instruct; plus Ambience aus Ort.",
   },
+  pwa: {
+    installTitle: "RP Audiobook installieren",
+    installAndroidHint:
+      "Für Vollbild & schnelleren Zugriff: App zum Startbildschirm hinzufügen.",
+    installIosHint:
+      "Safari: Teilen ↗ → „Zum Home-Bildschirm“. Dann startet die App ohne Browser-Leiste.",
+    installButton: "Installieren",
+    later: "Später",
+    dismiss: "Schließen",
+  },
 } as const;
 
 type DeepStringRecord<T> = {

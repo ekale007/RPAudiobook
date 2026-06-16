@@ -550,4 +550,14 @@ export const enMessages: Messages = {
     sceneStyleDesc:
       "in chat (plot + paragraph) — Fish [whisper]/[laughing], Eleven v3, Qwen instruct; plus ambience from location.",
   },
+  pwa: {
+    installTitle: "Install RP Audiobook",
+    installAndroidHint:
+      "Add to your home screen for fullscreen and quicker access.",
+    installIosHint:
+      "Safari: Share ↗ → “Add to Home Screen”. The app opens without the browser bar.",
+    installButton: "Install",
+    later: "Later",
+    dismiss: "Close",
+  },
 };

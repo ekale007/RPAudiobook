@@ -1,11 +1,31 @@
 # Mobile (PWA) testing
 
+## Install hint (in-app)
+
+On phones, a banner appears when the app is not yet installed:
+
+- **Android (Chrome):** tap **Install** when the browser offers the PWA prompt.
+- **iOS (Safari):** tap **Share** → **Add to Home Screen** (Apple does not allow a one-tap install button).
+
+Dismiss with **Not now** — the hint stays hidden for 14 days. In standalone mode (already on the home screen), the banner does not show.
+
+Icons and `manifest.webmanifest` use `/brand/logo.png` (192 / 512, maskable).
+
 ## On the same Wi‑Fi
 
 1. On PC: `npm run dev` (listens on `0.0.0.0:3000`)
 2. Find PC IP: `ipconfig` → IPv4 (e.g. `192.168.1.42`)
 3. On phone browser: `http://192.168.1.42:3000` (not localhost)
-4. **Add to Home Screen** (Safari/Chrome) for app-like UI
+4. **Add to Home Screen** (Safari/Chrome) for app-like UI — or use the in-app install banner (see [MOBILE.md](MOBILE.md)).
+
+## Mobile QA checklist (local or prod)
+
+- [ ] Install banner: Android shows **Install**; iOS shows Safari steps
+- [ ] Banner hidden after dismiss; hidden in standalone / home-screen mode
+- [ ] Safe areas: header and chat input not under notch / home indicator
+- [ ] Chat scroll and keyboard: input stays visible while typing
+- [ ] TTS play/pause usable with one thumb
+- [ ] Landscape: layout does not break (library carousel, chat)
 
 ## Login on phone
 

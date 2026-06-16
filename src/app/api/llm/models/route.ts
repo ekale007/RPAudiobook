@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import {
   formatModelPriceHint,
-  getLlmModelCatalog,
 } from "@/lib/server/llmModels";
+import { fetchLlmModelCatalog } from "@/lib/server/providerPricing";
 import { requireUser } from "@/lib/server/requireUser";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 import {
@@ -23,9 +23,10 @@ export async function GET(req: Request) {
     limits = null;
   }
 
+  const catalogBase = await fetchLlmModelCatalog(supabase);
   const catalog = limits
-    ? filterCatalogForTier(getLlmModelCatalog(), limits)
-    : getLlmModelCatalog();
+    ? filterCatalogForTier(catalogBase, limits)
+    : catalogBase;
 
   const models = catalog.map((m) => ({
     id: m.id,

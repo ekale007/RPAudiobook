@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
+import {
+  AdminProviderPricingSection,
+  draftFromProviderPricing,
+  parseProviderPricingDraft,
+} from "@/components/admin/AdminProviderPricingSection";
+import type { ProviderPricingPayload } from "@/lib/server/providerPricing";
 import { authFetch } from "@/lib/supabase/authFetch";
 type UserTier = "free" | "beta" | "pro";
 
@@ -120,6 +126,10 @@ export default function AdminPage() {
   >(null);
   const [creditEur, setCreditEur] = useState("5");
   const [creditNote, setCreditNote] = useState("");
+  const [providerPricingDraft, setProviderPricingDraft] = useState<
+    ReturnType<typeof draftFromProviderPricing> | null
+  >(null);
+  const [billingEnvFallback, setBillingEnvFallback] = useState(false);
 
   const loadBilling = useCallback(async () => {
     const res = await authFetch("/api/admin/billing-settings");
@@ -127,6 +137,8 @@ export default function AdminPage() {
     const json = (await res.json()) as {
       settings: BillingSettingsState;
       tierLimits?: TierLimitsMap;
+      providerPricing?: ProviderPricingPayload;
+      envFallback?: boolean;
       warning?: string;
       pricingUrl?: string;
       starterPlanNote?: string;
@@ -144,6 +156,10 @@ export default function AdminPage() {
       setTierLimits(json.tierLimits);
       setTierLimitsDraft(draftFromTierLimits(json.tierLimits));
     }
+    if (json.providerPricing) {
+      setProviderPricingDraft(draftFromProviderPricing(json.providerPricing));
+    }
+    setBillingEnvFallback(Boolean(json.envFallback));
   }, []);
 
   const loadUsers = useCallback(async () => {
@@ -255,6 +271,34 @@ export default function AdminPage() {
       setMessage("Tarif-Limits gespeichert.");
       await loadBilling();
       await loadUsers();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveProviderPricing = async () => {
+    if (!providerPricingDraft) return;
+    const parsed = parseProviderPricingDraft(providerPricingDraft);
+    if ("error" in parsed) {
+      setMessage(parsed.error);
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await authFetch("/api/admin/billing-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ providerPricing: parsed }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Speichern fehlgeschlagen (${res.status})`);
+      }
+      setMessage("LLM/TTS-Preise gespeichert.");
+      await loadBilling();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : String(e));
     } finally {
@@ -508,6 +552,14 @@ export default function AdminPage() {
               </p>
             ) : null}
           </section>
+
+          <AdminProviderPricingSection
+            draft={providerPricingDraft}
+            onChange={setProviderPricingDraft}
+            onSave={() => void saveProviderPricing()}
+            busy={busy}
+            disabled={billingEnvFallback}
+          />
 
           {tierLimitsDraft ? (
             <section className="rounded-xl border border-surface-border bg-surface-raised p-4">

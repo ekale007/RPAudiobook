@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { PwaBootstrap } from "@/components/PwaBootstrap";
+import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { ServerCapabilitiesBootstrap } from "@/components/ServerCapabilitiesBootstrap";
 import { UserPreferencesBootstrap } from "@/components/UserPreferencesBootstrap";
 import { brand } from "@/lib/brand";
@@ -43,6 +44,7 @@ export default function RootLayout({
         <UserPreferencesBootstrap />
         <UiLocaleProvider>
           {children}
+          <PwaInstallBanner />
         </UiLocaleProvider>
       </body>
     </html>
