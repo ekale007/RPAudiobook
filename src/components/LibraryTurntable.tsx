@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   filterPublicLibraryTemplates,
-  type LibraryLocaleFilter,
   type LibraryTemplateId,
   type LibraryTemplateDefinition,
 } from "@/lib/story/libraryTemplates";
@@ -116,8 +115,7 @@ export function LibraryTurntable({
   onImport: (id: LibraryTemplateId) => void;
 }) {
   const { locale: uiLocale, t } = useUiLocale();
-  const [localeFilter, setLocaleFilter] = useState<LibraryLocaleFilter>("all");
-  const templates = filterPublicLibraryTemplates(localeFilter, uiLocale);
+  const templates = filterPublicLibraryTemplates(uiLocale);
   const count = templates.length;
   const angleStep = count > 0 ? 360 / count : 360;
 
@@ -128,7 +126,7 @@ export function LibraryTurntable({
 
   useEffect(() => {
     setActiveIndex(0);
-  }, [localeFilter, uiLocale]);
+  }, [uiLocale]);
 
   const activeTemplate = templates[activeIndex] ?? templates[0];
   const rotation = -activeIndex * angleStep;
@@ -182,26 +180,10 @@ export function LibraryTurntable({
     setDragging(false);
   };
 
-  const filterBtn = (id: LibraryLocaleFilter, label: string) => (
-    <button
-      key={id}
-      type="button"
-      onClick={() => setLocaleFilter(id)}
-      aria-pressed={localeFilter === id}
-      className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${
-        localeFilter === id
-          ? "bg-accent/20 text-accent"
-          : "border border-zinc-700/80 text-zinc-500"
-      }`}
-    >
-      {label}
-    </button>
-  );
-
   if (!activeTemplate) {
     return (
       <section className="mt-6 px-1 text-xs text-zinc-500">
-        {t("library.title")} — no templates for this filter.
+        {t("library.title")} — {t("library.emptyFilter")}
       </section>
     );
   }
@@ -214,16 +196,9 @@ export function LibraryTurntable({
   return (
     <section className="mt-6 flex flex-col gap-3">
       <div className="px-1">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-medium text-zinc-200">
-            {t("library.title")}
-          </h2>
-          <div className="flex gap-1">
-            {filterBtn("all", t("library.filterAll"))}
-            {filterBtn("de", t("library.filterDe"))}
-            {filterBtn("en", t("library.filterEn"))}
-          </div>
-        </div>
+        <h2 className="text-sm font-medium text-zinc-200">
+          {t("library.title")}
+        </h2>
         <p className="mt-0.5 text-xs text-zinc-500">{t("library.hint")}</p>
       </div>
 

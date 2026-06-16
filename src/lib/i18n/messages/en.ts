@@ -32,10 +32,10 @@ export const enMessages: Messages = {
   },
   library: {
     title: "Library",
-    hint: "Every story is available in German and English — swipe or use the arrows.",
-    filterAll: "All",
+    hint: "Templates in your UI language (switch DE/EN above) — swipe or use the arrows.",
     filterDe: "DE",
     filterEn: "EN",
+    emptyFilter: "no templates",
     import: "Import",
     importing: "Importing…",
     prevBook: "Previous book",

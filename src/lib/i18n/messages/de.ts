@@ -30,10 +30,10 @@ export const deMessages = {
   },
   library: {
     title: "Bibliothek",
-    hint: "Jede Geschichte gibt es auf Deutsch und Englisch — wische oder nutze die Pfeile.",
-    filterAll: "Alle",
+    hint: "Vorlagen in deiner Oberflächensprache (DE/EN oben) — wischen oder Pfeile nutzen.",
     filterDe: "DE",
     filterEn: "EN",
+    emptyFilter: "keine Vorlagen",
     import: "Importieren",
     importing: "Importiert …",
     prevBook: "Vorheriges Buch",

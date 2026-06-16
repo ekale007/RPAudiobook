@@ -955,38 +955,10 @@ export function getLibraryTemplate(
   return PUBLIC_LIBRARY_TEMPLATES.find((t) => t.id === id);
 }
 
-export type LibraryLocaleFilter = "all" | "de" | "en";
-
 export function filterPublicLibraryTemplates(
-  filter: LibraryLocaleFilter,
-  uiLocale?: "de" | "en",
+  uiLocale: "de" | "en",
 ): LibraryTemplateDefinition[] {
-  const filtered =
-    filter === "all"
-      ? [...PUBLIC_LIBRARY_TEMPLATES]
-      : PUBLIC_LIBRARY_TEMPLATES.filter((t) => t.locale === filter);
-
-  if (filter !== "all" || !uiLocale) return filtered;
-
-  const bySeries = new Map<string, LibraryTemplateDefinition[]>();
-  for (const template of filtered) {
-    const key = libraryTemplateSeriesId(template);
-    const group = bySeries.get(key);
-    if (group) group.push(template);
-    else bySeries.set(key, [template]);
-  }
-
-  const ordered: LibraryTemplateDefinition[] = [];
-  for (const group of bySeries.values()) {
-    group.sort((a, b) => {
-      if (a.locale === b.locale) return a.id.localeCompare(b.id);
-      if (a.locale === uiLocale) return -1;
-      if (b.locale === uiLocale) return 1;
-      return a.locale === "de" ? -1 : 1;
-    });
-    ordered.push(...group);
-  }
-  return ordered;
+  return PUBLIC_LIBRARY_TEMPLATES.filter((t) => t.locale === uiLocale);
 }
 
 export function libraryTemplateToDraft(
