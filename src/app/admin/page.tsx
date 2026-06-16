@@ -94,10 +94,6 @@ type AdminLogEvent = {
 
 type BillingSettingsState = {
   usdToEurRate: number;
-  ttsUsdPer1kFlash: number;
-  ttsUsdPer1kStandard: number;
-  eurPer1kFlashHint?: string;
-  eurPer1kStandardHint?: string;
   updatedAt: string | null;
 };
 
@@ -110,16 +106,8 @@ export default function AdminPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [billing, setBilling] = useState<BillingSettingsState | null>(null);
-  const [billingDraft, setBillingDraft] = useState({
-    usdToEur: "",
-    ttsUsdFlash: "",
-    ttsUsdStandard: "",
-  });
+  const [billingDraft, setBillingDraft] = useState({ usdToEur: "" });
   const [billingWarning, setBillingWarning] = useState<string | null>(null);
-  const [pricingUrl, setPricingUrl] = useState(
-    "https://elevenlabs.io/pricing/api",
-  );
-  const [starterNote, setStarterNote] = useState<string | null>(null);
   const [tierLimits, setTierLimits] = useState<TierLimitsMap | null>(null);
   const [tierLimitsDraft, setTierLimitsDraft] = useState<
     Record<UserTier, Record<keyof TierLimitDefaults, string>> | null
@@ -140,18 +128,12 @@ export default function AdminPage() {
       providerPricing?: ProviderPricingPayload;
       envFallback?: boolean;
       warning?: string;
-      pricingUrl?: string;
-      starterPlanNote?: string;
     };
     setBilling(json.settings);
     setBillingDraft({
       usdToEur: String(json.settings.usdToEurRate),
-      ttsUsdFlash: String(json.settings.ttsUsdPer1kFlash),
-      ttsUsdStandard: String(json.settings.ttsUsdPer1kStandard),
     });
     setBillingWarning(json.warning ?? null);
-    if (json.pricingUrl) setPricingUrl(json.pricingUrl);
-    setStarterNote(json.starterPlanNote ?? null);
     if (json.tierLimits) {
       setTierLimits(json.tierLimits);
       setTierLimitsDraft(draftFromTierLimits(json.tierLimits));
@@ -206,22 +188,8 @@ export default function AdminPage() {
 
   const saveBilling = async () => {
     const usdToEurRate = Number.parseFloat(billingDraft.usdToEur.replace(",", "."));
-    const ttsUsdPer1kFlash = Number.parseFloat(
-      billingDraft.ttsUsdFlash.replace(",", "."),
-    );
-    const ttsUsdPer1kStandard = Number.parseFloat(
-      billingDraft.ttsUsdStandard.replace(",", "."),
-    );
     if (!Number.isFinite(usdToEurRate) || usdToEurRate <= 0 || usdToEurRate > 5) {
       setMessage("USD→EUR muss zwischen 0 und 5 liegen.");
-      return;
-    }
-    if (!Number.isFinite(ttsUsdPer1kFlash) || ttsUsdPer1kFlash < 0) {
-      setMessage("TTS Flash $/1k ungültig.");
-      return;
-    }
-    if (!Number.isFinite(ttsUsdPer1kStandard) || ttsUsdPer1kStandard < 0) {
-      setMessage("TTS Multilingual/v3 $/1k ungültig.");
       return;
     }
     setBusy(true);
@@ -230,17 +198,13 @@ export default function AdminPage() {
       const res = await authFetch("/api/admin/billing-settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          usdToEurRate,
-          ttsUsdPer1kFlash,
-          ttsUsdPer1kStandard,
-        }),
+        body: JSON.stringify({ usdToEurRate }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? `Speichern fehlgeschlagen (${res.status})`);
       }
-      setMessage("Kurse gespeichert.");
+      setMessage("Wechselkurs gespeichert.");
       await loadBilling();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : String(e));
@@ -453,24 +417,12 @@ export default function AdminPage() {
           <>
           <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
             <h2 className="mb-1 text-sm font-medium text-accent">
-              Abrechnungskurse
+              Wechselkurs
             </h2>
             <p className="mb-2 text-xs text-zinc-500">
-              OpenRouter-USD → EUR für LLM. TTS nach{" "}
-              <a
-                href={pricingUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-accent underline"
-              >
-                Eleven API-Preisliste
-              </a>
-              : Flash/Turbo $0,05 · Multilingual/v3 $0,10 pro 1k Zeichen
-              (Defaults).
+              USD → EUR für OpenRouter-LLM und alle TTS-Anbieter (vor Markup).
+              TTS-USD-Preise je Anbieter unten in der Preistabelle.
             </p>
-            {starterNote ? (
-              <p className="mb-3 text-xs text-zinc-600">{starterNote}</p>
-            ) : null}
             {billingWarning ? (
               <p className="mb-2 text-xs text-amber-300">{billingWarning}</p>
             ) : null}
@@ -491,55 +443,13 @@ export default function AdminPage() {
                   className="w-28 rounded border border-surface-border bg-surface px-2 py-1.5 text-zinc-200"
                 />
               </label>
-              <label className="flex flex-col gap-1 text-xs text-zinc-400">
-                TTS Flash $/1k
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  disabled={busy}
-                  value={billingDraft.ttsUsdFlash}
-                  onChange={(e) =>
-                    setBillingDraft((d) => ({
-                      ...d,
-                      ttsUsdFlash: e.target.value,
-                    }))
-                  }
-                  className="w-24 rounded border border-surface-border bg-surface px-2 py-1.5 text-zinc-200"
-                />
-                {billing?.eurPer1kFlashHint ? (
-                  <span className="text-[10px] text-zinc-600">
-                    ≈ {billing.eurPer1kFlashHint}/1k
-                  </span>
-                ) : null}
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-zinc-400">
-                TTS Multilingual/v3 $/1k
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  disabled={busy}
-                  value={billingDraft.ttsUsdStandard}
-                  onChange={(e) =>
-                    setBillingDraft((d) => ({
-                      ...d,
-                      ttsUsdStandard: e.target.value,
-                    }))
-                  }
-                  className="w-24 rounded border border-surface-border bg-surface px-2 py-1.5 text-zinc-200"
-                />
-                {billing?.eurPer1kStandardHint ? (
-                  <span className="text-[10px] text-zinc-600">
-                    ≈ {billing.eurPer1kStandardHint}/1k
-                  </span>
-                ) : null}
-              </label>
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => void saveBilling()}
                 className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-surface disabled:opacity-50"
               >
-                Kurse speichern
+                Kurs speichern
               </button>
             </div>
             {billing?.updatedAt ? (

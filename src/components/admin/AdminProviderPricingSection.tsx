@@ -139,8 +139,16 @@ export function AdminProviderPricingSection({
       </h2>
       <p className="mb-3 text-xs text-zinc-500">
         LLM: Cent pro 1k Tokens (Fallback wenn OpenRouter keinen USD-Preis
-        liefert). TTS: USD laut Anbieter-Einheit. Markup wird auf die
-        Nutzer-Abrechnung aufgeschlagen (nach USD→EUR).
+        liefert). TTS: USD laut Anbieter-Einheit — z. B.{" "}
+        <a
+          href="https://elevenlabs.io/pricing/api"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-accent underline"
+        >
+          ElevenLabs API
+        </a>
+        . Markup wird auf die Nutzer-Abrechnung aufgeschlagen (nach USD→EUR).
       </p>
 
       <h3 className="mb-2 text-xs font-medium text-zinc-300">LLM-Modelle</h3>
