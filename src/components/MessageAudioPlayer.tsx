@@ -404,7 +404,7 @@ export const MessageAudioPlayer = forwardRef<
         settings.provider === "qwen-cloud"
           ? `${ttsCacheVoiceKey(settings)}:${localVoice}${
               useMultiVoice
-                ? `:multi:${scriptMulti ? "script:" : ""}${JSON.stringify(activeOverrides)}:${storyLocale?.startsWith("de") ? "de" : "en"}:${JSON.stringify(voiceEnabledSlugs ?? null)}${localTtsRouteCacheSuffix(settings, storyLocale)}`
+                ? `:multi:${scriptMulti ? "script2:" : ""}${JSON.stringify(activeOverrides)}:${storyLocale?.startsWith("de") ? "de" : "en"}:${JSON.stringify(voiceEnabledSlugs ?? null)}${localTtsRouteCacheSuffix(settings, storyLocale)}`
                 : localTtsRouteCacheSuffix(settings, storyLocale)
             }`
           : ttsCacheVoiceKey(settings),

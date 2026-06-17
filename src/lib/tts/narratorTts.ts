@@ -7,7 +7,12 @@ import {
   parseSpeakerBlocks,
   preprocessAssistantMarkup,
 } from "@/lib/chat/parseSpeakerBlocks";
-import { PROTAGONIST_SPEAKER_SLUG } from "@/lib/story/protagonist";
+import {
+  PROTAGONIST_SPEAKER_SLUG,
+  normalizeStoryContentLocale,
+  type StoryContentLocale,
+} from "@/lib/story/protagonist";
+import { extractMarkedSnippets } from "@/lib/chat/dialogueQuotes";
 import {
   isSpeakableForTts,
   sanitizeTextForTtsRetry,
@@ -605,7 +610,7 @@ export async function getNarratorAudio(
     storyLocale,
   );
   const voiceKey = useMultiVoice
-    ? `${ttsCacheVoiceKey(settings)}:multi:${scriptMulti ? "script:" : ""}${JSON.stringify(
+    ? `${ttsCacheVoiceKey(settings)}:multi:${scriptMulti ? "script2:" : ""}${JSON.stringify(
         activeOverrides,
       )}:${normalizeStoryLocaleKey(storyLocale)}:${JSON.stringify(options?.voiceEnabledSlugs ?? null)}${localTtsRouteCacheSuffix(settings, storyLocale)}`
     : cacheVoiceKey(settings, voice, storyLocale);
@@ -642,6 +647,7 @@ export async function getNarratorAudio(
     rawMarked,
     activeOverrides,
     hasSegmentOverrides,
+    normalizeStoryContentLocale(storyLocale ?? "en"),
   );
 
   for (const seg of segments) {
@@ -757,10 +763,35 @@ function filterOverridesInScope(
   return out;
 }
 
+function splitCastBlockForTts(
+  blockText: string,
+  blockSpeakerSlug: string,
+  scopedOverrides: Record<string, string>,
+  locale: StoryContentLocale,
+): Array<{ text: string; speakerSlug: string | null }> {
+  const snippets = extractMarkedSnippets(blockText, locale);
+  if (!snippets.length) {
+    return [{ text: blockText, speakerSlug: null }];
+  }
+
+  const overrides: Record<string, string> = {};
+  for (const snippet of snippets) {
+    const assigned = scopedOverrides[snippet];
+    if (assigned && assigned !== "narrator") {
+      overrides[snippet] = assigned;
+    } else {
+      overrides[snippet] = blockSpeakerSlug;
+    }
+  }
+
+  return splitByOverrides(blockText, overrides);
+}
+
 function segmentsFromScriptBlocks(
   rawMarked: string,
   activeOverrides: Record<string, string>,
   hasSegmentOverrides: boolean,
+  locale: StoryContentLocale,
 ): Array<{ text: string; speakerSlug: string | null }> {
   const blocks = parseSpeakerBlocks(rawMarked);
   const segments: Array<{ text: string; speakerSlug: string | null }> = [];
@@ -773,23 +804,28 @@ function segmentsFromScriptBlocks(
     const isNarratorBlock = slug === "narrator";
     const isProtagonistBlock = slug === PROTAGONIST_SPEAKER_SLUG;
 
-    if ((isNarratorBlock || isProtagonistBlock) && hasSegmentOverrides) {
-      const scoped = filterOverridesInScope(activeOverrides, blockText);
-      for (const seg of splitByOverrides(blockText, scoped)) {
-        segments.push({
-          text: seg.text,
-          speakerSlug: isProtagonistBlock
-            ? (seg.speakerSlug ?? PROTAGONIST_SPEAKER_SLUG)
-            : seg.speakerSlug,
-        });
+    if (isNarratorBlock) {
+      if (hasSegmentOverrides) {
+        const scoped = filterOverridesInScope(activeOverrides, blockText);
+        for (const seg of splitByOverrides(blockText, scoped)) {
+          segments.push({ text: seg.text, speakerSlug: seg.speakerSlug });
+        }
+      } else {
+        segments.push({ text: blockText, speakerSlug: null });
       }
       continue;
     }
 
-    segments.push({
-      text: blockText,
-      speakerSlug: isNarratorBlock ? null : slug,
-    });
+    const blockSpeaker = isProtagonistBlock ? PROTAGONIST_SPEAKER_SLUG : slug;
+    const scoped = filterOverridesInScope(activeOverrides, blockText);
+    for (const seg of splitCastBlockForTts(
+      blockText,
+      blockSpeaker,
+      scoped,
+      locale,
+    )) {
+      segments.push(seg);
+    }
   }
 
   return segments.length ? segments : [{ text: "", speakerSlug: null }];
@@ -800,12 +836,14 @@ function buildTtsSegments(
   rawMarked: string,
   activeOverrides: Record<string, string>,
   hasSegmentOverrides: boolean,
+  locale: StoryContentLocale,
 ): Array<{ text: string; speakerSlug: string | null }> {
   if (rawMarked && hasSpeakerTags(rawMarked)) {
     return segmentsFromScriptBlocks(
       rawMarked,
       activeOverrides,
       hasSegmentOverrides,
+      locale,
     );
   }
   if (hasSegmentOverrides) {
