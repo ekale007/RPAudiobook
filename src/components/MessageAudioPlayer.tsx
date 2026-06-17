@@ -12,7 +12,7 @@ import type { MessageAudioPlayerHandle } from "@/lib/tts/messageAudioPlayerHandl
 import { createClient } from "@/lib/supabase/client";
 import { downloadTurnAudio } from "@/lib/db/ttsStorage";
 import { storeTurnAudioToCloud } from "@/lib/tts/storeTurnAudioCloud";
-import { getNarratorAudio } from "@/lib/tts/narratorTts";
+import { getNarratorAudio, scriptBlocksNeedMultiVoice } from "@/lib/tts/narratorTts";
 import type { CharacterRow } from "@/lib/db/stories";
 import type { VoiceMap, StorySettings } from "@/lib/types";
 import { loadTtsSettings, ttsCacheVoiceKey } from "@/lib/storage/ttsSettings";
@@ -378,6 +378,10 @@ export const MessageAudioPlayer = forwardRef<
         ([snippet, slug]) =>
           snippet.trim().length > 0 && slug && slug !== "narrator",
       );
+      const scriptMulti = rawContent?.trim()
+        ? scriptBlocksNeedMultiVoice(rawContent)
+        : false;
+      const useMultiVoice = hasSegmentOverrides || scriptMulti;
 
       const baseText =
         assistantTurnProseText(rawContent ?? text).trim() || text.trim();
@@ -399,8 +403,8 @@ export const MessageAudioPlayer = forwardRef<
         settings.provider === "qwen" ||
         settings.provider === "qwen-cloud"
           ? `${ttsCacheVoiceKey(settings)}:${localVoice}${
-              hasSegmentOverrides
-                ? `:multi:${JSON.stringify(activeOverrides)}:${storyLocale?.startsWith("de") ? "de" : "en"}:${JSON.stringify(voiceEnabledSlugs ?? null)}${localTtsRouteCacheSuffix(settings, storyLocale)}`
+              useMultiVoice
+                ? `:multi:${scriptMulti ? "script:" : ""}${JSON.stringify(activeOverrides)}:${storyLocale?.startsWith("de") ? "de" : "en"}:${JSON.stringify(voiceEnabledSlugs ?? null)}${localTtsRouteCacheSuffix(settings, storyLocale)}`
                 : localTtsRouteCacheSuffix(settings, storyLocale)
             }`
           : ttsCacheVoiceKey(settings),
@@ -409,7 +413,7 @@ export const MessageAudioPlayer = forwardRef<
       );
       blob = await getCachedAudio(cacheKey);
 
-      if (!blob && audioStoragePath && !hasSegmentOverrides) {
+      if (!blob && audioStoragePath && !useMultiVoice) {
         blob = await downloadTurnAudio(audioStoragePath);
         if (blob) await setCachedAudio(cacheKey, blob);
       }

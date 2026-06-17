@@ -1,7 +1,13 @@
 import { concatAudioBlobs } from "@/lib/audio/concatAudioBlobs";
 import { chunkTextForTts } from "@/lib/tts/chunkText";
 import { QWEN_CLOUD_MAX_TEXT_CHARS } from "@/lib/tts/qwenCloudLimits";
-import { assistantTurnProseText } from "@/lib/chat/parseSpeakerBlocks";
+import {
+  assistantTurnProseText,
+  hasSpeakerTags,
+  parseSpeakerBlocks,
+  preprocessAssistantMarkup,
+} from "@/lib/chat/parseSpeakerBlocks";
+import { PROTAGONIST_SPEAKER_SLUG } from "@/lib/story/protagonist";
 import {
   isSpeakableForTts,
   sanitizeTextForTtsRetry,
@@ -70,10 +76,18 @@ import { stripSfxTags } from "@/lib/audio/sfxCatalog";
 function ttsChunkCharLimit(provider: TtsProvider, settings?: TtsSettings): number {
   if (provider === "qwen-cloud") return QWEN_CLOUD_MAX_TEXT_CHARS;
   if (provider === "local" || provider === "qwen") return 4000;
+  if (provider === "fish-audio") return 2350;
   if (provider === "fal-ai" && settings) {
     return falTtsMaxChars(settings.falTtsModel);
   }
   return 2400;
+}
+
+/** True when <<speaker:…>> blocks include cast / protagonist (not narrator-only). */
+export function scriptBlocksNeedMultiVoice(rawContent: string): boolean {
+  const marked = preprocessAssistantMarkup(rawContent);
+  if (!hasSpeakerTags(marked)) return false;
+  return parseSpeakerBlocks(marked).some((b) => b.speakerSlug !== "narrator");
 }
 
 async function synthesizeChunkLocal(
@@ -241,6 +255,12 @@ async function synthesizeChunkFishAudio(
     storyLocale,
     { segmentText: deliveryContext?.segmentText ?? text },
   );
+
+  if (ttsText.length > 2400) {
+    throw new Error(
+      `Fish Audio: Abschnitt zu lang (${ttsText.length} Zeichen, max. 2400).`,
+    );
+  }
 
   const res = await authFetch("/api/tts/fish", {
     method: "POST",
@@ -564,10 +584,15 @@ export async function getNarratorAudio(
     ([snippet, slug]) =>
       snippet.trim().length > 0 && slug && slug !== "narrator",
   );
+  const rawMarked = options?.rawContent?.trim()
+    ? preprocessAssistantMarkup(options.rawContent)
+    : "";
+  const scriptMulti = rawMarked ? scriptBlocksNeedMultiVoice(rawMarked) : false;
+  const useMultiVoice = hasSegmentOverrides || scriptMulti;
 
   const storyLocale = options?.storyLocale;
   const normalizedText = normalizeTextForTts(
-    hasSegmentOverrides ? splitSource : stripSfxTags(text),
+    useMultiVoice ? splitSource : stripSfxTags(text),
     settings,
     options?.cast ?? [],
     storyLocale,
@@ -579,8 +604,8 @@ export async function getNarratorAudio(
     options?.voiceEnabledSlugs,
     storyLocale,
   );
-  const voiceKey = hasSegmentOverrides
-    ? `${ttsCacheVoiceKey(settings)}:multi:${JSON.stringify(
+  const voiceKey = useMultiVoice
+    ? `${ttsCacheVoiceKey(settings)}:multi:${scriptMulti ? "script:" : ""}${JSON.stringify(
         activeOverrides,
       )}:${normalizeStoryLocaleKey(storyLocale)}:${JSON.stringify(options?.voiceEnabledSlugs ?? null)}${localTtsRouteCacheSuffix(settings, storyLocale)}`
     : cacheVoiceKey(settings, voice, storyLocale);
@@ -612,57 +637,44 @@ export async function getNarratorAudio(
     }) satisfies TtsChunkContext;
 
   const parts: Blob[] = [];
-  if (!hasSegmentOverrides) {
-    const qwen = qwenForSpeaker(options?.speakerSlug, normalizedText);
-    const chunks = chunkTextForTts(normalizedText, chunkLimit);
+  const segments = buildTtsSegments(
+    splitSource,
+    rawMarked,
+    activeOverrides,
+    hasSegmentOverrides,
+  );
+
+  for (const seg of segments) {
+    let segText = normalizeTextForTts(
+      prepareSegmentForTts(seg.text, seg.speakerSlug, options?.cast ?? []),
+      settings,
+      options?.cast ?? [],
+      storyLocale,
+    );
+    if (!isSpeakableForTts(segText)) continue;
+
+    const segVoice = resolveVoice(
+      settings,
+      seg.speakerSlug,
+      options?.voiceMap,
+      options?.voiceEnabledSlugs,
+      storyLocale,
+    );
+    const qwen = qwenForSpeaker(seg.speakerSlug, segText);
+    const chunks = chunkTextForTts(segText, chunkLimit);
     for (const chunk of chunks) {
       if (!isSpeakableForTts(chunk)) continue;
-      const chunkQwen = qwenForSpeaker(options?.speakerSlug, chunk) ?? qwen;
+      const chunkQwen = qwenForSpeaker(seg.speakerSlug, chunk) ?? qwen;
       const chunkResult = await synthesizeChunk(
         settings,
         chunk,
-        chunkQwen?.voice ?? voice,
+        chunkQwen?.voice ?? segVoice,
         storyLocale,
         chunkQwen ?? undefined,
-        deliveryCtx(options?.speakerSlug ?? null, chunk),
+        deliveryCtx(seg.speakerSlug, chunk),
       );
       parts.push(chunkResult.blob);
       ttsCostCentsTotal += chunkResult.ttsCostCents;
-    }
-  } else {
-    const segments = splitByOverrides(splitSource, activeOverrides);
-    for (const seg of segments) {
-      let segText = normalizeTextForTts(
-        prepareSegmentForTts(seg.text, seg.speakerSlug, options?.cast ?? []),
-        settings,
-        options?.cast ?? [],
-        storyLocale,
-      );
-      if (!isSpeakableForTts(segText)) continue;
-
-      const segVoice = resolveVoice(
-        settings,
-        seg.speakerSlug,
-        options?.voiceMap,
-        options?.voiceEnabledSlugs,
-        storyLocale,
-      );
-      const qwen = qwenForSpeaker(seg.speakerSlug, segText);
-      const chunks = chunkTextForTts(segText, chunkLimit);
-      for (const chunk of chunks) {
-        if (!isSpeakableForTts(chunk)) continue;
-        const chunkQwen = qwenForSpeaker(seg.speakerSlug, chunk) ?? qwen;
-        const chunkResult = await synthesizeChunk(
-          settings,
-          chunk,
-          chunkQwen?.voice ?? segVoice,
-          storyLocale,
-          chunkQwen ?? undefined,
-          deliveryCtx(seg.speakerSlug, chunk),
-        );
-        parts.push(chunkResult.blob);
-        ttsCostCentsTotal += chunkResult.ttsCostCents;
-      }
     }
   }
 
@@ -730,6 +742,76 @@ function applyEdgeStyleNameHints(
     out = out.replace(re, hint.replacement);
   }
   return out;
+}
+
+function filterOverridesInScope(
+  overrides: Record<string, string>,
+  scope: string,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [snippet, slug] of Object.entries(overrides)) {
+    if (snippet.trim() && slug && scope.includes(snippet)) {
+      out[snippet] = slug;
+    }
+  }
+  return out;
+}
+
+function segmentsFromScriptBlocks(
+  rawMarked: string,
+  activeOverrides: Record<string, string>,
+  hasSegmentOverrides: boolean,
+): Array<{ text: string; speakerSlug: string | null }> {
+  const blocks = parseSpeakerBlocks(rawMarked);
+  const segments: Array<{ text: string; speakerSlug: string | null }> = [];
+
+  for (const block of blocks) {
+    const blockText = stripSfxTags(block.content).trim();
+    if (!blockText) continue;
+
+    const slug = block.speakerSlug;
+    const isNarratorBlock = slug === "narrator";
+    const isProtagonistBlock = slug === PROTAGONIST_SPEAKER_SLUG;
+
+    if ((isNarratorBlock || isProtagonistBlock) && hasSegmentOverrides) {
+      const scoped = filterOverridesInScope(activeOverrides, blockText);
+      for (const seg of splitByOverrides(blockText, scoped)) {
+        segments.push({
+          text: seg.text,
+          speakerSlug: isProtagonistBlock
+            ? (seg.speakerSlug ?? PROTAGONIST_SPEAKER_SLUG)
+            : seg.speakerSlug,
+        });
+      }
+      continue;
+    }
+
+    segments.push({
+      text: blockText,
+      speakerSlug: isNarratorBlock ? null : slug,
+    });
+  }
+
+  return segments.length ? segments : [{ text: "", speakerSlug: null }];
+}
+
+function buildTtsSegments(
+  splitSource: string,
+  rawMarked: string,
+  activeOverrides: Record<string, string>,
+  hasSegmentOverrides: boolean,
+): Array<{ text: string; speakerSlug: string | null }> {
+  if (rawMarked && hasSpeakerTags(rawMarked)) {
+    return segmentsFromScriptBlocks(
+      rawMarked,
+      activeOverrides,
+      hasSegmentOverrides,
+    );
+  }
+  if (hasSegmentOverrides) {
+    return splitByOverrides(splitSource, activeOverrides);
+  }
+  return [{ text: splitSource, speakerSlug: null }];
 }
 
 function splitByOverrides(
