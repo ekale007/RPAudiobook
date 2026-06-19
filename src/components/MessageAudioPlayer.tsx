@@ -165,6 +165,7 @@ export const MessageAudioPlayer = forwardRef<
   const ensurePromiseRef = useRef<Promise<HTMLAudioElement | null> | null>(
     null,
   );
+  const blobPromiseRef = useRef<Promise<Blob | null> | null>(null);
   const tickRef = useRef<number | null>(null);
   const playEndRef = useRef<(() => void) | null>(null);
   const blobRef = useRef<Blob | null>(null);
@@ -224,8 +225,8 @@ export const MessageAudioPlayer = forwardRef<
       if (detail?.from !== turnId) return;
       setStatus((s) => (s === "playing" ? "ready" : s));
       setCurrentTime(0);
-      playEndRef.current?.();
-      playEndRef.current = null;
+      setTtsContentPlaying(false);
+      endSpeechDucking();
     };
     window.addEventListener("tts-shared-handoff", onHandoff);
     return () => window.removeEventListener("tts-shared-handoff", onHandoff);
@@ -289,6 +290,7 @@ export const MessageAudioPlayer = forwardRef<
     audioRef.current?.pause();
     audioRef.current = null;
     ensurePromiseRef.current = null;
+    blobPromiseRef.current = null;
     setStatus("idle");
     setError(null);
     setAutoplayBlocked(false);
@@ -339,164 +341,186 @@ export const MessageAudioPlayer = forwardRef<
     };
   };
 
+  const bindPlaybackElement = (blob: Blob): HTMLAudioElement => {
+    if (preferHtmlMediaPlayback()) {
+      const audio = bindSharedTtsSource(blob, turnId);
+      audioRef.current = audio;
+      attachAudio(audio);
+      return audio;
+    }
+    cleanupUrl();
+    const url = URL.createObjectURL(blob);
+    objectUrlRef.current = url;
+    const audio = new Audio(url);
+    configureMobileHtmlAudio(audio);
+    audioRef.current = audio;
+    attachAudio(audio);
+    return audio;
+  };
+
+  const loadTurnBlob = async (): Promise<Blob | null> => {
+    if (blobRef.current) return blobRef.current;
+    if (blobPromiseRef.current) return blobPromiseRef.current;
+
+    const run = async (): Promise<Blob | null> => {
+      const settings = loadTtsSettings();
+      if (
+        settings.provider === "elevenlabs" &&
+        !settings.elevenLabsApiKey.trim()
+      ) {
+        await refreshServerCapabilities();
+        if (!isServerElevenLabsAvailable()) {
+          setError(
+            "ElevenLabs-Key in Settings eintragen oder ELEVENLABS_API_KEY auf dem Server setzen.",
+          );
+          setStatus("error");
+          return null;
+        }
+      }
+      if (settings.provider === "fish-audio") {
+        await refreshServerCapabilities();
+        if (!isServerFishAudioTtsAvailable()) {
+          setError(
+            "Fish Audio ist auf dem Server nicht aktiv — FISH_AUDIO_API_KEY in Vercel setzen oder in Einstellungen einen anderen TTS-Anbieter wählen.",
+          );
+          setStatus("error");
+          return null;
+        }
+      }
+
+      setStatus("loading");
+      setError(null);
+
+      try {
+        let blob: Blob | null = null;
+
+        let resolvedOverrides = segmentOverrides ?? {};
+        const hasPassedOverrides = Object.entries(resolvedOverrides).some(
+          ([snippet, slug]) =>
+            snippet.trim().length > 0 && slug && slug !== "narrator",
+        );
+        if (rawContent?.trim() && cast?.length && !hasPassedOverrides) {
+          resolvedOverrides = await resolveSegmentOverridesForTurn(
+            turnId,
+            rawContent,
+            cast,
+            {
+              locale: storyLocale,
+              protagonist: storySettings?.protagonist,
+            },
+          );
+        }
+
+        const activeOverrides = filterSegmentOverridesForActivation(
+          resolvedOverrides,
+          voiceEnabledSlugs,
+        );
+        const hasSegmentOverrides = Object.entries(activeOverrides).some(
+          ([snippet, slug]) =>
+            snippet.trim().length > 0 && slug && slug !== "narrator",
+        );
+        const scriptMulti = rawContent?.trim()
+          ? scriptBlocksNeedMultiVoice(rawContent)
+          : false;
+        const useMultiVoice = hasSegmentOverrides || scriptMulti;
+
+        const baseText =
+          assistantTurnProseText(rawContent ?? text).trim() || text.trim();
+
+        const localVoice =
+          (settings.provider === "local" ||
+            settings.provider === "qwen" ||
+            settings.provider === "qwen-cloud") &&
+          voiceMap
+            ? voiceForSpeaker(
+                speakerSlug,
+                voiceMap,
+                settings.localVoice,
+                voiceEnabledSlugs,
+              )
+            : settings.localVoice;
+        const cacheKey = buildTtsCacheKey(
+          settings.provider === "local" ||
+          settings.provider === "qwen" ||
+          settings.provider === "qwen-cloud"
+            ? `${ttsCacheVoiceKey(settings)}:${localVoice}${
+                useMultiVoice
+                  ? `:multi:${scriptMulti ? "script2:" : ""}${JSON.stringify(activeOverrides)}:${storyLocale?.startsWith("de") ? "de" : "en"}:${JSON.stringify(voiceEnabledSlugs ?? null)}${localTtsRouteCacheSuffix(settings, storyLocale)}`
+                  : localTtsRouteCacheSuffix(settings, storyLocale)
+              }`
+            : ttsCacheVoiceKey(settings),
+          settings.provider,
+          baseText,
+        );
+        blob = await getCachedAudio(cacheKey);
+
+        if (!blob && audioStoragePath && !useMultiVoice) {
+          blob = await downloadTurnAudio(audioStoragePath);
+          if (blob) await setCachedAudio(cacheKey, blob);
+        }
+
+        if (!blob) {
+          const audioResult = await getNarratorAudio(settings, baseText, {
+            speakerSlug,
+            voiceMap,
+            segmentOverrides: activeOverrides,
+            cast,
+            voiceEnabledSlugs,
+            rawContent: rawContent ?? text,
+            storyLocale,
+            storySettings,
+          });
+          blob = audioResult.blob;
+          if (audioResult.ttsCostCents != null && audioResult.ttsCostCents > 0) {
+            onTtsCostCents?.(audioResult.ttsCostCents);
+          }
+
+          if (!audioStoragePath && !turnId.startsWith("tmp-")) {
+            const stored = await storeTurnAudioToCloud(turnId, blob);
+            if (stored.ok && stored.path) {
+              setCloudSaved(true);
+              onStoragePath?.(stored.path);
+              onCloudQuotaChange?.();
+            }
+          }
+        }
+
+        blobRef.current = blob;
+        setStatus("ready");
+        return blob;
+      } catch (e) {
+        setStatus("error");
+        setError(e instanceof Error ? e.message : String(e));
+        return null;
+      }
+    };
+
+    blobPromiseRef.current = run().finally(() => {
+      blobPromiseRef.current = null;
+    });
+    return blobPromiseRef.current;
+  };
+
   const ensureAudio = async (): Promise<HTMLAudioElement | null> => {
-    if (audioRef.current && blobRef.current) {
-      if (preferHtmlMediaPlayback()) {
-        if (sharedTtsOwnerTurnId() === turnId) return audioRef.current;
-      } else if (objectUrlRef.current) {
+    if (preferHtmlMediaPlayback()) {
+      if (
+        audioRef.current &&
+        blobRef.current &&
+        sharedTtsOwnerTurnId() === turnId
+      ) {
         return audioRef.current;
       }
+    } else if (audioRef.current && objectUrlRef.current) {
+      return audioRef.current;
     }
     if (ensurePromiseRef.current) {
       return ensurePromiseRef.current;
     }
 
     const run = async (): Promise<HTMLAudioElement | null> => {
-    const settings = loadTtsSettings();
-    if (
-      settings.provider === "elevenlabs" &&
-      !settings.elevenLabsApiKey.trim()
-    ) {
-      await refreshServerCapabilities();
-      if (!isServerElevenLabsAvailable()) {
-        setError(
-          "ElevenLabs-Key in Settings eintragen oder ELEVENLABS_API_KEY auf dem Server setzen.",
-        );
-        setStatus("error");
-        return null;
-      }
-    }
-    if (settings.provider === "fish-audio") {
-      await refreshServerCapabilities();
-      if (!isServerFishAudioTtsAvailable()) {
-        setError(
-          "Fish Audio ist auf dem Server nicht aktiv — FISH_AUDIO_API_KEY in Vercel setzen oder in Einstellungen einen anderen TTS-Anbieter wählen.",
-        );
-        setStatus("error");
-        return null;
-      }
-    }
-
-    setStatus("loading");
-    setError(null);
-
-    try {
-      let blob: Blob | null = null;
-
-      let resolvedOverrides = segmentOverrides ?? {};
-      const hasPassedOverrides = Object.entries(resolvedOverrides).some(
-        ([snippet, slug]) =>
-          snippet.trim().length > 0 && slug && slug !== "narrator",
-      );
-      if (rawContent?.trim() && cast?.length && !hasPassedOverrides) {
-        resolvedOverrides = await resolveSegmentOverridesForTurn(
-          turnId,
-          rawContent,
-          cast,
-          {
-            locale: storyLocale,
-            protagonist: storySettings?.protagonist,
-          },
-        );
-      }
-
-      const activeOverrides = filterSegmentOverridesForActivation(
-        resolvedOverrides,
-        voiceEnabledSlugs,
-      );
-      const hasSegmentOverrides = Object.entries(activeOverrides).some(
-        ([snippet, slug]) =>
-          snippet.trim().length > 0 && slug && slug !== "narrator",
-      );
-      const scriptMulti = rawContent?.trim()
-        ? scriptBlocksNeedMultiVoice(rawContent)
-        : false;
-      const useMultiVoice = hasSegmentOverrides || scriptMulti;
-
-      const baseText =
-        assistantTurnProseText(rawContent ?? text).trim() || text.trim();
-
-      const localVoice =
-        (settings.provider === "local" ||
-          settings.provider === "qwen" ||
-          settings.provider === "qwen-cloud") &&
-        voiceMap
-          ? voiceForSpeaker(
-              speakerSlug,
-              voiceMap,
-              settings.localVoice,
-              voiceEnabledSlugs,
-            )
-          : settings.localVoice;
-      const cacheKey = buildTtsCacheKey(
-        settings.provider === "local" ||
-        settings.provider === "qwen" ||
-        settings.provider === "qwen-cloud"
-          ? `${ttsCacheVoiceKey(settings)}:${localVoice}${
-              useMultiVoice
-                ? `:multi:${scriptMulti ? "script2:" : ""}${JSON.stringify(activeOverrides)}:${storyLocale?.startsWith("de") ? "de" : "en"}:${JSON.stringify(voiceEnabledSlugs ?? null)}${localTtsRouteCacheSuffix(settings, storyLocale)}`
-                : localTtsRouteCacheSuffix(settings, storyLocale)
-            }`
-          : ttsCacheVoiceKey(settings),
-        settings.provider,
-        baseText,
-      );
-      blob = await getCachedAudio(cacheKey);
-
-      if (!blob && audioStoragePath && !useMultiVoice) {
-        blob = await downloadTurnAudio(audioStoragePath);
-        if (blob) await setCachedAudio(cacheKey, blob);
-      }
-
-      if (!blob) {
-        const audioResult = await getNarratorAudio(settings, baseText, {
-          speakerSlug,
-          voiceMap,
-          segmentOverrides: activeOverrides,
-          cast,
-          voiceEnabledSlugs,
-          rawContent: rawContent ?? text,
-          storyLocale,
-          storySettings,
-        });
-        blob = audioResult.blob;
-        if (audioResult.ttsCostCents != null && audioResult.ttsCostCents > 0) {
-          onTtsCostCents?.(audioResult.ttsCostCents);
-        }
-
-        if (!audioStoragePath && !turnId.startsWith("tmp-")) {
-          const stored = await storeTurnAudioToCloud(turnId, blob);
-          if (stored.ok && stored.path) {
-            setCloudSaved(true);
-            onStoragePath?.(stored.path);
-            onCloudQuotaChange?.();
-          }
-        }
-      }
-
-      blobRef.current = blob;
-      cleanupUrl();
-      audioRef.current?.pause();
-
-      let audio: HTMLAudioElement;
-      if (preferHtmlMediaPlayback()) {
-        audio = bindSharedTtsSource(blob, turnId);
-      } else {
-        const url = URL.createObjectURL(blob);
-        objectUrlRef.current = url;
-        audio = new Audio(url);
-        configureMobileHtmlAudio(audio);
-      }
-      audioRef.current = audio;
-      attachAudio(audio);
-
-      setStatus("ready");
-      return audio;
-    } catch (e) {
-      setStatus("error");
-      setError(e instanceof Error ? e.message : String(e));
-      return null;
-    }
+      const blob = await loadTurnBlob();
+      if (!blob) return null;
+      return bindPlaybackElement(blob);
     };
 
     ensurePromiseRef.current = run().finally(() => {
@@ -515,6 +539,16 @@ export const MessageAudioPlayer = forwardRef<
     reject: (reason?: unknown) => void,
   ) => {
     finishPlayWait();
+    if (
+      error instanceof DOMException &&
+      error.name === "AbortError"
+    ) {
+      setStatus("ready");
+      setError(null);
+      setAutoplayBlocked(false);
+      reject(error);
+      return;
+    }
     if (isAutoplayBlockedError(error)) {
       setStatus("ready");
       setError(null);
@@ -632,8 +666,8 @@ export const MessageAudioPlayer = forwardRef<
   };
 
   const prepare = async (): Promise<void> => {
-    const audio = await ensureAudio();
-    if (!audio) {
+    const blob = await loadTurnBlob();
+    if (!blob) {
       throw new Error("Audio nicht verfügbar");
     }
   };
@@ -736,6 +770,10 @@ export const MessageAudioPlayer = forwardRef<
       await tryResumeOrPlay(audioRef.current);
       return;
     }
+    if (status === "ready" && blobRef.current) {
+      await play();
+      return;
+    }
     try {
       await play();
     } catch (error) {
@@ -798,8 +836,7 @@ export const MessageAudioPlayer = forwardRef<
 
       let blob = blobRef.current;
       if (!blob) {
-        await ensureAudio();
-        blob = blobRef.current;
+        blob = await loadTurnBlob();
       }
       if (!blob) {
         setError("Keine Audio-Datei — zuerst ▶ zum Erzeugen tippen.");
