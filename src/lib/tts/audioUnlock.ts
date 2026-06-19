@@ -19,6 +19,7 @@ let unlockEl: HTMLAudioElement | null = null;
 let sessionKeepalive: HTMLAudioElement | null = null;
 let visibilityBound = false;
 let readOnlyMode = false;
+let ttsContentPlaying = false;
 
 export function isTtsReadOnly(): boolean {
   return readOnlyMode;
@@ -51,7 +52,8 @@ function bindVisibilityResume(): void {
       void primeTtsAudioContext();
       return;
     }
-    /* Keep silent keepalive running so the next HTML clip can start while locked. */
+    /* Do not restart silent keepalive while TTS is playing — iOS allows one stream. */
+    if (ttsContentPlaying) return;
     try {
       if (sessionKeepalive && sessionKeepalive.paused) {
         void sessionKeepalive.play().catch(() => undefined);
@@ -60,6 +62,23 @@ function bindVisibilityResume(): void {
       /* ignore */
     }
   });
+}
+
+/** Pause silent keepalive while real TTS plays (iOS single audio session). */
+export function setTtsContentPlaying(playing: boolean): void {
+  ttsContentPlaying = playing;
+  if (typeof window === "undefined" || readOnlyMode) return;
+  try {
+    if (!sessionKeepalive) return;
+    if (playing) {
+      sessionKeepalive.pause();
+    } else {
+      sessionKeepalive.currentTime = 0;
+      void sessionKeepalive.play().catch(() => undefined);
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Call synchronously inside click/touch handlers before async TTS work. */

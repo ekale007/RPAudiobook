@@ -54,7 +54,7 @@ import {
   autoplayBlockedHint,
   isAutoplayBlockedError,
 } from "@/lib/tts/autoplayPolicy";
-import { unlockAudioForAutoplay } from "@/lib/tts/audioUnlock";
+import { unlockAudioForAutoplay, setTtsContentPlaying } from "@/lib/tts/audioUnlock";
 import {
   configureMobileHtmlAudio,
   getWebAudioPlaybackDuration,
@@ -67,6 +67,13 @@ import {
   seekWebAudioPlayback,
   stopActiveTtsSource,
 } from "@/lib/tts/mobileAudioPlayback";
+import {
+  bindSharedTtsSource,
+  pauseSharedTtsHtmlAudio,
+  sharedTtsOwnerTurnId,
+  stopSharedTtsHtmlAudio,
+} from "@/lib/tts/sharedTtsHtmlAudio";
+import { isTtsQueueHandoffActive } from "@/lib/tts/ttsAutoplayQueue";
 import {
   getExclusiveTtsTurn,
   isExclusiveTtsTurn,
@@ -212,10 +219,24 @@ export const MessageAudioPlayer = forwardRef<
   }, [status]);
 
   useEffect(() => {
+    const onHandoff = (event: Event) => {
+      const detail = (event as CustomEvent<{ from: string; to: string }>).detail;
+      if (detail?.from !== turnId) return;
+      setStatus((s) => (s === "playing" ? "ready" : s));
+      setCurrentTime(0);
+      playEndRef.current?.();
+      playEndRef.current = null;
+    };
+    window.addEventListener("tts-shared-handoff", onHandoff);
+    return () => window.removeEventListener("tts-shared-handoff", onHandoff);
+  }, [turnId]);
+
+  useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       const owner = getExclusiveTtsTurn();
       if (!owner || owner === turnId) return;
+      if (preferHtmlMediaPlayback() && sharedTtsOwnerTurnId() === owner) return;
       const audio = audioRef.current;
       if (audio && !audio.paused) {
         audio.pause();
@@ -300,22 +321,31 @@ export const MessageAudioPlayer = forwardRef<
     };
     audio.onended = () => {
       endSpeechDucking();
+      setTtsContentPlaying(false);
       setStatus("ready");
       setCurrentTime(0);
       if (audioRef.current) audioRef.current.currentTime = 0;
-      clearTtsNowPlaying();
+      if (!isTtsQueueHandoffActive()) {
+        clearTtsNowPlaying();
+        setTtsMediaPlaybackState("none");
+      }
       playEndRef.current?.();
       playEndRef.current = null;
     };
     audio.onerror = () => {
+      setTtsContentPlaying(false);
       setStatus("error");
       setError("Wiedergabe fehlgeschlagen");
     };
   };
 
   const ensureAudio = async (): Promise<HTMLAudioElement | null> => {
-    if (audioRef.current && objectUrlRef.current) {
-      return audioRef.current;
+    if (audioRef.current && blobRef.current) {
+      if (preferHtmlMediaPlayback()) {
+        if (sharedTtsOwnerTurnId() === turnId) return audioRef.current;
+      } else if (objectUrlRef.current) {
+        return audioRef.current;
+      }
     }
     if (ensurePromiseRef.current) {
       return ensurePromiseRef.current;
@@ -446,12 +476,17 @@ export const MessageAudioPlayer = forwardRef<
 
       blobRef.current = blob;
       cleanupUrl();
-      const url = URL.createObjectURL(blob);
-      objectUrlRef.current = url;
-
       audioRef.current?.pause();
-      const audio = new Audio(url);
-      configureMobileHtmlAudio(audio);
+
+      let audio: HTMLAudioElement;
+      if (preferHtmlMediaPlayback()) {
+        audio = bindSharedTtsSource(blob, turnId);
+      } else {
+        const url = URL.createObjectURL(blob);
+        objectUrlRef.current = url;
+        audio = new Audio(url);
+        configureMobileHtmlAudio(audio);
+      }
       audioRef.current = audio;
       attachAudio(audio);
 
@@ -516,9 +551,13 @@ export const MessageAudioPlayer = forwardRef<
   const finishWebAudioPlayback = useCallback(() => {
     webAudioActiveRef.current = false;
     endSpeechDucking();
+    setTtsContentPlaying(false);
     setStatus("ready");
     setCurrentTime(0);
-    clearTtsNowPlaying();
+    if (!isTtsQueueHandoffActive()) {
+      clearTtsNowPlaying();
+      setTtsMediaPlaybackState("none");
+    }
     playEndRef.current?.();
     playEndRef.current = null;
   }, []);
@@ -539,6 +578,7 @@ export const MessageAudioPlayer = forwardRef<
       await runSfxBeforePlay(options);
       setAutoplayBlocked(false);
       webAudioActiveRef.current = true;
+      setTtsContentPlaying(true);
       setStatus("playing");
       publishNowPlaying();
       setTtsMediaPlaybackState("playing");
@@ -555,6 +595,7 @@ export const MessageAudioPlayer = forwardRef<
     await runSfxBeforePlay(options);
     publishNowPlaying();
     setSpeechDucking(true);
+    setTtsContentPlaying(true);
     await audio.play();
     setAutoplayBlocked(false);
     setStatus("playing");
@@ -603,10 +644,23 @@ export const MessageAudioPlayer = forwardRef<
     } else {
       audioRef.current?.pause();
     }
+    if (
+      preferHtmlMediaPlayback() &&
+      sharedTtsOwnerTurnId() === turnId &&
+      statusRef.current === "playing"
+    ) {
+      pauseSharedTtsHtmlAudio();
+    }
     pauseAllSfxLoops();
-    setStatus("paused");
+    if (isTtsQueueHandoffActive()) {
+      setStatus("ready");
+      setCurrentTime(0);
+    } else {
+      setTtsContentPlaying(false);
+      setStatus("paused");
+      setTtsMediaPlaybackState("paused");
+    }
     syncTimesFromAudio();
-    setTtsMediaPlaybackState("paused");
   };
 
   const tryResumeOrPlay = async (audio: HTMLAudioElement | null) => {
@@ -771,11 +825,16 @@ export const MessageAudioPlayer = forwardRef<
     webAudioActiveRef.current = false;
     stopActiveTtsSource();
     stopTick();
-    audioRef.current?.pause();
-    if (audioRef.current) audioRef.current.currentTime = 0;
+    if (preferHtmlMediaPlayback() && sharedTtsOwnerTurnId() === turnId) {
+      stopSharedTtsHtmlAudio();
+    } else {
+      audioRef.current?.pause();
+      if (audioRef.current) audioRef.current.currentTime = 0;
+    }
     cleanupUrl();
     blobRef.current = null;
     audioRef.current = null;
+    setTtsContentPlaying(false);
     setStatus("idle");
     setCurrentTime(0);
     setDuration(0);

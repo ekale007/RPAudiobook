@@ -10,6 +10,12 @@ import { ttsPlayerWaitMs } from "@/lib/tts/mobilePlayback";
 const PLAYER_POLL_MS = 50;
 const PREWARM_AHEAD = 4;
 
+let queueHandoffActive = false;
+
+export function isTtsQueueHandoffActive(): boolean {
+  return queueHandoffActive;
+}
+
 /** Serial TTS playback — new turns, manual ▶ with autoplay, and follow-up buffering. */
 export class TtsAutoplayQueue {
   private queue: string[] = [];
@@ -52,12 +58,15 @@ export class TtsAutoplayQueue {
   /** Pause stray <audio> elements when returning from lock screen / app switch. */
   stabilizeOnForeground(): void {
     const id = this.playingTurnId;
-    if (id) this.stopOthersExcept(id);
+    if (id) {
+      this.pauseOthersExcept(id);
+      void this.players.get(id)?.resumeIfPaused().catch(() => undefined);
+    }
   }
 
-  private stopOthersExcept(keepId: string): void {
+  private pauseOthersExcept(keepId: string): void {
     for (const [id, player] of this.players) {
-      if (id !== keepId) player.stop();
+      if (id !== keepId) player.pause();
     }
   }
 
@@ -65,12 +74,14 @@ export class TtsAutoplayQueue {
     turnId: string,
     player: MessageAudioPlayerHandle,
   ): Promise<void> {
-    this.stopOthersExcept(turnId);
+    queueHandoffActive = true;
+    this.pauseOthersExcept(turnId);
     this.playingTurnId = turnId;
     setExclusiveTtsTurn(turnId);
     try {
       await player.play();
     } finally {
+      queueHandoffActive = false;
       if (this.playingTurnId === turnId) this.playingTurnId = null;
       if (getExclusiveTtsTurn() === turnId) setExclusiveTtsTurn(null);
     }
@@ -143,7 +154,7 @@ export class TtsAutoplayQueue {
 
     this.stopped = false;
     for (const [id, player] of this.players) {
-      if (id !== turnId) player.stop();
+      if (id !== turnId) player.pause();
     }
     this.queue = order.slice(idx);
     this.prewarmQueue(PREWARM_AHEAD);
