@@ -348,6 +348,11 @@ export function ChatView({
 
   const handleTtsPlaybackChange = useCallback(
     (turnId: string, active: boolean) => {
+      if (active) {
+        bubbleRefs.current
+          .get(turnId)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
       setTtsPlayingTurnId((prev) => {
         const next = active ? turnId : prev === turnId ? null : prev;
         ttsPlayingTurnIdRef.current = next;
@@ -495,11 +500,11 @@ export function ChatView({
   }, [turns, hasTts]);
 
   const scrollToBubbleIndex = useCallback(
-    (index: number) => {
+    (index: number, options?: { focus?: boolean }) => {
       const clamped = Math.max(0, Math.min(index, turns.length - 1));
       const turn = turns[clamped];
       if (!turn) return;
-      setBubbleFocusIndex(clamped);
+      if (options?.focus !== false) setBubbleFocusIndex(clamped);
       const el = bubbleRefs.current.get(turn.id);
       el?.scrollIntoView({ behavior: "smooth", block: "start" });
     },

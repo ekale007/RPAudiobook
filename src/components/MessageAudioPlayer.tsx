@@ -90,6 +90,10 @@ import {
   downloadBlob,
 } from "@/lib/audio/downloadBlob";
 import { saveTurnAudioToDevice } from "@/lib/audio/saveTurnAudio";
+import {
+  activeLineIndexForProgress,
+  type PlaybackLine,
+} from "@/lib/tts/ttsPlaybackLines";
 
 type Status = "idle" | "loading" | "ready" | "playing" | "paused" | "error";
 
@@ -121,6 +125,9 @@ export const MessageAudioPlayer = forwardRef<
     autoplayChain?: boolean;
     onChainPlay?: () => void;
     onPlaybackActiveChange?: (active: boolean) => void;
+    /** Lines for read-along highlight (same order as visible bubble text). */
+    playbackLines?: PlaybackLine[];
+    onActiveLineChange?: (index: number | null) => void;
     storyLocale?: string;
     storySettings?: StorySettings;
     chapterTitle?: string | null;
@@ -142,6 +149,8 @@ export const MessageAudioPlayer = forwardRef<
     autoplayChain,
     onChainPlay,
     onPlaybackActiveChange,
+    playbackLines,
+    onActiveLineChange,
     storyLocale,
     storySettings,
     chapterTitle,
@@ -167,6 +176,7 @@ export const MessageAudioPlayer = forwardRef<
   );
   const blobPromiseRef = useRef<Promise<Blob | null> | null>(null);
   const tickRef = useRef<number | null>(null);
+  const lastActiveLineRef = useRef<number | null>(null);
   const playEndRef = useRef<(() => void) | null>(null);
   const blobRef = useRef<Blob | null>(null);
   const webAudioActiveRef = useRef(false);
@@ -277,11 +287,35 @@ export const MessageAudioPlayer = forwardRef<
     onPlaybackActiveChange?.(active);
   }, [status, onPlaybackActiveChange]);
 
+  useEffect(() => {
+    const lines = playbackLines ?? [];
+    if (status !== "playing" && status !== "paused") {
+      if (lastActiveLineRef.current !== null) {
+        lastActiveLineRef.current = null;
+        onActiveLineChange?.(null);
+      }
+      return;
+    }
+    if (!lines.length || duration <= 0) return;
+    const idx = activeLineIndexForProgress(lines, currentTime / duration);
+    if (idx !== lastActiveLineRef.current) {
+      lastActiveLineRef.current = idx;
+      onActiveLineChange?.(idx);
+    }
+  }, [
+    currentTime,
+    duration,
+    status,
+    playbackLines,
+    onActiveLineChange,
+  ]);
+
   useEffect(
     () => () => {
       onPlaybackActiveChange?.(false);
+      onActiveLineChange?.(null);
     },
-    [onPlaybackActiveChange],
+    [onPlaybackActiveChange, onActiveLineChange],
   );
 
   /** Drop stale blob URLs after HMR or when turn content changes. */

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { MessageAudioPlayer } from "@/components/MessageAudioPlayer";
 import { speakerDisplayName } from "@/lib/chat/speakerDisplay";
 import type { MessageAudioPlayerHandle } from "@/lib/tts/messageAudioPlayerHandle";
@@ -25,6 +25,7 @@ import {
   PROTAGONIST_SPEAKER_SLUG,
 } from "@/lib/story/protagonist";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
+import { splitTextIntoPlaybackLines } from "@/lib/tts/ttsPlaybackLines";
 
 export function ChatTurnBubble({
   turn,
@@ -87,6 +88,8 @@ export function ChatTurnBubble({
   const [draft, setDraft] = useState(turn.content);
   const [busy, setBusy] = useState(false);
   const [copiedRaw, setCopiedRaw] = useState(false);
+  const [activeTtsLine, setActiveTtsLine] = useState<number | null>(null);
+  const lineRefs = useRef<(HTMLParagraphElement | null)[]>([]);
   const contentLocale = normalizeStoryContentLocale(storyLocale);
   const steeringTurn =
     turn.role === "user" && isSteeringUserTurn(turn.content);
@@ -95,6 +98,23 @@ export function ChatTurnBubble({
       steeringTurn ? stripSteeringTurnPrefix(turn.content) : turn.content,
     ),
   );
+  const playbackLines = useMemo(
+    () => splitTextIntoPlaybackLines(displayContent),
+    [displayContent],
+  );
+  const ttsReadAlong = ttsPlaying && playbackLines.length > 0;
+
+  useEffect(() => {
+    if (!ttsReadAlong || activeTtsLine == null) return;
+    lineRefs.current[activeTtsLine]?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }, [activeTtsLine, ttsReadAlong]);
+
+  useEffect(() => {
+    if (!ttsPlaying) setActiveTtsLine(null);
+  }, [ttsPlaying]);
   const markedSnippets = useMemo(
     () =>
       showDialogueMarkup &&
@@ -257,11 +277,13 @@ export function ChatTurnBubble({
         className={`max-w-[92%] rounded-2xl px-4 py-2.5 text-sm transition-[box-shadow,border-color,background-color] duration-300 ${
           turn.role === "user"
             ? "bg-accent/20 text-zinc-100"
-            : ttsPlaying
-              ? "border-2 border-accent bg-surface-raised shadow-[0_0_20px_rgba(250,204,21,0.12)] ring-1 ring-accent/40"
-              : ttsQueued
-                ? "border border-accent/35 bg-surface-raised/90 shadow-[inset_0_0_0_1px_rgba(250,204,21,0.08)]"
-                : "bg-surface-raised border border-surface-border"
+            : ttsQueued
+              ? "border border-accent/35 bg-surface-raised/90 shadow-[inset_0_0_0_1px_rgba(250,204,21,0.08)]"
+              : ttsReadAlong
+                ? "border border-accent/25 bg-surface-raised"
+                : ttsPlaying
+                  ? "border border-accent/30 bg-surface-raised"
+                  : "bg-surface-raised border border-surface-border"
         }`}
       >
         {turn.role === "assistant" && turn.speaker_slug ? (
@@ -299,6 +321,38 @@ export function ChatTurnBubble({
             rows={4}
             className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-sm text-zinc-100"
           />
+        ) : ttsReadAlong ? (
+          <div className="prose-chat flex flex-col gap-1.5">
+            {playbackLines.map((line, index) => (
+              <p
+                key={`${index}-${line.text.slice(0, 24)}`}
+                ref={(el) => {
+                  lineRefs.current[index] = el;
+                }}
+                className={`rounded-md px-1 py-0.5 transition-colors duration-200 ${
+                  index === activeTtsLine
+                    ? "bg-accent/15 text-zinc-50 ring-1 ring-accent/45"
+                    : "text-zinc-400"
+                }`}
+              >
+                {showDialogueMarkup && markedSnippets.length > 0
+                  ? renderInlineMarkedContent({
+                      text: line.text,
+                      snippets: markedSnippets.filter((s) =>
+                        line.text.includes(s),
+                      ),
+                      selectedBySnippet: markedLookup,
+                      cast,
+                      voiceMap,
+                      voiceEnabledSlugs,
+                      dialogueTitle: (name) =>
+                        t("chat.dialogueTitle", { name }),
+                      speakerTitle: (name) => t("chat.speakerTitle", { name }),
+                    })
+                  : line.text}
+              </p>
+            ))}
+          </div>
         ) : showDialogueMarkup && markedSnippets.length > 0 ? (
           <div className="prose-chat">
             {renderInlineMarkedContent({
@@ -342,6 +396,8 @@ export function ChatTurnBubble({
             onPlaybackActiveChange={(active) =>
               onTtsPlaybackChange?.(turn.id, active)
             }
+            playbackLines={playbackLines}
+            onActiveLineChange={setActiveTtsLine}
             storyLocale={storyLocale}
             storySettings={storySettings}
             chapterTitle={chapterTitle}
