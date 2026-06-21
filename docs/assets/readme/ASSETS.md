@@ -2,6 +2,17 @@
 
 Files in this folder are embedded in the [GitHub README](../../README.md).
 
+## Playback on GitHub
+
+GitHub README **does not** inline-play repo-relative `.mp3` links (they open the blob viewer).
+
+| Approach | Where |
+|----------|--------|
+| **README `<audio>` + jsDelivr** | [README](../../README.md#demo) — uses `cdn.jsdelivr.net/gh/ekale007/RPAudiobook@master/...` |
+| **Demo page** | [docs/demo/index.html](../demo/index.html) → `https://ekale007.github.io/RPAudiobook/demo/` after Pages enabled |
+
+Enable Pages: repo **Settings → Pages → Build from branch `master`, folder `/docs`**.
+
 ## Current inventory
 
 | File | Used in README |

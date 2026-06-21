@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RP Audiobook — Demo audio</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0a0a0b;
+        --panel: #18181b;
+        --text: #e4e4e7;
+        --muted: #a1a1aa;
+        --accent: #c4b5fd;
+        --border: #3f3f46;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.5;
+        padding: 2rem 1rem 3rem;
+      }
+      main {
+        max-width: 42rem;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0 0 0.25rem;
+      }
+      p {
+        color: var(--muted);
+        margin: 0 0 1.5rem;
+      }
+      a {
+        color: var(--accent);
+      }
+      .clip {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 0.75rem;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1rem;
+      }
+      .clip h2 {
+        font-size: 1rem;
+        font-weight: 600;
+        margin: 0 0 0.75rem;
+      }
+      audio {
+        width: 100%;
+        height: 2.5rem;
+      }
+      footer {
+        margin-top: 2rem;
+        font-size: 0.875rem;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>RP Audiobook — Demo audio</h1>
+      <p>
+        Samples from a local session (Kokoro / soundscape). Also linked from the
+        <a href="https://github.com/ekale007/RPAudiobook">GitHub README</a>.
+      </p>
+
+      <section class="clip">
+        <h2>EN — Narrator</h2>
+        <audio controls preload="metadata" src="../assets/readme/demo-narrator-en.mp3"></audio>
+      </section>
+
+      <section class="clip">
+        <h2>Multi-voice cast</h2>
+        <audio controls preload="metadata" src="../assets/readme/demo-multivoice.mp3"></audio>
+      </section>
+
+      <section class="clip">
+        <h2>Soundscape</h2>
+        <audio controls preload="metadata" src="../assets/readme/demo-soundscape.mp3"></audio>
+      </section>
+
+      <footer>
+        <a href="https://github.com/ekale007/RPAudiobook#quick-start">Quick start</a>
+        · AGPL-3.0
+      </footer>
+    </main>
+  </body>
+</html>

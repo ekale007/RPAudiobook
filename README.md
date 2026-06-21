@@ -47,21 +47,26 @@
 
 ## Demo
 
-Audio from a local session — click to play in the browser:
-
-| Clip | |
-|------|---|
-| **EN — Narrator** | [▶ Play `demo-narrator-en.mp3`](docs/assets/readme/demo-narrator-en.mp3) |
-| **Multi-voice cast** | [▶ Play `demo-multivoice.mp3`](docs/assets/readme/demo-multivoice.mp3) |
-| **Soundscape** | [▶ Play `demo-soundscape.mp3`](docs/assets/readme/demo-soundscape.mp3) |
-
 <p align="center">
-  <a href="docs/assets/readme/demo-narrator-en.mp3"><strong>▶ Narrator sample</strong></a>
-  &nbsp;·&nbsp;
-  <a href="docs/assets/readme/demo-multivoice.mp3"><strong>▶ Multi-voice</strong></a>
-  &nbsp;·&nbsp;
-  <a href="docs/assets/readme/demo-soundscape.mp3"><strong>▶ Soundscape</strong></a>
+  <a href="https://ekale007.github.io/RPAudiobook/demo/"><strong>▶ Open demo player</strong></a>
+  <br>
+  <sub>Inline playback · enable once: Settings → Pages → branch <code>master</code>, folder <code>/docs</code></sub>
 </p>
+
+**EN — Narrator**
+
+<video controls preload="metadata" width="100%" src="https://cdn.jsdelivr.net/gh/ekale007/RPAudiobook@master/docs/assets/readme/demo-narrator-en.mp3"></video>
+
+**Multi-voice cast**
+
+<video controls preload="metadata" width="100%" src="https://cdn.jsdelivr.net/gh/ekale007/RPAudiobook@master/docs/assets/readme/demo-multivoice.mp3"></video>
+
+**Soundscape**
+
+<video controls preload="metadata" width="100%" src="https://cdn.jsdelivr.net/gh/ekale007/RPAudiobook@master/docs/assets/readme/demo-soundscape.mp3"></video>
+
+<sub>Players not showing? Use the <a href="https://ekale007.github.io/RPAudiobook/demo/">demo page</a> or
+<a href="https://raw.githubusercontent.com/ekale007/RPAudiobook/master/docs/assets/readme/demo-narrator-en.mp3">direct stream</a> (opens the browser audio player).</sub>
 
 ---
 
