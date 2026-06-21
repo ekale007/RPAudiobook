@@ -1,34 +1,29 @@
 # README media assets
 
-Drop files here to populate the [GitHub README](../../README.md). Use these **exact filenames** so links and images resolve automatically.
+Files in this folder are embedded in the [GitHub README](../../README.md).
 
-## Screenshots (WebP or PNG, ~1200–1600 px wide)
+## Current inventory
 
-| File | Suggested content |
-|------|-------------------|
-| `screenshot-library.webp` | Home / library with template cards |
-| `screenshot-chat.webp` | Story chat with narrator bubble + Listen button |
-| `screenshot-cast.webp` | Cast / multi-voice picker |
-| `screenshot-settings.webp` | Settings — local TTS + OpenRouter BYOK (optional) |
-| `screenshot-mobile.webp` | Phone layout / PWA (optional) |
+| File | Used in README |
+|------|----------------|
+| `screenshot-library.png` | Library |
+| `screenshot-chat.png` | Chat |
+| `screenshot-cast.png` | Cast |
+| `screenshot-settings.png` | Settings |
+| `screenshot-mobile.webp` | Mobile |
+| `demo-narrator-en.mp3` | EN narrator demo |
+| `demo-multivoice.mp3` | Multi-voice demo |
+| `demo-soundscape.mp3` | Soundscape demo |
 
-Tips: crop browser chrome, use dark theme (matches app), export WebP for smaller repo size.
+## Optional additions
 
-## Demo audio (MP3 or M4A, 15–45 s each)
-
-| File | Suggested content |
-|------|-------------------|
-| `demo-narrator-en.mp3` | English narrator line from *When Dawn Breaks* or similar |
+| File | Content |
+|------|---------|
 | `demo-narrator-de.mp3` | German narrator sample |
-| `demo-multivoice.mp3` | Cast scene — narrator + character dialogue voices |
-| `demo-soundscape.mp3` | Optional: ambience/SFX layered under narration |
+| `hero-banner.webp` | Wide banner above logo |
 
-Tips: normalize loudness (~−16 LUFS), mono or stereo, no copyrighted music in background unless licensed.
+## Tips
 
-## Optional hero
-
-| File | Use |
-|------|-----|
-| `hero-banner.webp` | Wide banner (~1600×600) above the logo in README — optional |
-
-After adding files, commit and push — GitHub renders images inline; audio is linked with ▶ play in the browser when clicked.
+- **Screenshots:** PNG or WebP, ~1200–1600 px wide; dark theme matches the app.
+- **Audio:** MP3, 15–45 s; normalize loudness (~−16 LUFS). `demo-narrator-en.mp3` is large (~21 MB) — consider re-export at 128 kbps if clone size matters.
+- After adding files, update README links if filenames differ.

@@ -47,54 +47,64 @@
 
 ## Demo
 
-Short audio clips from a local session (add your files to [`docs/assets/readme/`](docs/assets/readme/ASSETS.md)):
+Audio from a local session — click to play in the browser:
 
 | Clip | |
 |------|---|
-| **EN — Narrator** | [▶ `demo-narrator-en.mp3`](docs/assets/readme/demo-narrator-en.mp3) |
-| **DE — Erzähler** | [▶ `demo-narrator-de.mp3`](docs/assets/readme/demo-narrator-de.mp3) |
-| **Multi-voice cast** | [▶ `demo-multivoice.mp3`](docs/assets/readme/demo-multivoice.mp3) |
-| **Soundscape** *(optional)* | [▶ `demo-soundscape.mp3`](docs/assets/readme/demo-soundscape.mp3) |
+| **EN — Narrator** | [▶ Play `demo-narrator-en.mp3`](docs/assets/readme/demo-narrator-en.mp3) |
+| **Multi-voice cast** | [▶ Play `demo-multivoice.mp3`](docs/assets/readme/demo-multivoice.mp3) |
+| **Soundscape** | [▶ Play `demo-soundscape.mp3`](docs/assets/readme/demo-soundscape.mp3) |
 
-<!-- When demo files exist, you can embed inline:
-<audio controls src="docs/assets/readme/demo-narrator-en.mp3"></audio>
-(GitHub may strip <audio>; links above always work.)
--->
+<p align="center">
+  <a href="docs/assets/readme/demo-narrator-en.mp3"><strong>▶ Narrator sample</strong></a>
+  &nbsp;·&nbsp;
+  <a href="docs/assets/readme/demo-multivoice.mp3"><strong>▶ Multi-voice</strong></a>
+  &nbsp;·&nbsp;
+  <a href="docs/assets/readme/demo-soundscape.mp3"><strong>▶ Soundscape</strong></a>
+</p>
 
 ---
 
 ## Screenshots
 
-<!-- Optional wide banner: docs/assets/readme/hero-banner.webp -->
-<!-- <p align="center"><img src="docs/assets/readme/hero-banner.webp" alt="RP Audiobook" width="100%"></p> -->
-
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="docs/assets/readme/screenshot-library.webp" alt="Library — story templates" width="100%">
+      <a href="docs/assets/readme/screenshot-library.png">
+        <img src="docs/assets/readme/screenshot-library.png" alt="Library — story templates" width="100%">
+      </a>
       <br><sub><b>Library</b> — bundled templates &amp; your stories</sub>
     </td>
     <td align="center" width="50%">
-      <img src="docs/assets/readme/screenshot-chat.webp" alt="Story chat with TTS" width="100%">
+      <a href="docs/assets/readme/screenshot-chat.png">
+        <img src="docs/assets/readme/screenshot-chat.png" alt="Story chat with TTS" width="100%">
+      </a>
       <br><sub><b>Chat</b> — play turns, listen to narration</sub>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/assets/readme/screenshot-cast.webp" alt="Cast and voices" width="100%">
+      <a href="docs/assets/readme/screenshot-cast.png">
+        <img src="docs/assets/readme/screenshot-cast.png" alt="Cast and voices" width="100%">
+      </a>
       <br><sub><b>Cast</b> — multi-voice dialogue</sub>
     </td>
     <td align="center">
-      <img src="docs/assets/readme/screenshot-settings.webp" alt="Settings — local TTS and API keys" width="100%">
+      <a href="docs/assets/readme/screenshot-settings.png">
+        <img src="docs/assets/readme/screenshot-settings.png" alt="Settings — local TTS and API keys" width="100%">
+      </a>
       <br><sub><b>Settings</b> — local TTS &amp; BYOK keys</sub>
     </td>
   </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <a href="docs/assets/readme/screenshot-mobile.webp">
+        <img src="docs/assets/readme/screenshot-mobile.webp" alt="Mobile layout" width="42%">
+      </a>
+      <br><sub><b>Mobile</b> — PWA on phone</sub>
+    </td>
+  </tr>
 </table>
-
-<p align="center"><sub>
-  Add WebP/PNG files → <a href="docs/assets/readme/ASSETS.md">docs/assets/readme/</a>
-  · Until then, images above appear broken — drop your captures and push.
-</sub></p>
 
 ---
 
