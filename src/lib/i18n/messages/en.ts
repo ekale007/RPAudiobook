@@ -46,6 +46,11 @@ export const enMessages: Messages = {
     carousel: "Library",
     storyLocaleDe: "Story in German",
     storyLocaleEn: "Story in English",
+    duplicateTitle: "Template already imported",
+    duplicateBody:
+      "“{title}” is already in your list. Open that story, or archive/delete it before importing the template again.",
+    duplicateOpen: "Open story",
+    duplicateDismiss: "Close",
   },
   story: {
     rename: "Rename",
@@ -130,6 +135,18 @@ export const enMessages: Messages = {
     signOut: "Sign out",
     techSettings: "Technical settings (voices, models):",
     adminLink: "Admin — users & plans",
+    knownIssuesTitle: "Known issues (beta)",
+    knownIssueIosReadOnly:
+      "iOS + background music: “Read only” in chat disables TTS so Spotify etc. keep playing.",
+    knownIssueFreeModels:
+      "Free plan: only selected low-cost LLM models — see limits above.",
+    knownIssueCloudTts:
+      "Cloud TTS: stored MP3s count against your quota (Account → Limits).",
+    knownIssueFishAuth:
+      "TTS error “fish_auth”: server voice temporarily offline — wait or contact admin.",
+    feedbackTitle: "Feedback",
+    feedbackHint: "Bug, idea, or question about the beta?",
+    feedbackLink: "Send feedback",
   },
   wallet: {
     title: "Balance",
@@ -222,8 +239,17 @@ export const enMessages: Messages = {
   onboarding: {
     title: "Welcome to {product}",
     intro: "A quick overview — then you can jump right in.",
-    stepLibrary: "Library:",
-    stepLibraryText: "Pick a template, set protagonist and voice.",
+    stepCounter: "Step {current} of {total}",
+    step1Intro: "Start a story from the library:",
+    step2Intro: "After import, set up your character:",
+    step3Intro: "In chat you hear the narrator — headphones recommended:",
+    stepLibrary: "Library",
+    stepLibraryText: "Pick a template and tap Import.",
+    stepProtagonist: "Protagonist",
+    stepProtagonistText: "Name, pronouns, and voice — cast voices later in the story hub.",
+    stepHeadphones: "Headphones & ▶",
+    stepHeadphonesText:
+      "Open chat, wait for a reply, tap ▶ Listen. Enable autoplay in chat tools (expand panel below).",
     stepChat: "Chat:",
     stepChatText:
       "Write the story; use headphones for TTS. Expand input below for Say & reactions.",
@@ -231,6 +257,9 @@ export const enMessages: Messages = {
     stepHubText: "Edit cast voices, memory & world.",
     disclaimer:
       "AI replies and speech are generated via third parties (OpenRouter, TTS). Only use content you have rights to.",
+    next: "Next",
+    back: "Back",
+    skip: "Skip",
     dismiss: "Got it — let's go",
   },
   usage: {
@@ -353,7 +382,7 @@ export const enMessages: Messages = {
   chat: {
     title: "Chat",
     confirmRewind:
-      "Delete from here? This message and everything after it will be removed.",
+      "Delete from here? This message and everything after it will be removed — including cloud TTS clips tied to those turns. Cannot be undone.",
     steeringAction: "Steering · action",
     steeringDialogue: "Steering · dialogue",
     steeringBoth: "Steering · action + dialogue",
@@ -361,7 +390,8 @@ export const enMessages: Messages = {
     ttsPlaying: "· playing",
     ttsQueued: "· queued",
     rewindAria: "Delete from here",
-    regenerateConfirm: "Generate a new version of this narration?",
+    regenerateConfirm:
+      "Regenerate this narrator reply? The current version and all later chat lines will be replaced.",
     regenerate: "Regenerate",
     copyRaw: "Copy raw data",
     copied: "Copied",
@@ -373,6 +403,7 @@ export const enMessages: Messages = {
     costTotal: "Σ {total} ct",
     loreActive: "{count} lore entries active",
     generating: "Narrator writing …",
+    stopGeneration: "Stop",
     openRouterKey: "Add OpenRouter key in Settings (for chapter transition).",
     openRouterKeyShort: "Add OpenRouter API key in Settings.",
     emptyModelReply: "Empty model reply — please try again.",
@@ -556,6 +587,18 @@ export const enMessages: Messages = {
     sceneStyle: "Scene style",
     sceneStyleDesc:
       "in chat (plot + paragraph) — Fish [whisper]/[laughing], Eleven v3, Qwen instruct; plus ambience from location.",
+  },
+  storyVoices: {
+    intro:
+      "One voice per speaker — including protagonist (you). Same card in the story hub.",
+    sceneDeliveryTitle:
+      "Mood from plot state (location, threats) — Fish tags, Eleven v3, or Qwen instruct.",
+    narratorTitle: "Narrator reads any speaker without a dedicated voice.",
+    protagonistTitle: "Your spoken lines (Say) — optional dedicated voice.",
+    ownVoiceTitle:
+      "Dedicated voice for this character — otherwise the narrator speaks for them.",
+    narratorFallback: "No dedicated voice — narrator takes over.",
+    expandHint: "Tap to pick a voice and preview.",
   },
   pwa: {
     installTitle: "Install RP Audiobook",

@@ -22,3 +22,9 @@ Web Audio decodes **OGG and WAV** — no conversion needed.
 More thunder variants: `thunder_*_near.wav` / `*_far.wav`. More wind: `wind_1`–`wind_4.wav`.
 
 Plot + **Szenen-Stil** an → auto `rain`, `wind`, `city`, `fire`, `thunder` from location text.
+
+| Tag | File | Loop |
+|-----|------|------|
+| `<<music:tension>>` | `music_tension.ogg` | yes |
+| `<<music:calm>>` | `music_calm.ogg` | yes |
+| `<<music:mystery>>` | `music_mystery.ogg` | yes |

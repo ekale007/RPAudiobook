@@ -12,8 +12,10 @@ import {
 } from "@/components/StoryHomeSections";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { LibraryImportProtagonistModal } from "@/components/story-hub/LibraryImportProtagonistModal";
+import { LibraryDuplicateImportModal } from "@/components/story-hub/LibraryDuplicateImportModal";
 import {
   deleteStory,
+  getActiveLibraryImportStory,
   importFromLibraryTemplate,
   isStoryArchived,
   listStories,
@@ -47,6 +49,10 @@ export default function HomePage() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [duplicateImport, setDuplicateImport] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
   const refreshStories = async (includeArchived = showArchived) => {
     if (!localMode && !user) return;
@@ -89,10 +95,19 @@ export default function HomePage() {
       .catch((e) => setMessage(String(e)));
   }, [localMode, user, showArchived]);
 
-  const handleLibraryImport = (templateId: LibraryTemplateId) => {
+  const handleLibraryImport = async (templateId: LibraryTemplateId) => {
     if (!localMode && !user) return;
     setMessage(null);
-    setImportSetupTemplateId(templateId);
+    try {
+      const existing = await getActiveLibraryImportStory(templateId);
+      if (existing) {
+        setDuplicateImport(existing);
+        return;
+      }
+      setImportSetupTemplateId(templateId);
+    } catch (e) {
+      setMessage(String(e));
+    }
   };
 
   const runLibraryImport = async (
@@ -323,6 +338,15 @@ export default function HomePage() {
             setImportSetupTemplateId(null);
             void runLibraryImport(id, setup);
           }}
+        />
+      ) : null}
+
+      {duplicateImport ? (
+        <LibraryDuplicateImportModal
+          open
+          storyId={duplicateImport.id}
+          storyTitle={duplicateImport.title}
+          onClose={() => setDuplicateImport(null)}
         />
       ) : null}
 

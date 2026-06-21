@@ -96,29 +96,29 @@ export const SFX_CATALOG: Record<string, SfxEntry> = {
     volume: 0.38,
     bus: "sfx",
   },
-  /** Placeholder beds — replace paths with real music loops later. */
+  /** Kenney Music Loops (CC0) — see public/sfx/CREDITS.md */
   "music-tension": {
     id: "music-tension",
     label: "Musik (Spannung)",
-    path: "/sfx/wind_2.wav",
+    path: "/sfx/music_tension.ogg",
     loop: true,
-    volume: 0.06,
+    volume: 0.08,
     bus: "music",
   },
   "music-calm": {
     id: "music-calm",
     label: "Musik (ruhig)",
-    path: "/sfx/city.wav",
+    path: "/sfx/music_calm.ogg",
     loop: true,
-    volume: 0.05,
+    volume: 0.07,
     bus: "music",
   },
   "music-mystery": {
     id: "music-mystery",
     label: "Musik (mystisch)",
-    path: "/sfx/wind_1.wav",
+    path: "/sfx/music_mystery.ogg",
     loop: true,
-    volume: 0.055,
+    volume: 0.075,
     bus: "music",
   },
 };

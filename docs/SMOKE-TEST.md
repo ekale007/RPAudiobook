@@ -36,7 +36,7 @@ Name von „Rauch aus dem Schornstein = Maschine läuft“ — hier: **5–10 Mi
 
 - [ ] Drehteller: wischen / Pfeile
 - [ ] Import → neue Story öffnet sich
-- [ ] **Duplikat:** gleiche Vorlage nochmal → Hinweis, keine doppelte Story
+- [ ] Duplikat: gleiche Vorlage nochmal → Hinweis-Dialog, **keine** zweite Story (Story öffnen)
 
 ### Chat (Desktop + Handy)
 

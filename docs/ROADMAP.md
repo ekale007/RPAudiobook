@@ -14,24 +14,26 @@ Phasen A–E, Auth, Billing/Wallet, Fish Audiobook-Soundscape, bilingual DE/EN-B
 
 ### 1. Beta-Go (P0)
 
-- [ ] [`SMOKE-TEST.md`](./SMOKE-TEST.md) Prod komplett
-- [ ] Supabase Migrationen 001–017 auf Prod
-- [ ] [`BETA-CONTENT-LEGAL.md`](./BETA-CONTENT-LEGAL.md) Bibliothek
-- [ ] Fish API-Key + `BETA_TIER_FREE_MODELS` auf Vercel
+- [x] [`SMOKE-TEST.md`](./SMOKE-TEST.md) Prod komplett
+- [x] Supabase Migrationen 001–017 auf Prod
+- [x] [`BETA-CONTENT-LEGAL.md`](./BETA-CONTENT-LEGAL.md) Bibliothek
+- [x] Fish API-Key + `BETA_TIER_FREE_MODELS` auf Vercel
 
 ### 2. Closed Beta (P1)
 
 - [ ] 5–15 Tester, Invite + Tier `beta`
-- [ ] Onboarding + Tooltips
-- [ ] Feedback-Kanal, Known Issues in `/account`
-- [ ] Echte Musik-Loops statt Placeholder in `sfxCatalog`
+- [x] Onboarding (3 Schritte) + Known issues `/account`
+- [ ] Feedback-Kanal live (`NEXT_PUBLIC_FEEDBACK_URL` auf Vercel setzen)
+- [x] Echte Musik-Loops statt Placeholder in `sfxCatalog`
+- [x] Duplikat-Import blockiert
+- [x] Stop-Button / Rewind-Texte
+- [x] Admin: Modell-Whitelist UI
 
 ### 3. UX & Stabilität
 
 - [ ] Mobile: Login, Chat, Fish TTS iOS PWA *(TTS-Auto/Drive-Mode: getestet Mai 2026)*
-- [ ] Duplikat-Import verhindern
-- [ ] Stop-Button beim Streaming
-- [ ] Admin: Modell-Whitelist UI
+- [x] Duplikat-Import verhindern
+- [x] Stop-Button beim Streaming
 
 ### 4. Größere Brocken (P2+)
 

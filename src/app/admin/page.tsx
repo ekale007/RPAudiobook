@@ -26,9 +26,20 @@ type TierLimitDefaults = {
   llmPerHour: number;
   ttsPerHour: number;
   ttsStorageMax: number;
+  allowedModelIds: string[] | null;
 };
 
 type TierLimitsMap = Record<UserTier, TierLimitDefaults>;
+
+type LlmModelOption = {
+  id: string;
+  label: string;
+};
+
+type TierLimitsDraftRow = Record<keyof Omit<TierLimitDefaults, "allowedModelIds">, string> & {
+  allModels: boolean;
+  modelIds: string[];
+};
 
 type AdminUser = {
   userId: string;
@@ -41,21 +52,24 @@ type AdminUser = {
 
 const TIERS: UserTier[] = ["free", "beta", "pro"];
 
-function draftFromTierLimits(map: TierLimitsMap): Record<UserTier, Record<keyof TierLimitDefaults, string>> {
-  const out = {} as Record<UserTier, Record<keyof TierLimitDefaults, string>>;
+function draftFromTierLimits(map: TierLimitsMap): Record<UserTier, TierLimitsDraftRow> {
+  const out = {} as Record<UserTier, TierLimitsDraftRow>;
   for (const tier of TIERS) {
+    const ids = map[tier].allowedModelIds;
     out[tier] = {
       llmBudgetCents: String(map[tier].llmBudgetCents),
       llmPerHour: String(map[tier].llmPerHour),
       ttsPerHour: String(map[tier].ttsPerHour),
       ttsStorageMax: String(map[tier].ttsStorageMax),
+      allModels: ids === null,
+      modelIds: ids ? [...ids] : [],
     };
   }
   return out;
 }
 
 function parseTierLimitsDraft(
-  draft: Record<UserTier, Record<keyof TierLimitDefaults, string>>,
+  draft: Record<UserTier, TierLimitsDraftRow>,
 ): TierLimitsMap | { error: string } {
   const result = {} as TierLimitsMap;
   for (const tier of TIERS) {
@@ -76,11 +90,17 @@ function parseTierLimitsDraft(
     ) {
       return { error: `Tarif „${tier}“: ungültige Limits` };
     }
+    if (!row.allModels && row.modelIds.length === 0) {
+      return {
+        error: `Tarif „${tier}“: mindestens ein LLM wählen oder „Alle Modelle“ aktivieren`,
+      };
+    }
     result[tier] = {
       llmBudgetCents,
       llmPerHour,
       ttsPerHour,
       ttsStorageMax,
+      allowedModelIds: row.allModels ? null : [...row.modelIds],
     };
   }
   return result;
@@ -113,8 +133,9 @@ export default function AdminPage() {
   const [billingWarning, setBillingWarning] = useState<string | null>(null);
   const [tierLimits, setTierLimits] = useState<TierLimitsMap | null>(null);
   const [tierLimitsDraft, setTierLimitsDraft] = useState<
-    Record<UserTier, Record<keyof TierLimitDefaults, string>> | null
+    Record<UserTier, TierLimitsDraftRow> | null
   >(null);
+  const [modelCatalog, setModelCatalog] = useState<LlmModelOption[]>([]);
   const [creditEur, setCreditEur] = useState("5");
   const [creditNote, setCreditNote] = useState("");
   const [providerPricingDraft, setProviderPricingDraft] = useState<
@@ -131,6 +152,7 @@ export default function AdminPage() {
       providerPricing?: ProviderPricingPayload;
       envFallback?: boolean;
       warning?: string;
+      modelCatalog?: LlmModelOption[];
     };
     setBilling(json.settings);
     setBillingDraft({
@@ -143,6 +165,9 @@ export default function AdminPage() {
     }
     if (json.providerPricing) {
       setProviderPricingDraft(draftFromProviderPricing(json.providerPricing));
+    }
+    if (json.modelCatalog?.length) {
+      setModelCatalog(json.modelCatalog);
     }
     setBillingEnvFallback(Boolean(json.envFallback));
   }, []);
@@ -563,6 +588,103 @@ export default function AdminPage() {
               >
                 Tarif-Limits speichern
               </button>
+
+              {modelCatalog.length ? (
+                <div className="mt-4 border-t border-surface-border/60 pt-4">
+                  <h3 className="mb-1 text-xs font-medium text-zinc-300">
+                    LLM-Whitelist pro Tarif
+                  </h3>
+                  <p className="mb-3 text-[10px] text-zinc-500">
+                    Steuert, welche OpenRouter-Modelle Nutzer wählen dürfen. „Alle
+                    Modelle“ = voller Katalog aus{" "}
+                    <code className="text-accent">BETA_LLM_MODELS</code>. Free-Tier
+                    Standard nur über Env, bis hier gespeichert.
+                  </p>
+                  <div className="flex flex-col gap-3">
+                    {TIERS.map((tier) => (
+                      <div
+                        key={tier}
+                        className="rounded-lg border border-surface-border/50 bg-surface px-3 py-2"
+                      >
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-medium capitalize text-zinc-300">
+                            {tier}
+                          </span>
+                          <label className="flex cursor-pointer items-center gap-1.5 text-[10px] text-zinc-500">
+                            <input
+                              type="checkbox"
+                              disabled={busy}
+                              checked={tierLimitsDraft[tier].allModels}
+                              onChange={(e) =>
+                                setTierLimitsDraft((d) =>
+                                  d
+                                    ? {
+                                        ...d,
+                                        [tier]: {
+                                          ...d[tier],
+                                          allModels: e.target.checked,
+                                          modelIds: e.target.checked
+                                            ? []
+                                            : d[tier].modelIds.length
+                                              ? d[tier].modelIds
+                                              : modelCatalog.slice(0, 1).map((m) => m.id),
+                                        },
+                                      }
+                                    : d,
+                                )
+                              }
+                              className="size-3 rounded border-surface-border"
+                            />
+                            Alle Modelle
+                          </label>
+                        </div>
+                        {!tierLimitsDraft[tier].allModels ? (
+                          <ul className="grid gap-1 sm:grid-cols-2">
+                            {modelCatalog.map((m) => {
+                              const checked = tierLimitsDraft[tier].modelIds.includes(m.id);
+                              return (
+                                <li key={m.id}>
+                                  <label className="flex cursor-pointer items-start gap-1.5 text-[10px] text-zinc-400">
+                                    <input
+                                      type="checkbox"
+                                      disabled={busy}
+                                      checked={checked}
+                                      onChange={(e) =>
+                                        setTierLimitsDraft((d) => {
+                                          if (!d) return d;
+                                          const prev = d[tier].modelIds;
+                                          const next = e.target.checked
+                                            ? [...prev, m.id]
+                                            : prev.filter((id) => id !== m.id);
+                                          return {
+                                            ...d,
+                                            [tier]: { ...d[tier], modelIds: next },
+                                          };
+                                        })
+                                      }
+                                      className="mt-0.5 size-3 rounded border-surface-border"
+                                    />
+                                    <span>
+                                      <span className="text-zinc-300">{m.label}</span>
+                                      <span className="block text-[9px] text-zinc-600">
+                                        {m.id}
+                                      </span>
+                                    </span>
+                                  </label>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : (
+                          <p className="text-[10px] text-zinc-600">
+                            Voller Katalog — keine Whitelist.
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </section>
           ) : null}
 

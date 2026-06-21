@@ -19,3 +19,13 @@
 
 	Follow on Twitter for updates:
 	@KenneyNL
+
+## Music loops (CC0)
+
+| File | Kenney source | Use |
+|------|---------------|-----|
+| `music_tension.ogg` | Music Loops — *Infinite Descent* | `<<music:tension>>` |
+| `music_calm.ogg` | Music Loops — *Night at the Beach* | `<<music:calm>>` |
+| `music_mystery.ogg` | Music Loops — *Flowing Rocks* | `<<music:mystery>>` |
+
+Pack: [Kenney Music Loops](https://kenney.nl) (CC0). Mirrored via gamesounds.xyz for setup.

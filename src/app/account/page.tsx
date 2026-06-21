@@ -157,6 +157,31 @@ export default function AccountPage() {
               ) : null}
             </section>
 
+            <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
+              <h2 className="font-medium text-accent">{t("account.knownIssuesTitle")}</h2>
+              <ul className="mt-2 list-disc space-y-1.5 pl-4 text-xs text-zinc-400">
+                <li>{t("account.knownIssueIosReadOnly")}</li>
+                <li>{t("account.knownIssueFreeModels")}</li>
+                <li>{t("account.knownIssueCloudTts")}</li>
+                <li>{t("account.knownIssueFishAuth")}</li>
+              </ul>
+            </section>
+
+            {process.env.NEXT_PUBLIC_FEEDBACK_URL ? (
+              <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
+                <h2 className="font-medium text-accent">{t("account.feedbackTitle")}</h2>
+                <p className="mt-2 text-sm text-zinc-400">{t("account.feedbackHint")}</p>
+                <a
+                  href={process.env.NEXT_PUBLIC_FEEDBACK_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-block rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-sm font-medium text-accent hover:border-accent/60"
+                >
+                  {t("account.feedbackLink")}
+                </a>
+              </section>
+            ) : null}
+
             <LlmUsagePanel />
 
             <UsageLogPanel />

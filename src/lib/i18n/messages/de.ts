@@ -44,6 +44,11 @@ export const deMessages = {
     carousel: "Bibliothek",
     storyLocaleDe: "Geschichte auf Deutsch",
     storyLocaleEn: "Story in English",
+    duplicateTitle: "Vorlage schon importiert",
+    duplicateBody:
+      "„{title}“ läuft bereits in deiner Liste. Öffne die Story oder archiviere/lösche sie, bevor du die Vorlage erneut importierst.",
+    duplicateOpen: "Story öffnen",
+    duplicateDismiss: "Schließen",
   },
   story: {
     rename: "Umbenennen",
@@ -128,6 +133,18 @@ export const deMessages = {
     signOut: "Abmelden",
     techSettings: "Technische Einstellungen (Stimmen, Modelle):",
     adminLink: "Admin — Nutzer & Tarife",
+    knownIssuesTitle: "Bekannte Hinweise (Beta)",
+    knownIssueIosReadOnly:
+      "iOS + Hintergrundmusik: „Nur lesen“ im Chat deaktiviert TTS — Spotify & Co. laufen weiter.",
+    knownIssueFreeModels:
+      "Free-Tarif: nur ausgewählte günstige LLM-Modelle — siehe Limits oben.",
+    knownIssueCloudTts:
+      "Cloud-TTS: gespeicherte MP3 zählen gegen dein Kontingent (Account → Limits).",
+    knownIssueFishAuth:
+      "TTS-Fehler „fish_auth“: Server-Stimme temporär offline — kurz warten oder Admin informieren.",
+    feedbackTitle: "Feedback",
+    feedbackHint: "Bug, Idee oder Frage zur Beta?",
+    feedbackLink: "Feedback senden",
   },
   wallet: {
     title: "Guthaben",
@@ -220,8 +237,17 @@ export const deMessages = {
   onboarding: {
     title: "Willkommen bei {product}",
     intro: "Kurz die wichtigsten Schritte — danach kannst du direkt loslegen.",
-    stepLibrary: "Bibliothek:",
-    stepLibraryText: "Vorlage wählen, Protagonist und Stimme festlegen.",
+    stepCounter: "Schritt {current} von {total}",
+    step1Intro: "So startest du eine Geschichte aus der Bibliothek:",
+    step2Intro: "Nach dem Import legst du deinen Charakter fest:",
+    step3Intro: "Im Chat hörst du den Erzähler — am besten mit Kopfhörern:",
+    stepLibrary: "Bibliothek",
+    stepLibraryText: "Vorlage wählen und „Importieren“ tippen.",
+    stepProtagonist: "Protagonist",
+    stepProtagonistText: "Name, Pronomen und Stimme — Cast-Stimmen später im Story-Hub.",
+    stepHeadphones: "Kopfhörer & ▶",
+    stepHeadphonesText:
+      "Chat öffnen, Antwort abwarten, ▶ Listen tippen. Autoplay in den Chat-Werkzeugen (unten aufklappen).",
     stepChat: "Chat:",
     stepChatText:
       "Geschichte schreiben; Kopfhörer für TTS. Eingabe unten aufklappen für Say & Reaktionen.",
@@ -229,6 +255,9 @@ export const deMessages = {
     stepHubText: "Cast für Stimmen, Gedächtnis & Welt bearbeiten.",
     disclaimer:
       "KI-Antworten und Sprache werden über Drittanbieter erzeugt (OpenRouter, TTS). Nur Inhalte nutzen, für die du Rechte hast.",
+    next: "Weiter",
+    back: "Zurück",
+    skip: "Überspringen",
     dismiss: "Verstanden — los geht's",
   },
   usage: {
@@ -351,7 +380,7 @@ export const deMessages = {
   chat: {
     title: "Chat",
     confirmRewind:
-      "Ab hier löschen? Diese Nachricht und alles danach werden entfernt.",
+      "Ab hier löschen? Diese Nachricht und alles danach verschwinden — inkl. zugehöriger TTS-Aufnahmen in der Cloud. Nicht rückgängig.",
     steeringAction: "Steuerung · Handlung",
     steeringDialogue: "Steuerung · Dialog",
     steeringBoth: "Steuerung · Handlung + Dialog",
@@ -359,7 +388,8 @@ export const deMessages = {
     ttsPlaying: "· läuft",
     ttsQueued: "· in Warteschlange",
     rewindAria: "Ab hier löschen",
-    regenerateConfirm: "Neue Version dieser Erzählung generieren?",
+    regenerateConfirm:
+      "Diese Erzähler-Antwort neu generieren? Die aktuelle Version und alle späteren Chat-Zeilen werden ersetzt.",
     regenerate: "Neu generieren",
     copyRaw: "Rohdaten kopieren",
     copied: "Kopiert",
@@ -371,6 +401,7 @@ export const deMessages = {
     costTotal: "Σ {total} ct",
     loreActive: "{count} Lore-Einträge aktiv",
     generating: "Erzähler schreibt …",
+    stopGeneration: "Stopp",
     openRouterKey: "OpenRouter-Key in Settings eintragen (für Kapitelübergang).",
     openRouterKeyShort: "OpenRouter API-Key in Settings hinterlegen.",
     emptyModelReply: "Leere Antwort vom Modell — bitte erneut versuchen.",
@@ -554,6 +585,18 @@ export const deMessages = {
     sceneStyle: "Szenen-Stil",
     sceneStyleDesc:
       "im Chat (Plot + Absatz) — Fish [whisper]/[laughing], Eleven v3, Qwen-instruct; plus Ambience aus Ort.",
+  },
+  storyVoices: {
+    intro:
+      "Pro Sprecher eine Stimme — inkl. Protagonist (du). Cast-Karte auch im Story-Hub.",
+    sceneDeliveryTitle:
+      "Stimmung aus Plot-State (Ort, Bedrohungen) — Fish-Tags, Eleven v3 oder Qwen-instruct.",
+    narratorTitle: "Erzähler liest alle nicht zugewiesenen Sprecher.",
+    protagonistTitle: "Deine gesprochenen Zeilen (Say) — eigene Stimme optional.",
+    ownVoiceTitle:
+      "Eigene Stimme für diese Figur — sonst spricht der Erzähler für sie.",
+    narratorFallback: "Keine eigene Stimme — Erzähler übernimmt.",
+    expandHint: "Antippen für Stimmen-Auswahl und Vorschau.",
   },
   pwa: {
     installTitle: "RP Audiobook installieren",

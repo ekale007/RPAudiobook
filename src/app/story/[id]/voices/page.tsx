@@ -50,6 +50,7 @@ import {
   protagonistDisplayLabel,
 } from "@/lib/story/protagonist";
 import { normalizeStoryLocale } from "@/lib/tts/ttsLocaleRouting";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
 import type { QwenVoiceProfile, StorySettings, VoiceMap } from "@/lib/types";
 
@@ -116,6 +117,7 @@ export default function StoryVoicesPage() {
   const [fishPinnedIds, setFishPinnedIds] = useState<string[]>([]);
   const [expandedSlug, setExpandedSlug] = useState<string | null>("narrator");
 
+  const { t } = useUiLocale();
   const { authReady } = useStorySession(router);
 
   useEffect(() => {
@@ -264,7 +266,7 @@ export default function StoryVoicesPage() {
     <main className="flex min-h-dvh flex-col">
       <AppHeader title="Figuren-Stimmen" backHref={`/story/${storyId}`} />
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-3">
-        <p className="text-[11px] leading-snug text-zinc-500">
+        <p className="text-[11px] leading-snug text-zinc-500" title={t("storyVoices.intro")}>
           {engineLabel} pro Sprecher — inkl.{" "}
           <strong className="text-zinc-400">Protagonist (du)</strong> unter Erzähler.
           Gleiche Karte auch im{" "}
@@ -287,7 +289,10 @@ export default function StoryVoicesPage() {
         </p>
 
         {sceneDelivery ? (
-          <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-surface-border bg-surface-raised px-3 py-2">
+          <label
+            className="flex cursor-pointer items-start gap-2 rounded-lg border border-surface-border bg-surface-raised px-3 py-2"
+            title={t("storyVoices.sceneDeliveryTitle")}
+          >
             <input
               type="checkbox"
               checked={qwenSceneInstruct}
@@ -329,6 +334,7 @@ export default function StoryVoicesPage() {
                 <button
                   type="button"
                   className="mb-1.5 flex w-full items-center gap-2 text-left"
+                  title={t("storyVoices.expandHint")}
                   onClick={() =>
                     setExpandedSlug(expanded ? null : s.slug)
                   }
@@ -345,16 +351,23 @@ export default function StoryVoicesPage() {
                     </p>
                   </div>
                   {s.isNarrator ? (
-                    <span className="shrink-0 text-[9px] uppercase tracking-wide text-accent">
+                    <span
+                      className="shrink-0 text-[9px] uppercase tracking-wide text-accent"
+                      title={t("storyVoices.narratorTitle")}
+                    >
                       Erzähler
                     </span>
                   ) : s.isProtagonist ? (
-                    <span className="shrink-0 text-[9px] uppercase tracking-wide text-zinc-400">
+                    <span
+                      className="shrink-0 text-[9px] uppercase tracking-wide text-zinc-400"
+                      title={t("storyVoices.protagonistTitle")}
+                    >
                       Du
                     </span>
                   ) : (
                     <label
                       className="flex shrink-0 cursor-pointer items-center gap-1 text-[10px] text-zinc-500"
+                      title={t("storyVoices.ownVoiceTitle")}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <input
@@ -374,7 +387,10 @@ export default function StoryVoicesPage() {
                 </button>
 
                 {voiceDisabled ? (
-                  <p className="mb-1 text-[10px] text-zinc-600">
+                  <p
+                    className="mb-1 text-[10px] text-zinc-600"
+                    title={t("storyVoices.narratorFallback")}
+                  >
                     → Erzähler-Stimme
                   </p>
                 ) : null}

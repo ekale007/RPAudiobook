@@ -328,17 +328,18 @@ export async function createStoryFromSeedPack(
   return { storyId, chapterId: chapter.id as string };
 }
 
-/** Titles of active (non-archived) stories from the same library template. */
-export async function listActiveLibraryImportTitles(
+/** Active (non-archived) story for this library template, if any. */
+export async function getActiveLibraryImportStory(
   templateId: LibraryTemplateId,
-): Promise<string[]> {
+): Promise<{ id: string; title: string } | null> {
   const rows = await listStories(false);
-  return rows
-    .filter((row) => getLibraryTemplateId(row.settings) === templateId)
-    .map((row) => row.title);
+  const hit = rows.find(
+    (row) => getLibraryTemplateId(row.settings) === templateId,
+  );
+  return hit ? { id: hit.id, title: hit.title } : null;
 }
 
-/** „Titel“, „Titel (2)“, … — mehrere parallele Durchläufe derselben Vorlage. */
+/** @deprecated Parallel imports blocked — kept for tests. */
 export function nextLibraryImportTitle(
   baseTitle: string,
   existingTitles: string[],
@@ -368,8 +369,18 @@ export async function importFromLibraryTemplate(
   const template = getLibraryTemplate(templateId);
   if (!template) throw new Error("Unknown library template");
 
-  const peerTitles = await listActiveLibraryImportTitles(templateId);
-  const title = nextLibraryImportTitle(template.title, peerTitles);
+  const existing = await getActiveLibraryImportStory(templateId);
+  if (existing) {
+    const err = new Error("LIBRARY_TEMPLATE_ALREADY_IMPORTED") as Error & {
+      storyId: string;
+      storyTitle: string;
+    };
+    err.storyId = existing.id;
+    err.storyTitle = existing.title;
+    throw err;
+  }
+
+  const title = template.title.trim();
 
   const pack = template.loadPack();
   const locale = normalizeStoryLocale(template.locale);

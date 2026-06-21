@@ -106,23 +106,26 @@ Interaktives Story-RPG im Browser: Nutzer steuern die Handlung per Chat, der Erz
 
 ### P0 — vor erweiterten Beta-Einladungen
 
-- [ ] **Prod-Smoke-Test** komplett: `[SMOKE-TEST.md](./SMOKE-TEST.md)` (Auth, LLM, Fish TTS DE+EN, Bibliothek, Mobile)
-- [ ] **Supabase Migrationen** 001–017 auf Prod verifizieren (inkl. Provider-Pricing)
-- [ ] **Content-Audit** Bibliothek: `[BETA-CONTENT-LEGAL.md](./BETA-CONTENT-LEGAL.md)`
-- [ ] **Fish API-Key** auf Vercel gültig halten; Ablauf in Kalender
-- [ ] **Invite-Workflow** einmal End-to-End (Mail → Passwort → Tier `beta`)
-- [ ] **Free-Tier-Modelle** in Vercel auf günstige IDs (`BETA_TIER_FREE_MODELS`)
+- [x] **Prod-Smoke-Test** komplett (Betreiber, Mai 2026)
+- [x] **Supabase Migrationen** 001–017 auf Prod
+- [x] **Content-Audit** Bibliothek
+- [x] **Fish API-Key** / Free-Tier-Modelle auf Vercel
+- [x] **Invite-Workflow** E2E
+- [x] **Legal** auf Prod (`NEXT_PUBLIC_LEGAL_*`)
+- [ ] **GitHub Security Advisories** aktivieren (optional)
 
 ### P1 — Qualität & UX (erste Beta-Wochen)
 
-- [ ] Onboarding-Overlay verfeinern (3 Schritte: Bibliothek → Protagonist → Kopfhörer)
-- [ ] Kontext-Tooltips (Cast-Stimmen, Say/Reaktionen, Account-Limits)
-- [ ] Admin-UI: Modell-Whitelist pro Tier (heute nur Env)
-- [ ] Feedback-Kanal festlegen (Form / WhatsApp)
-- [ ] **Musik-Assets** in `sfxCatalog.ts` durch echte Loops ersetzen (Placeholder-WAVs)
-- [ ] Duplikat-Import verhindern (zweites „When Dawn Breaks“)
-- [ ] Rewind/Reroll: klarere Bestätigungstexte
-- [ ] Streaming-Abbruch (Stop-Button)
+- [x] Onboarding-Overlay (3 Schritte: Bibliothek → Protagonist → Kopfhörer)
+- [x] Kontext-Tooltips (Cast-Stimmen, Say/Reaktionen)
+- [x] Admin-UI: Modell-Whitelist pro Tier
+- [x] Feedback-Kanal (Env `NEXT_PUBLIC_FEEDBACK_URL` → `/account`)
+- [x] **Musik-Assets** in `sfxCatalog.ts` (Kenney CC0 Loops)
+- [x] Duplikat-Import verhindern (Bibliothek)
+- [x] Rewind/Reroll: klarere Bestätigungstexte
+- [x] Streaming-Abbruch (Stop in Chat + GeneratingIndicator, i18n)
+- [ ] **5–15 Tester** + Tier `beta` (Ops)
+- [x] Known issues auf `/account`
 
 ### P2 — nach stabiler Closed Beta
 
@@ -134,17 +137,9 @@ Interaktives Story-RPG im Browser: Nutzer steuern die Handlung per Chat, der Erz
 - [ ] Öffentlicher Landing-Text / Warteliste
 - [ ] LokalAI CORS-Fix auf USB-Stick deployen
 
-### Uncommitted im Repo (Aufräumen vor nächstem Commit)
+### Uncommitted / Cleanup
 
-
-| Pfad                                        | Status                                  |
-| ------------------------------------------- | --------------------------------------- |
-| `image-studio/`                             | Fertig ausgelagert, noch untracked      |
-| `samples/omnivoice/`                        | Probe-WAVs + Manifest, Experiment       |
-| `scripts/install-omnivoice.ps1` usw.        | OmniVoice-Tooling                       |
-| `src/lib/tts/buildPlayTurnParams.ts`        | Refactor-Helfer, noch nicht eingebunden |
-| `src/lib/tts/downloadAudioBlob.ts`          | Refactor-Helfer, noch nicht eingebunden |
-| Gelöscht: `src/lib/images/localImageGen.ts` | Bewusst → `image-studio/`               |
+*(Siehe Git — OSS-Repo ohne `image-studio/`, `samples/omnivoice/`, `supabase/migrations/`.)*
 
 
 ---

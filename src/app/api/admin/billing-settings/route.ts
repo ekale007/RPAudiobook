@@ -17,6 +17,7 @@ import {
   validateTierLimitsPayload,
   type TierLimitsMap,
 } from "@/lib/server/tierLimitsSettings";
+import { getLlmModelCatalog } from "@/lib/server/llmModels";
 import {
   defaultProviderPricing,
   invalidateProviderPricingCache,
@@ -69,6 +70,7 @@ export async function GET(req: Request) {
       },
       tierLimits: envTierLimits,
       providerPricing: defaultProviderPricing(),
+      modelCatalog: getLlmModelCatalog(),
       envFallback: true,
       pricingUrl: "https://elevenlabs.io/pricing/api",
       starterPlanNote:
@@ -106,6 +108,7 @@ export async function GET(req: Request) {
       },
       tierLimits: envTierLimits,
       providerPricing: defaultProviderPricing(),
+      modelCatalog: getLlmModelCatalog(),
       envFallback: true,
       pricingUrl: "https://elevenlabs.io/pricing/api",
       warning: "Migration 012 ausführen (beta_billing_settings).",
@@ -121,6 +124,7 @@ export async function GET(req: Request) {
     settings: toApiSettings(data as Record<string, unknown>, usdToEur),
     tierLimits,
     providerPricing,
+    modelCatalog: getLlmModelCatalog(),
     envFallback: false,
     pricingUrl: "https://elevenlabs.io/pricing/api",
     starterPlanNote:
