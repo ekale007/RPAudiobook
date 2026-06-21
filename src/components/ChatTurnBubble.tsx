@@ -25,7 +25,7 @@ import {
   PROTAGONIST_SPEAKER_SLUG,
 } from "@/lib/story/protagonist";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
-import { splitTextIntoPlaybackLines } from "@/lib/tts/ttsPlaybackLines";
+import { tokenizeTextForPlayback } from "@/lib/tts/ttsPlaybackLines";
 
 export function ChatTurnBubble({
   turn,
@@ -88,8 +88,8 @@ export function ChatTurnBubble({
   const [draft, setDraft] = useState(turn.content);
   const [busy, setBusy] = useState(false);
   const [copiedRaw, setCopiedRaw] = useState(false);
-  const [activeTtsLine, setActiveTtsLine] = useState<number | null>(null);
-  const lineRefs = useRef<(HTMLParagraphElement | null)[]>([]);
+  const [activeTtsWord, setActiveTtsWord] = useState<number | null>(null);
+  const wordRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const contentLocale = normalizeStoryContentLocale(storyLocale);
   const steeringTurn =
     turn.role === "user" && isSteeringUserTurn(turn.content);
@@ -98,22 +98,24 @@ export function ChatTurnBubble({
       steeringTurn ? stripSteeringTurnPrefix(turn.content) : turn.content,
     ),
   );
-  const playbackLines = useMemo(
-    () => splitTextIntoPlaybackLines(displayContent),
+  const playbackTokens = useMemo(
+    () => tokenizeTextForPlayback(displayContent),
     [displayContent],
   );
-  const ttsReadAlong = ttsPlaying && playbackLines.length > 0;
+  const ttsReadAlong =
+    ttsPlaying && playbackTokens.some((t) => t.isWord);
 
   useEffect(() => {
-    if (!ttsReadAlong || activeTtsLine == null) return;
-    lineRefs.current[activeTtsLine]?.scrollIntoView({
+    if (!ttsReadAlong || activeTtsWord == null) return;
+    wordRefs.current[activeTtsWord]?.scrollIntoView({
       behavior: "smooth",
-      block: "center",
+      block: "nearest",
+      inline: "nearest",
     });
-  }, [activeTtsLine, ttsReadAlong]);
+  }, [activeTtsWord, ttsReadAlong]);
 
   useEffect(() => {
-    if (!ttsPlaying) setActiveTtsLine(null);
+    if (!ttsPlaying) setActiveTtsWord(null);
   }, [ttsPlaying]);
   const markedSnippets = useMemo(
     () =>
@@ -322,37 +324,42 @@ export function ChatTurnBubble({
             className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-sm text-zinc-100"
           />
         ) : ttsReadAlong ? (
-          <div className="prose-chat flex flex-col gap-1.5">
-            {playbackLines.map((line, index) => (
-              <p
-                key={`${index}-${line.text.slice(0, 24)}`}
-                ref={(el) => {
-                  lineRefs.current[index] = el;
-                }}
-                className={`rounded-md px-1 py-0.5 transition-colors duration-200 ${
-                  index === activeTtsLine
-                    ? "bg-accent/15 text-zinc-50 ring-1 ring-accent/45"
-                    : "text-zinc-400"
-                }`}
-              >
-                {showDialogueMarkup && markedSnippets.length > 0
-                  ? renderInlineMarkedContent({
-                      text: line.text,
-                      snippets: markedSnippets.filter((s) =>
-                        line.text.includes(s),
-                      ),
-                      selectedBySnippet: markedLookup,
-                      cast,
-                      voiceMap,
-                      voiceEnabledSlugs,
-                      dialogueTitle: (name) =>
-                        t("chat.dialogueTitle", { name }),
-                      speakerTitle: (name) => t("chat.speakerTitle", { name }),
-                    })
-                  : line.text}
-              </p>
-            ))}
-          </div>
+          <p className="prose-chat leading-relaxed">
+            {playbackTokens.map((token, index) => {
+              if (!token.isWord) {
+                return (
+                  <span key={`ws-${index}`} className="whitespace-pre-wrap">
+                    {token.text}
+                  </span>
+                );
+              }
+              const state =
+                activeTtsWord == null
+                  ? "future"
+                  : index === activeTtsWord
+                    ? "current"
+                    : index < activeTtsWord
+                      ? "past"
+                      : "future";
+              return (
+                <span
+                  key={`w-${index}-${token.text.slice(0, 12)}`}
+                  ref={(el) => {
+                    wordRefs.current[index] = el;
+                  }}
+                  className={`rounded-sm px-[1px] transition-colors duration-150 ${
+                    state === "current"
+                      ? "bg-accent/35 text-zinc-50 ring-1 ring-accent/50"
+                      : state === "past"
+                        ? "text-zinc-300"
+                        : "text-zinc-500"
+                  }`}
+                >
+                  {token.text}
+                </span>
+              );
+            })}
+          </p>
         ) : showDialogueMarkup && markedSnippets.length > 0 ? (
           <div className="prose-chat">
             {renderInlineMarkedContent({
@@ -396,8 +403,8 @@ export function ChatTurnBubble({
             onPlaybackActiveChange={(active) =>
               onTtsPlaybackChange?.(turn.id, active)
             }
-            playbackLines={playbackLines}
-            onActiveLineChange={setActiveTtsLine}
+            playbackTokens={playbackTokens}
+            onActiveWordIndexChange={setActiveTtsWord}
             storyLocale={storyLocale}
             storySettings={storySettings}
             chapterTitle={chapterTitle}

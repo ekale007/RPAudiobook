@@ -1,61 +1,80 @@
-/** Split visible turn text into lines for TTS read-along highlighting. */
+/** Tokenize visible turn text for TTS read-along (word highlight). */
 
-export type PlaybackLine = {
+export type PlaybackToken = {
   text: string;
-  /** Speakable length proxy for time mapping (chars). */
+  /** Counts toward speak-time mapping (words only). */
+  isWord: boolean;
   weight: number;
 };
 
-function speakableWeight(text: string): number {
-  const n = text.replace(/\s+/g, " ").trim().length;
-  return n > 0 ? n : 1;
+function wordWeight(text: string): number {
+  const letters = text.replace(/[^\p{L}\p{N}]/gu, "");
+  return letters.length > 0 ? letters.length : 1;
 }
 
-function splitBySentences(text: string): PlaybackLine[] {
-  const trimmed = text.trim();
-  if (!trimmed) return [];
-  const parts = trimmed
-    .split(/(?<=[.!?…])\s+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (parts.length <= 1) {
-    return [{ text: trimmed, weight: speakableWeight(trimmed) }];
+/** Split into words and whitespace/punctuation chunks (display order preserved). */
+export function tokenizeTextForPlayback(text: string): PlaybackToken[] {
+  if (!text) return [];
+  const tokens: PlaybackToken[] = [];
+  const re = /\S+|\s+/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text)) !== null) {
+    const chunk = match[0]!;
+    const isWord = /\p{L}|\p{N}/u.test(chunk);
+    tokens.push({
+      text: chunk,
+      isWord,
+      weight: isWord ? wordWeight(chunk) : 0,
+    });
   }
-  return parts.map((t) => ({ text: t, weight: speakableWeight(t) }));
+  return tokens;
 }
 
-/** Prefer paragraph/line breaks; fall back to sentences for single blocks. */
+/** Map playback progress (0–1) to token index (word token). */
+export function activeWordTokenIndexForProgress(
+  tokens: PlaybackToken[],
+  progress: number,
+): number {
+  const wordIndices: number[] = [];
+  let total = 0;
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i]!;
+    if (!t.isWord || t.weight <= 0) continue;
+    wordIndices.push(i);
+    total += t.weight;
+  }
+  if (!wordIndices.length) return 0;
+
+  const p = Math.min(1, Math.max(0, progress));
+  if (p <= 0) return wordIndices[0]!;
+  if (p >= 1) return wordIndices[wordIndices.length - 1]!;
+
+  let remaining = p * total;
+  for (const idx of wordIndices) {
+    remaining -= tokens[idx]!.weight;
+    if (remaining <= 0) return idx;
+  }
+  return wordIndices[wordIndices.length - 1]!;
+}
+
+/** @deprecated Use tokenizeTextForPlayback — kept for tests. */
+export type PlaybackLine = { text: string; weight: number };
+
 export function splitTextIntoPlaybackLines(text: string): PlaybackLine[] {
-  const normalized = text.replace(/\r\n/g, "\n").trim();
-  if (!normalized) return [];
-
-  const byNewline = normalized
-    .split(/\n+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  if (byNewline.length > 1) {
-    return byNewline.map((t) => ({ text: t, weight: speakableWeight(t) }));
-  }
-
-  return splitBySentences(normalized);
+  return tokenizeTextForPlayback(text)
+    .filter((t) => t.isWord)
+    .map((t) => ({ text: t.text, weight: t.weight }));
 }
 
-/** Map playback progress (0–1) to a line index. */
 export function activeLineIndexForProgress(
   lines: PlaybackLine[],
   progress: number,
 ): number {
   if (!lines.length) return 0;
-  const p = Math.min(1, Math.max(0, progress));
-  if (p <= 0) return 0;
-  if (p >= 1) return lines.length - 1;
-
-  const total = lines.reduce((sum, line) => sum + line.weight, 0);
-  let remaining = p * total;
-  for (let i = 0; i < lines.length; i++) {
-    remaining -= lines[i]!.weight;
-    if (remaining <= 0) return i;
-  }
-  return lines.length - 1;
+  const tokens: PlaybackToken[] = lines.map((l) => ({
+    text: l.text,
+    isWord: true,
+    weight: l.weight,
+  }));
+  return activeWordTokenIndexForProgress(tokens, progress);
 }

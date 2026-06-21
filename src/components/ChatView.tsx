@@ -348,11 +348,6 @@ export function ChatView({
 
   const handleTtsPlaybackChange = useCallback(
     (turnId: string, active: boolean) => {
-      if (active) {
-        bubbleRefs.current
-          .get(turnId)
-          ?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
       setTtsPlayingTurnId((prev) => {
         const next = active ? turnId : prev === turnId ? null : prev;
         ttsPlayingTurnIdRef.current = next;

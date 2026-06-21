@@ -91,8 +91,8 @@ import {
 } from "@/lib/audio/downloadBlob";
 import { saveTurnAudioToDevice } from "@/lib/audio/saveTurnAudio";
 import {
-  activeLineIndexForProgress,
-  type PlaybackLine,
+  activeWordTokenIndexForProgress,
+  type PlaybackToken,
 } from "@/lib/tts/ttsPlaybackLines";
 
 type Status = "idle" | "loading" | "ready" | "playing" | "paused" | "error";
@@ -125,9 +125,9 @@ export const MessageAudioPlayer = forwardRef<
     autoplayChain?: boolean;
     onChainPlay?: () => void;
     onPlaybackActiveChange?: (active: boolean) => void;
-    /** Lines for read-along highlight (same order as visible bubble text). */
-    playbackLines?: PlaybackLine[];
-    onActiveLineChange?: (index: number | null) => void;
+    /** Tokens for read-along word highlight (visible bubble text). */
+    playbackTokens?: PlaybackToken[];
+    onActiveWordIndexChange?: (tokenIndex: number | null) => void;
     storyLocale?: string;
     storySettings?: StorySettings;
     chapterTitle?: string | null;
@@ -149,8 +149,8 @@ export const MessageAudioPlayer = forwardRef<
     autoplayChain,
     onChainPlay,
     onPlaybackActiveChange,
-    playbackLines,
-    onActiveLineChange,
+    playbackTokens,
+    onActiveWordIndexChange,
     storyLocale,
     storySettings,
     chapterTitle,
@@ -176,7 +176,9 @@ export const MessageAudioPlayer = forwardRef<
   );
   const blobPromiseRef = useRef<Promise<Blob | null> | null>(null);
   const tickRef = useRef<number | null>(null);
-  const lastActiveLineRef = useRef<number | null>(null);
+  const lastActiveWordRef = useRef<number | null>(null);
+  const playbackTokensRef = useRef<PlaybackToken[]>([]);
+  const onActiveWordRef = useRef(onActiveWordIndexChange);
   const playEndRef = useRef<(() => void) | null>(null);
   const blobRef = useRef<Blob | null>(null);
   const webAudioActiveRef = useRef(false);
@@ -196,21 +198,58 @@ export const MessageAudioPlayer = forwardRef<
     }
   }, []);
 
+  useEffect(() => {
+    playbackTokensRef.current = playbackTokens ?? [];
+  }, [playbackTokens]);
+
+  useEffect(() => {
+    onActiveWordRef.current = onActiveWordIndexChange;
+  }, [onActiveWordIndexChange]);
+
+  const publishReadAlongProgress = useCallback(
+    (positionSec: number, durationSec: number) => {
+      const tokens = playbackTokensRef.current;
+      const active =
+        statusRef.current === "playing" || statusRef.current === "paused";
+      if (!active || !tokens.length || durationSec <= 0) {
+        if (lastActiveWordRef.current !== null) {
+          lastActiveWordRef.current = null;
+          onActiveWordRef.current?.(null);
+        }
+        return;
+      }
+      const idx = activeWordTokenIndexForProgress(
+        tokens,
+        positionSec / durationSec,
+      );
+      if (idx !== lastActiveWordRef.current) {
+        lastActiveWordRef.current = idx;
+        onActiveWordRef.current?.(idx);
+      }
+    },
+    [],
+  );
+
   const syncTimesFromAudio = useCallback(() => {
     if (webAudioActiveRef.current && isWebAudioTtsActive()) {
       const pos = getWebAudioPlaybackPosition();
       const dur = getWebAudioPlaybackDuration();
       setCurrentTime(pos);
       if (dur > 0) setDuration(dur);
+      publishReadAlongProgress(pos, dur);
       return;
     }
     const audio = audioRef.current;
     if (!audio) return;
-    setCurrentTime(audio.currentTime);
-    if (Number.isFinite(audio.duration) && audio.duration > 0) {
-      setDuration(audio.duration);
-    }
-  }, []);
+    const pos = audio.currentTime;
+    const dur =
+      Number.isFinite(audio.duration) && audio.duration > 0
+        ? audio.duration
+        : 0;
+    setCurrentTime(pos);
+    if (dur > 0) setDuration(dur);
+    publishReadAlongProgress(pos, dur);
+  }, [publishReadAlongProgress]);
 
   const startTick = useCallback(() => {
     stopTick();
@@ -287,35 +326,13 @@ export const MessageAudioPlayer = forwardRef<
     onPlaybackActiveChange?.(active);
   }, [status, onPlaybackActiveChange]);
 
-  useEffect(() => {
-    const lines = playbackLines ?? [];
-    if (status !== "playing" && status !== "paused") {
-      if (lastActiveLineRef.current !== null) {
-        lastActiveLineRef.current = null;
-        onActiveLineChange?.(null);
-      }
-      return;
-    }
-    if (!lines.length || duration <= 0) return;
-    const idx = activeLineIndexForProgress(lines, currentTime / duration);
-    if (idx !== lastActiveLineRef.current) {
-      lastActiveLineRef.current = idx;
-      onActiveLineChange?.(idx);
-    }
-  }, [
-    currentTime,
-    duration,
-    status,
-    playbackLines,
-    onActiveLineChange,
-  ]);
-
   useEffect(
     () => () => {
       onPlaybackActiveChange?.(false);
-      onActiveLineChange?.(null);
+      lastActiveWordRef.current = null;
+      onActiveWordRef.current?.(null);
     },
-    [onPlaybackActiveChange, onActiveLineChange],
+    [onPlaybackActiveChange],
   );
 
   /** Drop stale blob URLs after HMR or when turn content changes. */
@@ -339,8 +356,10 @@ export const MessageAudioPlayer = forwardRef<
     configureMobileHtmlAudio(audio);
     audio.playbackRate = playbackRate;
     audio.ontimeupdate = () => {
-      if (!seeking) setCurrentTime(audio.currentTime);
+      if (!seeking) syncTimesFromAudio();
+      const audio = audioRef.current;
       if (
+        audio &&
         !audio.paused &&
         Number.isFinite(audio.duration) &&
         audio.duration > 0
@@ -360,6 +379,8 @@ export const MessageAudioPlayer = forwardRef<
       setTtsContentPlaying(false);
       setStatus("ready");
       setCurrentTime(0);
+      lastActiveWordRef.current = null;
+      onActiveWordRef.current?.(null);
       if (audioRef.current) audioRef.current.currentTime = 0;
       if (!isTtsQueueHandoffActive()) {
         clearTtsNowPlaying();
@@ -651,11 +672,18 @@ export const MessageAudioPlayer = forwardRef<
       publishNowPlaying();
       setTtsMediaPlaybackState("playing");
       setSpeechDucking(true);
-      const { durationSec } = await playBlobViaWebAudio(
-        blobRef.current,
-        playbackRate,
-      );
+      const playPromise = playBlobViaWebAudio(blobRef.current, playbackRate);
+      requestAnimationFrame(() => {
+        const dur = getWebAudioPlaybackDuration();
+        if (dur > 0) {
+          setDuration(dur);
+          publishReadAlongProgress(0, dur);
+        }
+      });
+      const { durationSec } = await playPromise;
       if (durationSec > 0) setDuration(durationSec);
+      lastActiveWordRef.current = null;
+      onActiveWordRef.current?.(null);
       finishWebAudioPlayback();
       return;
     }
@@ -910,6 +938,8 @@ export const MessageAudioPlayer = forwardRef<
     setCurrentTime(0);
     setDuration(0);
     setAutoplayBlocked(false);
+    lastActiveWordRef.current = null;
+    onActiveWordRef.current?.(null);
     if (isExclusiveTtsTurn(turnId)) setExclusiveTtsTurn(null);
     clearTtsNowPlaying();
   };
