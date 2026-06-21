@@ -60,7 +60,7 @@ Story → Band → Chapter → Turns (user/assistant)
 | `/story/[id]/export` | Kapitel-Audio-Export |
 | `/story/[id]/pronunciation` | Aussprache-Hints |
 | `/legal/*` | Impressum, Datenschutz, AGB |
-| `/dev/image-generator` | Verweis auf lokales `image-studio/` |
+| `/dev/image-generator` | Stub (GPU tooling not in public OSS) |
 | `/dev/qwen-voices` | Qwen-Stimmen-Dev |
 
 ---
@@ -153,22 +153,9 @@ Story → Band → Chapter → Turns (user/assistant)
 
 ---
 
-## Supabase Migrationen
+## Supabase (SaaS only)
 
-`supabase/migrations/` — **001–017** (Prod alle anwenden):
-
-| # | Thema |
-|---|--------|
-| 001 | Initial schema |
-| 002–003 | Turn audio, speaker |
-| 004–006 | Memory, covers, preferences |
-| 007–008 | LLM usage, TTS quota |
-| 009–011 | User profiles, usage events, email |
-| 012–015 | Beta billing, TTS rates, tier limits, turn cost |
-| 016 | Wallet + Stripe |
-| **017** | **Provider pricing** (LLM/TTS Kosten + Markup pro Modell) |
-
----
+Schema **001–017** on the operator Supabase instance (not shipped in public OSS). Tables include stories, `user_profiles`, usage, wallet/Stripe, `provider_pricing`.
 
 ## Datenflüsse
 
@@ -196,7 +183,7 @@ Story → Band → Chapter → Turns (user/assistant)
 - **Keine Git-Commits** ohne explizite Nutzer-Anfrage
 - Minimale Diffs; bestehende Patterns in `src/lib/` wiederverwenden
 - `npm run build` vor Release-Claims
-- Image Studio: `image-studio/` — **nicht** Vercel-deployed
+- Image gen / OmniVoice / SQL migrations: **not** in public OSS repo
 - OmniVoice/Qwen lokal: Experimente, nicht Beta-Scope
 
 ---
@@ -210,7 +197,6 @@ Story → Band → Chapter → Turns (user/assistant)
 | `npm run start:local` | Kokoro + Next (Windows) |
 | `npm run tts:kokoro` | Lokaler Multi-Voice-Server |
 | `npm run covers:missing` | Fehlende Bibliotheks-Cover |
-| `npm run image-studio` | SDXL-GUI (separates Projekt) |
 | `npm run agentmemory:seed` | Agentmemory bootstrap |
 
 ---
@@ -262,9 +248,6 @@ MCP-Tools in Cursor: `search_graph`, `trace_path`, `get_code_snippet`, `detect_c
 
 | Pfad | Zweck |
 |------|--------|
-| `image-studio/` | SDXL Cover-Studio (Port 5125) |
-| `samples/omnivoice/` | OmniVoice Probe-WAVs |
-| `scripts/install-omnivoice.ps1` | OmniVoice-Setup |
-| `d:\LokalAI` | Separates Repo (8765/8766) — nicht HörbuchKI |
+| `d:\LokalAI` | Separates Repo (8765/8766) — nicht RP Audiobook |
 
-→ [`docs/EXPERIMENTAL-LOCAL.md`](docs/EXPERIMENTAL-LOCAL.md)
+→ [`docs/EXPERIMENTAL-LOCAL.md`](docs/EXPERIMENTAL-LOCAL.md) — `image-studio/`, `samples/omnivoice/`, `supabase/migrations/` **removed from public OSS**

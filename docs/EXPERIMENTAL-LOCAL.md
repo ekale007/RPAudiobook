@@ -2,26 +2,7 @@
 
 Diese Tracks laufen **nur auf deinem PC** und sind bewusst **nicht** Teil der Vercel-Prod-Beta.
 
----
-
-## Image Studio (`image-studio/`)
-
-- **Zweck:** SDXL-Turbo Cover & Avatare mit OpenRouter-Prompt-Hilfe
-- **Ports:** Web 5173 (Dev), API 5125
-- **Start:** `cd image-studio && npm run dev` oder `npm run image-studio` aus Repo-Root
-- **HörbuchKI:** `/dev/image-generator` verweist hierher; Batch-Cover weiter `npm run covers:missing`
-
-→ [`image-studio/README.md`](../image-studio/README.md)
-
----
-
-## OmniVoice (`samples/omnivoice/`)
-
-- **Zweck:** Lokales Multi-Voice-TTS (Clone/Design), Qualitätsvergleich zu Fish/Kokoro
-- **Scripts:** `npm run tts:omnivoice:install`, `tts:omnivoice:refs`, `tts:omnivoice:probe`
-- **Assets:** `refs/` (edge-tts Referenzen), `probes/` (Modell-Ausgaben), `manifest.json`
-
-→ [`samples/omnivoice/README.md`](../samples/omnivoice/README.md)
+> **OSS-Hinweis:** `image-studio/`, `samples/omnivoice/` und `supabase/migrations/` sind **nicht** im öffentlichen GitHub-Repo (SaaS/Experimente beim Betreiber).
 
 ---
 
@@ -33,6 +14,12 @@ Diese Tracks laufen **nur auf deinem PC** und sind bewusst **nicht** Teil der Ve
 | Qwen Cloud | [`QWEN-CLOUD.md`](./QWEN-CLOUD.md) |
 | Qwen Masterplan | [`QWEN-MASTERPLAN.md`](./QWEN-MASTERPLAN.md) |
 | RunPod Serverless | [`RUNPOD-SERVERLESS-QWEN.md`](./RUNPOD-SERVERLESS-QWEN.md) |
+
+---
+
+## Bibliotheks-Cover (Batch)
+
+CLI ohne separate GUI — [`LOCAL-COVERS.md`](./LOCAL-COVERS.md), `npm run covers:missing`
 
 ---
 

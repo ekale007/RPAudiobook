@@ -61,5 +61,3 @@ Phasen A–E, Auth, Billing/Wallet, Fish Audiobook-Soundscape, bilingual DE/EN-B
 |------|--------|
 | `src/` | Next.js App |
 | `docs/PROJECT-STATUS.md` | Wissensbasis |
-| `image-studio/` | Lokales SDXL (nicht Vercel) |
-| `samples/omnivoice/` | TTS-Experimente |

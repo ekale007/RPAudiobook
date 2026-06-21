@@ -5,17 +5,9 @@ Checkliste für Beta-Deploy mit Server-LLM/TTS (ElevenLabs + OpenRouter).
 ## 1. Supabase (Prod)
 
 1. Projekt anlegen oder Prod-Instanz nutzen
-2. **SQL-Migrationen** der Reihe nach ausführen (`supabase/migrations/001` … `011`)
+2. **SQL-Schema** auf der Supabase-Instanz anwenden (Migrationen **nicht** im öffentlichen OSS-Repo — beim Betreiber der gehosteten Instanz hinterlegt; Prod ist bereits migriert)
 
-   | Datei | Inhalt |
-   |-------|--------|
-   | `009_user_profiles.sql` | Tabelle `user_profiles`, Tarife — **zuerst**, wenn `011` „relation does not exist“ meldet |
-   | `010_usage_events.sql` | Verbrauchsprotokoll |
-   | `011_profile_email.sql` | E-Mail-Spalte für Admin — **nur nach 009** |
-   | `012_beta_billing_settings.sql` | USD→EUR & TTS-Tarif (Admin-UI) |
-   | `013_eleven_tts_usd_rates.sql` | Eleven Flash/Standard $/1k (API-Preisliste) |
-
-   Bei `009` warnt Supabase **„destructive“** wegen `drop trigger if exists` — das ersetzt nur den Signup-Trigger, keine Tabellen werden gelöscht. Bestätigen und ausführen.
+   Relevante Tabellen u. a.: `user_profiles`, `usage_events`, `beta_billing_settings`, Wallet/Stripe (016+), `provider_pricing` (017).
 3. **Auth → URL configuration**
    - Site URL: `https://<deine-domain>`
    - Redirect URLs: `https://<deine-domain>/auth/callback`, `http://localhost:3000/auth/callback` (Dev)

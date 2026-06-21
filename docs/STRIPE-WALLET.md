@@ -4,11 +4,7 @@ Prepaid-Guthaben für LLM und TTS. Free-Tier: **2 € Gratis pro Woche** (Mo UTC
 
 ## 1. Supabase Migration
 
-```bash
-# Lokal oder Supabase SQL Editor
-supabase db push
-# oder Datei ausführen: supabase/migrations/016_wallet_stripe.sql
-```
+Schema für Wallet/Stripe auf der **Betreiber-Supabase** anwenden (SQL nicht im öffentlichen OSS-Repo).
 
 Neue Spalten auf `user_profiles`: `wallet_balance_cents`, `stripe_customer_id`, `beta_welcome_credit_granted`.  
 Neue Tabellen: `user_weekly_usage`, `wallet_transactions`, `stripe_webhook_events`.  

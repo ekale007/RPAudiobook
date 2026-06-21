@@ -152,7 +152,8 @@ Settings → **Local** → engine **kokoro** → Save.
 
 ### SaaS / self-host (optional)
 
-Supabase migrations in `supabase/migrations/`, set `NEXT_PUBLIC_SUPABASE_*` and legal env vars — [docs/AUTH.md](docs/AUTH.md), [docs/DEPLOY.md](docs/DEPLOY.md).
+Set `NEXT_PUBLIC_SUPABASE_*` and legal env vars on your host — [docs/AUTH.md](docs/AUTH.md), [docs/DEPLOY.md](docs/DEPLOY.md).  
+The public OSS repo does **not** ship Supabase SQL migrations (operator-managed database).
 
 ---
 

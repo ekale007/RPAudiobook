@@ -91,19 +91,17 @@ const memories = [
   {
     type: "architecture",
     content:
-      "Master project knowledge doc: docs/PROJECT-STATUS.md (status, learnings, P0-P2 open steps, future phases). Experimental local-only: image-studio/ (SDXL port 5125), samples/omnivoice/, LokalAI repo d:\\LokalAI (ports 8765/8766, separate from RP Audiobook). Image gen removed from main app; /dev/image-generator redirects to image-studio.",
+      "Master project knowledge doc: docs/PROJECT-STATUS.md (status, learnings, P0-P2 open steps, future phases). Public OSS excludes image-studio/, samples/omnivoice/, supabase/migrations/ (SaaS operator only). LokalAI repo d:\\LokalAI (ports 8765/8766) is separate from RP Audiobook.",
     concepts: [
       "project-status",
-      "image-studio",
-      "omnivoice",
       "lokalai",
       "experimental",
       "documentation",
+      "oss",
     ],
     files: [
       "docs/PROJECT-STATUS.md",
       "docs/EXPERIMENTAL-LOCAL.md",
-      "image-studio/README.md",
       "AGENTS.md",
     ],
   },
@@ -130,17 +128,15 @@ const memories = [
   {
     type: "architecture",
     content:
-      "Admin provider pricing (migration 017_provider_pricing.sql): per-model LLM/TTS cost USD + markup in admin UI. Server module providerPricing.ts; billing charges use provider rates. PWA: PwaInstallBanner + manifest. Library filters by UI locale (DE/EN header), no All/DE/EN toggle.",
+      "Admin provider pricing: per-model LLM/TTS cost USD + markup in admin UI. Server module providerPricing.ts; billing charges use provider rates. PWA: PwaInstallBanner + manifest. Library filters by UI locale (DE/EN header), no All/DE/EN toggle.",
     concepts: [
       "provider-pricing",
       "admin",
       "billing",
       "pwa",
       "library-locale",
-      "migration-017",
     ],
     files: [
-      "supabase/migrations/017_provider_pricing.sql",
       "src/lib/server/providerPricing.ts",
       "src/app/admin/page.tsx",
       "src/components/PwaInstallBanner.tsx",
@@ -198,15 +194,14 @@ const memories = [
   {
     type: "preference",
     content:
-      "User prefers German UI copy, minimal scoped diffs, no git commits unless explicitly asked. Image Studio lives in image-studio/ as a separate local project (SDXL + Vite), not deployed with main app. OmniVoice scripts are experimental local TTS, out of beta scope.",
+      "User prefers German UI copy, minimal scoped diffs, no git commits unless explicitly asked. Public OSS repo is local-first focused; SaaS DB migrations and experimental tooling are not in the public tree.",
     concepts: [
       "conventions",
-      "image-studio",
-      "omnivoice",
+      "oss",
       "git",
       "german-ui",
     ],
-    files: ["image-studio/README.md", "AGENTS.md", "package.json"],
+    files: ["AGENTS.md", "package.json"],
   },
 ];
 

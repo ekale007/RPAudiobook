@@ -56,18 +56,6 @@ Audiobook cover illustration, vertical portrait 2:3, painterly cinematic digital
 
 Ohne Cloud-Budget: **[LOCAL-COVERS.md](./LOCAL-COVERS.md)** — `npm run covers:install` dann `npm run covers:missing` (SDXL-Turbo, GTX 1080 Ti).
 
-### Bildstudio (Cover + Porträts, eigenständig)
-
-Ordner `image-studio/` — siehe `image-studio/README.md`:
-
-```powershell
-cd image-studio
-.\scripts\install.ps1
-npm install
-npm run dev
-```
-
-
 | Option                    | Pro                                | Contra                                                  |
 | ------------------------- | ---------------------------------- | ------------------------------------------------------- |
 | **Du** (Midjourney o.ä.)  | Einheitlicher Stil, beste Qualität | Manueller Aufwand                                       |

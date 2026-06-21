@@ -4,7 +4,9 @@
 **Prod:** [https://rp-audiobook.vercel.app](https://rp-audiobook.vercel.app)  
 **Stand:** Mai 2026 (Index aktualisiert)
 
-Dieses Dokument bündelt Erkenntnisse aus Entwicklung und Tests. Für Agenten: auch `AGENTS.md` und `node scripts/seed-agentmemory.mjs`.
+> **OSS (public GitHub):** `image-studio/`, `samples/omnivoice/` und `supabase/migrations/` sind **nicht** im Repo — nur Local-first-Kern + SaaS-**Code** (Supabase-Client). Schema/Migrationen beim Betreiber der gehosteten Instanz.
+
+Dieses Dokument bündelt Erkenntnisse aus Entwicklung und Tests.
 
 ---
 
