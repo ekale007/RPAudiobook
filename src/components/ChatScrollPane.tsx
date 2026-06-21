@@ -119,6 +119,7 @@ export function ChatScrollPane({
     <div className="flex h-full min-h-0">
       <div
         ref={setRefs}
+        data-chat-scroll
         onScroll={handleScroll}
         className="min-h-0 flex-1 overflow-y-scroll overscroll-y-contain py-3 pl-11 pr-2 [scrollbar-width:none] sm:pl-12 sm:pr-2 [&::-webkit-scrollbar]:hidden"
       >

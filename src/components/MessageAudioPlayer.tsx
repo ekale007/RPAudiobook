@@ -177,6 +177,7 @@ export const MessageAudioPlayer = forwardRef<
   const blobPromiseRef = useRef<Promise<Blob | null> | null>(null);
   const tickRef = useRef<number | null>(null);
   const lastActiveWordRef = useRef<number | null>(null);
+  const lastUiTimeRef = useRef(0);
   const playbackTokensRef = useRef<PlaybackToken[]>([]);
   const onActiveWordRef = useRef(onActiveWordIndexChange);
   const playEndRef = useRef<(() => void) | null>(null);
@@ -231,22 +232,27 @@ export const MessageAudioPlayer = forwardRef<
   );
 
   const syncTimesFromAudio = useCallback(() => {
+    let pos = 0;
+    let dur = 0;
     if (webAudioActiveRef.current && isWebAudioTtsActive()) {
-      const pos = getWebAudioPlaybackPosition();
-      const dur = getWebAudioPlaybackDuration();
-      setCurrentTime(pos);
-      if (dur > 0) setDuration(dur);
-      publishReadAlongProgress(pos, dur);
-      return;
+      pos = getWebAudioPlaybackPosition();
+      dur = getWebAudioPlaybackDuration();
+    } else {
+      const audio = audioRef.current;
+      if (!audio) return;
+      pos = audio.currentTime;
+      dur =
+        Number.isFinite(audio.duration) && audio.duration > 0
+          ? audio.duration
+          : 0;
     }
-    const audio = audioRef.current;
-    if (!audio) return;
-    const pos = audio.currentTime;
-    const dur =
-      Number.isFinite(audio.duration) && audio.duration > 0
-        ? audio.duration
-        : 0;
-    setCurrentTime(pos);
+    if (
+      Math.abs(pos - lastUiTimeRef.current) >= 0.2 ||
+      (dur > 0 && pos >= dur - 0.05)
+    ) {
+      lastUiTimeRef.current = pos;
+      setCurrentTime(pos);
+    }
     if (dur > 0) setDuration(dur);
     publishReadAlongProgress(pos, dur);
   }, [publishReadAlongProgress]);

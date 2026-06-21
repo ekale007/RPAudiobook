@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { MessageAudioPlayer } from "@/components/MessageAudioPlayer";
 import { speakerDisplayName } from "@/lib/chat/speakerDisplay";
 import type { MessageAudioPlayerHandle } from "@/lib/tts/messageAudioPlayerHandle";
@@ -25,7 +25,7 @@ import {
   PROTAGONIST_SPEAKER_SLUG,
 } from "@/lib/story/protagonist";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
-import { tokenizeTextForPlayback } from "@/lib/tts/ttsPlaybackLines";
+import { tokenizeTextForPlayback, type PlaybackToken } from "@/lib/tts/ttsPlaybackLines";
 
 export function ChatTurnBubble({
   turn,
@@ -88,8 +88,8 @@ export function ChatTurnBubble({
   const [draft, setDraft] = useState(turn.content);
   const [busy, setBusy] = useState(false);
   const [copiedRaw, setCopiedRaw] = useState(false);
-  const [activeTtsWord, setActiveTtsWord] = useState<number | null>(null);
   const wordRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const playbackTokensRef = useRef<PlaybackToken[]>([]);
   const contentLocale = normalizeStoryContentLocale(storyLocale);
   const steeringTurn =
     turn.role === "user" && isSteeringUserTurn(turn.content);
@@ -102,21 +102,64 @@ export function ChatTurnBubble({
     () => tokenizeTextForPlayback(displayContent),
     [displayContent],
   );
+  playbackTokensRef.current = playbackTokens;
   const ttsReadAlong =
     ttsPlaying && playbackTokens.some((t) => t.isWord);
 
-  useEffect(() => {
-    if (!ttsReadAlong || activeTtsWord == null) return;
-    wordRefs.current[activeTtsWord]?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "nearest",
-    });
-  }, [activeTtsWord, ttsReadAlong]);
+  const applyReadAlongClasses = useCallback(
+    (activeIndex: number | null, tokens: PlaybackToken[]) => {
+      for (let i = 0; i < tokens.length; i++) {
+        const el = wordRefs.current[i];
+        const token = tokens[i];
+        if (!el || !token?.isWord) continue;
+        if (activeIndex == null) {
+          el.className = TTS_WORD_FUTURE;
+        } else if (i === activeIndex) {
+          el.className = TTS_WORD_CURRENT;
+        } else if (i < activeIndex) {
+          el.className = TTS_WORD_PAST;
+        } else {
+          el.className = TTS_WORD_FUTURE;
+        }
+      }
+    },
+    [],
+  );
+
+  const scrollWordIfNeeded = useCallback((el: HTMLElement) => {
+    const scrollRoot = el.closest(
+      "[data-chat-scroll]",
+    ) as HTMLElement | null;
+    const margin = 56;
+    if (scrollRoot) {
+      const er = el.getBoundingClientRect();
+      const sr = scrollRoot.getBoundingClientRect();
+      if (
+        er.top >= sr.top + margin &&
+        er.bottom <= sr.bottom - margin
+      ) {
+        return;
+      }
+    }
+    el.scrollIntoView({ block: "nearest", behavior: "auto" });
+  }, []);
+
+  const handleActiveWordIndex = useCallback(
+    (index: number | null) => {
+      applyReadAlongClasses(index, playbackTokensRef.current);
+      if (index != null) {
+        const el = wordRefs.current[index];
+        if (el) scrollWordIfNeeded(el);
+      }
+    },
+    [applyReadAlongClasses, scrollWordIfNeeded],
+  );
 
   useEffect(() => {
-    if (!ttsPlaying) setActiveTtsWord(null);
-  }, [ttsPlaying]);
+    if (!ttsReadAlong) {
+      applyReadAlongClasses(null, playbackTokensRef.current);
+    }
+  }, [ttsReadAlong, applyReadAlongClasses]);
   const markedSnippets = useMemo(
     () =>
       showDialogueMarkup &&
@@ -324,7 +367,7 @@ export function ChatTurnBubble({
             className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-sm text-zinc-100"
           />
         ) : ttsReadAlong ? (
-          <p className="prose-chat leading-relaxed">
+          <p className="prose-chat leading-relaxed [contain:content]">
             {playbackTokens.map((token, index) => {
               if (!token.isWord) {
                 return (
@@ -333,27 +376,13 @@ export function ChatTurnBubble({
                   </span>
                 );
               }
-              const state =
-                activeTtsWord == null
-                  ? "future"
-                  : index === activeTtsWord
-                    ? "current"
-                    : index < activeTtsWord
-                      ? "past"
-                      : "future";
               return (
                 <span
-                  key={`w-${index}-${token.text.slice(0, 12)}`}
+                  key={`w-${index}`}
                   ref={(el) => {
                     wordRefs.current[index] = el;
                   }}
-                  className={`rounded-sm px-[1px] transition-colors duration-150 ${
-                    state === "current"
-                      ? "bg-accent/35 text-zinc-50 ring-1 ring-accent/50"
-                      : state === "past"
-                        ? "text-zinc-300"
-                        : "text-zinc-500"
-                  }`}
+                  className={TTS_WORD_FUTURE}
                 >
                   {token.text}
                 </span>
@@ -404,7 +433,7 @@ export function ChatTurnBubble({
               onTtsPlaybackChange?.(turn.id, active)
             }
             playbackTokens={playbackTokens}
-            onActiveWordIndexChange={setActiveTtsWord}
+            onActiveWordIndexChange={handleActiveWordIndex}
             storyLocale={storyLocale}
             storySettings={storySettings}
             chapterTitle={chapterTitle}
@@ -493,6 +522,11 @@ export function ChatTurnBubble({
     </div>
   );
 }
+
+const TTS_WORD_BASE = "rounded-sm px-[1px]";
+const TTS_WORD_CURRENT = `${TTS_WORD_BASE} bg-accent/55 text-surface`;
+const TTS_WORD_PAST = `${TTS_WORD_BASE} text-zinc-400`;
+const TTS_WORD_FUTURE = `${TTS_WORD_BASE} text-zinc-500`;
 
 type HighlightRange = {
   start: number;
