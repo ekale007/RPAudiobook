@@ -1,4 +1,8 @@
 import { authFetch } from "@/lib/supabase/authFetch";
+import { loadTtsSettings } from "@/lib/storage/ttsSettings";
+import {
+  isServerFishAudioTtsAvailable,
+} from "@/lib/server/serverCapabilities";
 
 export type FishVoiceCatalogEntry = {
   id: string;
@@ -45,8 +49,15 @@ export async function loadFishAudioVoiceCatalogDetailed(
     ? `?pinned=${encodeURIComponent(pinnedIds.join(","))}`
     : "";
 
+  const headers: Record<string, string> = {};
+  if (!isServerFishAudioTtsAvailable()) {
+    const fishKey = loadTtsSettings().fishAudioApiKey?.trim();
+    if (fishKey) headers.Authorization = `Bearer ${fishKey}`;
+  }
+
   inflight = authFetch(`/api/tts/fish/voices${pinnedQuery}`, {
     cache: "no-store",
+    headers,
   })
     .then(async (res) => {
       if (!res.ok) throw new Error(`Fish-Stimmenliste ${res.status}`);

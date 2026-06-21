@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AppHeader } from "@/components/AppHeader";
+import { LocalModeRedirect } from "@/components/LocalModeRedirect";
 import { LegalFooter } from "@/components/legal/LegalFooter";
 import { createClient } from "@/lib/supabase/client";
 import { formatAuthError } from "@/lib/auth/errors";
@@ -266,5 +267,9 @@ function LoginPageContent() {
 }
 
 export default function LoginPage() {
-  return <LoginPageContent />;
+  return (
+    <LocalModeRedirect>
+      <LoginPageContent />
+    </LocalModeRedirect>
+  );
 }

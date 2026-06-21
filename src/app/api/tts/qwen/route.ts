@@ -8,7 +8,8 @@ import {
   isServerQwenTtsConfigured,
 } from "@/lib/server/env";
 import { checkRateLimit } from "@/lib/server/rateLimit";
-import { requireUser } from "@/lib/server/requireUser";
+import { isSaasMode } from "@/lib/server/deploymentMode";
+import { requireApiActor } from "@/lib/server/requireApiActor";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 import { getTtsHourlyLimitForUser } from "@/lib/server/userTier";
 
@@ -20,11 +21,15 @@ export async function GET() {
 
 /** Qwen3-TTS on RunPod or self-hosted GPU — proxied with auth + rate limit. */
 export async function POST(req: Request) {
-  const auth = await requireUser(req);
+  const auth = await requireApiActor(req);
   if ("error" in auth) return auth.error;
 
-  const supabase = await createServerSupabaseFromRequest(req);
-  const ttsPerHour = await getTtsHourlyLimitForUser(supabase, auth.user.id);
+  const saas = isSaasMode();
+  const supabase = saas ? await createServerSupabaseFromRequest(req) : null;
+  const ttsPerHour =
+    saas && supabase
+      ? await getTtsHourlyLimitForUser(supabase, auth.user.id)
+      : getRateLimitTtsPerHour();
   const limit = checkRateLimit(`tts-qwen:${auth.user.id}`, ttsPerHour);
   if (!limit.ok) {
     return NextResponse.json(

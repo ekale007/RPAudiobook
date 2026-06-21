@@ -94,7 +94,8 @@ import {
   truncateTurnsFrom,
   updateTurnContent,
 } from "@/lib/db/turns";
-import { createClient } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { resolveStoryActorId } from "@/lib/story/useStorySession";
 import { resolveStoryVoiceMap } from "@/lib/tts/defaultVoiceMap";
 import { isTtsReady, loadTtsSettings } from "@/lib/storage/ttsSettings";
 import { subscribeServerCapabilities } from "@/lib/server/serverCapabilities";
@@ -298,12 +299,10 @@ export function ChatView({
   }, []);
 
   useEffect(() => {
-    if (!hasTts) return;
-    void createClient()
-      .auth.getUser()
-      .then(({ data: { user } }) => {
-        if (user) refreshTtsCloudQuota();
-      });
+    if (!hasTts || !isSupabaseConfigured()) return;
+    void resolveStoryActorId().then((userId) => {
+      if (userId) refreshTtsCloudQuota();
+    });
   }, [hasTts, refreshTtsCloudQuota]);
 
   const registerTtsPlayer = useCallback(
@@ -559,10 +558,8 @@ export function ChatView({
         ]);
 
         let latestCast = allCast;
-        const {
-          data: { user },
-        } = await createClient().auth.getUser();
-        if (user) {
+        const userId = await resolveStoryActorId();
+        if (userId) {
           const charUpdates = await extractCharacterMemoryUpdates(
             s,
             chat,
@@ -573,7 +570,7 @@ export function ChatView({
             latestCast = (
               await applyCharacterMemoryUpdates(
                 storyId,
-                user.id,
+                userId,
                 charUpdates,
                 chapterId,
               )

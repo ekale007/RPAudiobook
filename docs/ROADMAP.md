@@ -1,123 +1,65 @@
-# HörbuchKI — Roadmap & offene Punkte
+# RP Audiobook — Roadmap
 
-Stand: nach Phase E (Chat edit / rewind / reroll / continue).  
-Ziel: Interaktives Story-RPG im Browser, PWA am Handy, Kokoro lokal am PC.
-
----
-
-## Erledigt
-
-| Phase | Inhalt |
-|-------|--------|
-| A | RPG-Chat, Lore, Seed „When Dawn Breaks“, Supabase |
-| B | TTS (edge-tts, ElevenLabs, Kokoro) |
-| C | Story-Hub, Kapitel, Export, Mobile LAN |
-| D | Gruppenchat, Multi-Voice (Kokoro pro Figur) |
-| E | Nachricht bearbeiten, Rewind, Reroll, Continue |
-| Auth | Passwort, Reset, kein Magic Link |
-| Ops | `HF_TOKEN`, `npm run start:local`, package.json BOM-Fix |
+> **Vollständiger Stand, Erkenntnisse und P0–P2-Checklisten:** [`PROJECT-STATUS.md`](./PROJECT-STATUS.md)
 
 ---
 
-## Nächste Schritte (empfohlene Reihenfolge)
+## Erledigt (Kurz)
 
-### 1. Mobile-Härtung (du testest gerade)
-
-- [ ] Login Passwort am Handy (`http://<PC-IP>:3000`)
-- [ ] Chat senden / streamen
-- [ ] **Listen** nur wenn PC: `npm run tts:kokoro` + `npm run dev` laufen
-- [ ] Settings: OpenRouter-Key pro Browser (localStorage)
-- [ ] PWA „Zum Home-Bildschirm“
-
-**Bekannte Lücke:** TTS läuft nicht auf dem Handy — nur Proxy über PC. Optional später: Cloud-TTS oder Handy im WLAN mit PC-Server (bereits so gedacht).
-
-### 2. Stabilität & Daten
-
-- [ ] Supabase-Migrationen 001–003 auf Prod-Projekt angewendet?
-- [ ] `turns.speaker_slug` vorhanden (003) — Gruppenchat sonst ohne Sprecher-Spalte
-- [x] Rolling summary: Voll-Rebuild, Sync nach Rewind/Reroll/Edit, Story-State-Block
-- [x] Keine doppelte Kapitel-Memory (Band ODER Prior-Summaries)
-- [ ] Duplikat-Import verhindern (zweites „When Dawn Breaks“)
-
-### 3. UX-Verbesserungen Chat
-
-- [ ] Rewind/Reroll: eigene Bestätigungstexte (Reroll ≠ Rewind)
-- [x] „Schlag was vor“: KI schlägt 3 Story-Richtungen mit Intro vor, Spieler wählt
-- [ ] Story-Beat-Vorschläge im Gruppenchat + am Handy testen
-- [ ] Streaming-Abbruch (Stop-Button)
-- [ ] Gruppenchat: Reroll ganze „Runde“ visuell klarer
-
-### 4. In-App-Editoren (größerer Brocken)
-
-- [ ] Lorebook-Einträge in der App bearbeiten
-- [ ] Character Cards anpassen
-- [ ] Voice-Map UI bereits unter `/story/[id]/voices` — evtl. Vorschau pro Figur
-
-### 5. Story-Struktur
-
-- [ ] Branching / alternative Timelines
-- [ ] Band-Übersicht über mehrere Volumes
-- [ ] Export/Import ganzer Story-Stände
-
-### 6. TTS / Audio
-
-- [x] **Kokoro** — produktiv (`npm run tts:kokoro`, Figuren-Stimmen, Autoplay)
-- [ ] Qwen3-TTS — **zurückgestellt**; Masterplan: [`docs/QWEN-MASTERPLAN.md`](./QWEN-MASTERPLAN.md) (Performance, Voice Design, Clone pro Figur)
-- [ ] WAV-Segmente sauber concat (Multi-Chunk) — bei langen Texten prüfen
-- [ ] ElevenLabs Multi-Voice (falls gewünscht)
-
-### 7. Produktion
-
-- [ ] Deploy (Vercel o.ä.) + Supabase Prod-URLs
-- [ ] Keine Secrets im Repo (`.env.local` nur lokal)
-- [ ] Optional: Custom SMTP Supabase (weniger Rate-Limits)
+Phasen A–E, Auth, Billing/Wallet, Fish Audiobook-Soundscape, bilingual DE/EN-Bibliothek (20 Twins), Login/Signup getrennt, Mixed-Speaker-Dialog, RP-Branding, Rechtsseiten + Beta-Onboarding.
 
 ---
 
-## Kritische / bekannte Stellen
+## Nächste Schritte (Reihenfolge)
 
-| Thema | Risiko | Workaround |
-|-------|--------|------------|
-| **TTS nur auf PC** | Handy ohne Ton wenn Kokoro aus | PC-Server laufen lassen; gleiches WLAN |
-| **Rewind/Reroll** | `rolling_summary` passt nicht mehr zum Text | Kapitel schließen / Summary manuell ignorieren; Fix: Summary nach Truncate neu generieren |
-| **package.json BOM** | `npm run dev` bricht | `predev`/`prebuild` strippt BOM; Editor auf UTF-8 ohne BOM speichern |
-| **HF_TOKEN** | Kokoro-Download rate-limit | `HF_TOKEN` in `.env.local` |
-| **Gruppenchat Parsing** | Modell vergisst `<<speaker:…>>` oder mischt „You…“ unter Figuren | Strengerer Prompt + Auto-Fix (`normalizeSpeakerBlocks`); bei anhaltenden Fehlern Narrator-Modus |
-| **TTS ohne Sprechername** | Kokoro liest nur Fließtext | `prepareTextForTts`: „Naya Vellen: …“ vor Figur-Dialog |
-| **Supabase RLS** | Nur eigene Stories | Korrekt so; Anonymous-User = eigene Daten |
-| **Archivierte Kapitel** | Read-only, keine Edit-Buttons | By design |
-| **Git** | Repo war lokal ohne Git | Erstes Commit angelegt (siehe unten) |
+### 1. Beta-Go (P0)
 
----
+- [ ] [`SMOKE-TEST.md`](./SMOKE-TEST.md) Prod komplett
+- [ ] Supabase Migrationen 001–017 auf Prod
+- [ ] [`BETA-CONTENT-LEGAL.md`](./BETA-CONTENT-LEGAL.md) Bibliothek
+- [ ] Fish API-Key + `BETA_TIER_FREE_MODELS` auf Vercel
 
-## Mobile-Test-Checkliste (kurz)
+### 2. Closed Beta (P1)
 
-```
-PC:  npm run start:local   (oder tts:kokoro + dev getrennt)
-App: http://<PC-IP>:3000
-```
+- [ ] 5–15 Tester, Invite + Tier `beta`
+- [ ] Onboarding + Tooltips
+- [ ] Feedback-Kanal, Known Issues in `/account`
+- [ ] Echte Musik-Loops statt Placeholder in `sfxCatalog`
 
-1. Login → Story → Continue playing  
-2. Nachricht senden, Antwort lesen  
-3. Edit / Rewind / Reroll an einer Antwort  
-4. Continue — narrator goes on  
-5. Story-Hub → Group chat + Character voices  
-6. Settings OpenRouter (falls noch nicht am Handy gesetzt)  
+### 3. UX & Stabilität
 
-Notizen unten eintragen:
+- [ ] Mobile: Login, Chat, Fish TTS iOS PWA *(TTS-Auto/Drive-Mode: getestet Mai 2026)*
+- [ ] Duplikat-Import verhindern
+- [ ] Stop-Button beim Streaming
+- [ ] Admin: Modell-Whitelist UI
 
-- [ ] …
+### 4. Größere Brocken (P2+)
+
+- [ ] **[LOCAL-FIRST.md](./LOCAL-FIRST.md)** — komplett lokal (IndexedDB, Ollama, lokales TTS)
+- [x] **[OPEN-SOURCE.md](./OPEN-SOURCE.md)** — AGPL-3.0, SECURITY.md, local-first OSS checklist
+- [ ] Lorebook-/Card-Editor in App
+- [ ] Branching / Timelines
+- [ ] Fish offline-SFX → Storage
+- [ ] OmniVoice/Qwen Produktionspfad (optional)
 
 ---
 
-## Verzeichnis / Skripte
+## Kritische Stellen
+
+| Thema | Workaround |
+|-------|------------|
+| Fish Key abgelaufen | 502 + `fish_auth` — Key in Vercel erneuern |
+| iOS + Spotify | „Nur lesen“ in Chat |
+| Supabase Mail-Limit | Passwort-Login |
+| LokalAI CORS 8766 | Separates Repo — Orchestrator starten, siehe [`EXPERIMENTAL-LOCAL.md`](./EXPERIMENTAL-LOCAL.md) |
+
+---
+
+## Verzeichnis
 
 | Pfad | Zweck |
 |------|--------|
 | `src/` | Next.js App |
-| `scripts/` | Kokoro, edge-tts, install, env loader |
-| `supabase/migrations/` | SQL 001–003 |
-| `docs/` | AUTH, MOBILE, KOKORO, ROADMAP |
-| `src/data/seed/library/` | Bundled library seed (kein HTTP) |
-
-Nicht versionieren: `node_modules/`, `.venv-*`, `.env.local`, `.next/`
+| `docs/PROJECT-STATUS.md` | Wissensbasis |
+| `image-studio/` | Lokales SDXL (nicht Vercel) |
+| `samples/omnivoice/` | TTS-Experimente |

@@ -9,8 +9,9 @@ import { createClient } from "@/lib/supabase/client";
 import { formatAuthError } from "@/lib/auth/errors";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import { isInviteOnlyBeta } from "@/lib/auth/betaAuth";
+import { LocalModeRedirect } from "@/components/LocalModeRedirect";
 
-export default function SignUpPage() {
+function SignUpPageContent() {
   const { t, locale } = useUiLocale();
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -108,5 +109,13 @@ export default function SignUpPage() {
       </div>
       <LegalFooter className="mt-auto" />
     </main>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <LocalModeRedirect>
+      <SignUpPageContent />
+    </LocalModeRedirect>
   );
 }

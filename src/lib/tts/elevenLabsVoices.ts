@@ -1,4 +1,4 @@
-/** Curated ElevenLabs premade voices for HörbuchKI (multilingual_v2). */
+/** Curated ElevenLabs premade voices for RP Audiobook (multilingual_v2). */
 
 import { isValidQwenPresetVoice } from "@/lib/tts/qwenVoiceSanitize";
 

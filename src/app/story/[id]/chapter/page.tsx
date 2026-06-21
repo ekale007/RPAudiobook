@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
-import { createClient } from "@/lib/supabase/client";
+import { useStorySession } from "@/lib/story/useStorySession";
 import {
   CHAPTER_INTRO_OPTIONS,
   getLastAssistantTurn,
@@ -53,15 +53,11 @@ export default function ChapterManagePage() {
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const { authReady } = useStorySession(router);
+
   useEffect(() => {
-    createClient()
-      .auth.getUser()
-      .then(({ data }) => {
-        if (!data.user) {
-          router.replace("/login");
-          return;
-        }
-        getStoryBundle(storyId).then(async (b) => {
+    if (!authReady) return;
+    getStoryBundle(storyId).then(async (b) => {
           setActiveChapterId(b.activeChapter.id);
           setChapterTitle(b.activeChapter.title);
           setBandId(b.band.id as string);
@@ -76,8 +72,7 @@ export default function ChapterManagePage() {
           const last = getLastAssistantTurn(turns);
           setIntroMode(last ? "ai_bridge" : "empty");
         });
-      });
-  }, [storyId, router]);
+  }, [authReady, storyId]);
 
   const introPreviews = useMemo(() => {
     const last = getLastAssistantTurn(priorTurns);

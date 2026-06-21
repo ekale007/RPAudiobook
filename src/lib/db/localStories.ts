@@ -3,6 +3,7 @@ import { minimalCharacterCard } from "@/lib/memory/characterMemory";
 import { parsePlotState } from "@/lib/memory/plotState";
 import { parseStoryPins } from "@/lib/memory/storyPins";
 import type { StoryOrigin } from "@/lib/story/storyOrigin";
+import { isLocalMode } from "@/lib/deploymentMode";
 import type {
   StoryCharacterCard,
   StoryLorebook,
@@ -21,6 +22,7 @@ export interface LocalCreateStoryFromPackOptions {
   phaseHint?: string | null;
   settings?: Partial<StorySettings>;
   storyOrigin?: StoryOrigin;
+  libraryTemplateId?: string | null;
   storyConcept?: string | null;
 }
 
@@ -172,6 +174,7 @@ type LocalChapterRecord = ChapterRow & {
 type LocalTurnRecord = TurnRow;
 
 export function shouldStoreStoryLocally(origin?: StoryOrigin): boolean {
+  if (isLocalMode()) return true;
   return origin === "epub" || origin === "editor";
 }
 
@@ -220,6 +223,7 @@ export async function createLocalStoryFromSeedPack(
     phaseHint = null,
     settings,
     storyOrigin = "editor",
+    libraryTemplateId = null,
     storyConcept = null,
   } = opts;
 
@@ -236,6 +240,7 @@ export async function createLocalStoryFromSeedPack(
     ...settings,
     storyOrigin,
     storageMode: "local",
+    ...(libraryTemplateId ? { libraryTemplateId } : {}),
     ...(storyConcept?.trim() ? { storyConcept: storyConcept.trim() } : {}),
   };
 

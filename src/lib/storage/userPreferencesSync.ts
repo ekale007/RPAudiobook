@@ -52,13 +52,13 @@ export function toSyncedOpenRouter(
 }
 
 export function toSyncedTts(settings: TtsSettings): SyncedTtsPrefs {
-  const { elevenLabsApiKey: _key, ...rest } = settings;
+  const { elevenLabsApiKey: _el, fishAudioApiKey: _fish, ...rest } = settings;
   return rest;
 }
 
 function stripTtsSyncMeta(
   remote: Partial<SyncedTtsPrefs>,
-): Partial<Omit<TtsSettings, "elevenLabsApiKey">> {
+): Partial<Omit<TtsSettings, "elevenLabsApiKey" | "fishAudioApiKey">> {
   const { updatedAt: _at, ...rest } = remote;
   return rest;
 }
@@ -89,6 +89,7 @@ function mergeTtsFromRemote(
         ...DEFAULT_TTS,
         ...remoteFields,
         elevenLabsApiKey: local.elevenLabsApiKey?.trim() ?? "",
+        fishAudioApiKey: local.fishAudioApiKey?.trim() ?? "",
         pronunciationMap: {
           ...(local.pronunciationMap ?? {}),
           ...(remoteFields.pronunciationMap ?? {}),
@@ -99,6 +100,7 @@ function mergeTtsFromRemote(
         ...remoteFields,
         ...local,
         elevenLabsApiKey: local.elevenLabsApiKey?.trim() ?? "",
+        fishAudioApiKey: local.fishAudioApiKey?.trim() ?? "",
         pronunciationMap: {
           ...(remoteFields.pronunciationMap ?? {}),
           ...(local.pronunciationMap ?? {}),

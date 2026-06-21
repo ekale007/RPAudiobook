@@ -65,4 +65,4 @@ Write-Host "  npm run covers:missing"
 Write-Host "  npm run covers:generate -- --id guild-last-light"
 Write-Host ""
 Write-Host "Optional: HF_TOKEN in .env.local speeds up Hugging Face model download." -ForegroundColor DarkGray
-Write-Host "  npm run images:server   (dev UI: /dev/image-generator)" -ForegroundColor DarkGray
+Write-Host "  GUI: cd image-studio && npm run dev" -ForegroundColor DarkGray

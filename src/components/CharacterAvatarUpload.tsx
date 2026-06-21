@@ -109,7 +109,10 @@ export function CharacterAvatarUpload({
             </button>
           ) : null}
         </div>
-        <p className="text-[10px] text-zinc-600">JPG, PNG oder WebP · max. 5 MB</p>
+        <p className="text-[10px] text-zinc-600">
+          JPG, PNG oder WebP · max. 5 MB · GPU-Porträt: Ordner{" "}
+          <code className="text-zinc-500">image-studio/</code>
+        </p>
         {error ? <p className="text-[10px] text-red-400">{error}</p> : null}
       </div>
     </div>

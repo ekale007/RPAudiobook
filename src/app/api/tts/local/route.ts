@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveAllowedLocalTtsUrl } from "@/lib/server/localTtsUrl";
 
 /** Proxy to your local TTS server (edge-tts / Kokoro / Qwen) on the same PC as Next.js. */
 export async function POST(req: Request) {
@@ -17,16 +18,22 @@ export async function POST(req: Request) {
 
   const text = body.text?.trim();
   const voice = body.voice?.trim() || "en-US-AndrewNeural";
-  const serverUrl =
-    body.serverUrl?.trim() ||
-    process.env.LOCAL_TTS_URL ||
-    "http://127.0.0.1:5123";
 
   if (!text) {
     return NextResponse.json({ error: "Missing text" }, { status: 400 });
   }
 
-  const base = serverUrl.replace(/\/$/, "");
+  let base: string;
+  try {
+    base = resolveAllowedLocalTtsUrl(
+      body.serverUrl,
+      process.env.LOCAL_TTS_URL,
+      "http://127.0.0.1:5123",
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 400 });
+  }
   const payload: Record<string, string | null> = { text, voice };
   if (body.language?.trim()) payload.language = body.language.trim();
   if (body.instruct?.trim()) payload.instruct = body.instruct.trim();

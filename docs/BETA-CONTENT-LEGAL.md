@@ -1,6 +1,8 @@
 # Beta — Inhalte & Copyright
 
-Checkliste vor öffentlicher Beta und Werbung. Kein Ersatz für juristische Beratung.
+Checkliste vor öffentlicher Beta und OSS-Release. Kein Ersatz für juristische Beratung.
+
+**OSS-Stand (Juni 2026):** Bundled Bibliotheks-Vorlagen sind **Projekt-Originale** (RP Audiobook Library), keine erkennbaren Fremd-IP-Franchises. Cover siehe `public/library-covers/README.md`.
 
 ---
 
@@ -8,7 +10,7 @@ Checkliste vor öffentlicher Beta und Werbung. Kein Ersatz für juristische Bera
 
 | Regel | Umsetzung |
 |-------|-----------|
-| Standard-Bibliothek = **eigene Werke** | `creator: "HörbuchKI Library"`, `creator_notes` ohne fremde Marken |
+| Standard-Bibliothek = **eigene Werke** | `creator: "RP Audiobook Library"`, `creator_notes` ohne fremde Marken |
 | Nutzer-Stories | Nutzer haftet für Prompts/Uploads; in AGB festhalten |
 | KI-Ausgabe | Hinweis: generiert, kann Fehler enthalten; nicht als professionelles Hörbuch verkaufen |
 | Stimmen | Kein Cloning realer Personen ohne Einwilligung; Beta: nur Preset-/Server-Stimmen |
@@ -23,26 +25,26 @@ Seed-Daten: `src/data/seed/library/`.
 
 | Vorlage (ID) | Locale | Urheber-Status | Cover | Aktion |
 |--------------|--------|----------------|-------|--------|
-| `when-dawn-breaks` | en | Eigen/Projekt — Texte HörbuchKI | prüfen | [x] `creator_notes` bereinigt |
-| `crossroads-inn` | en | HörbuchKI Library | generated? | [ ] bestätigen |
-| `station-echo` | en | HörbuchKI Library | | [ ] |
-| `last-letter` | en | HörbuchKI Library | | [ ] |
-| `haunted-lake` | en | HörbuchKI Library | | [ ] |
-| `midnight-bakery` | en | HörbuchKI Library | | [ ] |
-| `iron-republic` | en | HörbuchKI Library | | [ ] |
-| `neon-witness` | en | HörbuchKI Library | | [ ] |
-| `desert-oath` | en | HörbuchKI Library | | [ ] |
-| `tide-line` | en | HörbuchKI Library | | [ ] |
-| `schatten-kaiser` | de | HörbuchKI Library | | [ ] |
-| `akademie-arkanum` | de | HörbuchKI Library | | [ ] |
-| `system-null` | de | HörbuchKI Library | | [ ] |
-| `blutmond-pakt` | de | HörbuchKI Library | | [ ] |
-| `zug-47` | de | HörbuchKI Library | | [ ] |
-| `second-life-protocol` | en | HörbuchKI Library | | [ ] |
-| `guild-last-light` | en | HörbuchKI Library | | [ ] |
-| `starlit-court` | en | HörbuchKI Library | | [ ] |
-| `hexbound-academy` | en | HörbuchKI Library | | [ ] |
-| `ghost-signal` | en | HörbuchKI Library | | [ ] |
+| `when-dawn-breaks` | en | Eigen/Projekt | project | [x] |
+| `crossroads-inn` | en | RP Audiobook Library | generated | [x] |
+| `station-echo` | en | RP Audiobook Library | generated | [x] |
+| `last-letter` | en | RP Audiobook Library | generated | [x] |
+| `haunted-lake` | en | RP Audiobook Library | generated | [x] |
+| `midnight-bakery` | en | RP Audiobook Library | generated | [x] |
+| `iron-republic` | en | RP Audiobook Library | generated | [x] |
+| `neon-witness` | en | RP Audiobook Library | generated | [x] |
+| `desert-oath` | en | RP Audiobook Library | generated | [x] |
+| `tide-line` | en | RP Audiobook Library | generated | [x] |
+| `schatten-kaiser` | de | RP Audiobook Library | generated | [x] |
+| `akademie-arkanum` | de | RP Audiobook Library | generated | [x] |
+| `system-null` | de | RP Audiobook Library | generated | [x] |
+| `blutmond-pakt` | de | RP Audiobook Library | generated | [x] |
+| `zug-47` | de | RP Audiobook Library | generated | [x] |
+| `second-life-protocol` | en | RP Audiobook Library | generated | [x] |
+| `guild-last-light` | en | RP Audiobook Library | generated | [x] |
+| `starlit-court` | en | RP Audiobook Library | generated | [x] |
+| `hexbound-academy` | en | RP Audiobook Library | generated | [x] |
+| `ghost-signal` | en | RP Audiobook Library | generated | [x] |
 
 **Prüffragen pro Vorlage**
 
@@ -81,12 +83,12 @@ Seed-Daten: `src/data/seed/library/`.
 
 ---
 
-## 6. Vor Go-Live
+## 6. Vor Go-Live (SaaS)
 
-- [ ] Inventar-Tabelle vollständig abgehakt
-- [ ] Keine Vorlage mit offensichtlichem Fanfic an fremden IP
-- [ ] Cover-Ordner: README mit Generierungs-Pipeline (`docs/COVER-PROMPTS.md` verlinken)
-- [ ] AGB verlinkt in App-Footer und Invite-Mail
+- [x] Inventar-Tabelle für OSS-Bibliothek abgehakt
+- [x] Keine Vorlage mit offensichtlichem Fanfic an fremden IP
+- [x] Cover-Ordner: README mit Generierungs-Pipeline (`docs/COVER-PROMPTS.md` verlinken)
+- [ ] AGB verlinkt in App-Footer und Invite-Mail (SaaS)
 
 ---
 

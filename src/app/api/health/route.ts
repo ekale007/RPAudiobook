@@ -9,16 +9,20 @@ import {
   isServerQwenTtsConfigured,
   isServerTtsConfigured,
 } from "@/lib/server/env";
+import { getDeploymentMode, isSaasMode } from "@/lib/server/deploymentMode";
 
 export async function GET() {
+  const saas = isSaasMode();
   return NextResponse.json({
-    serverTts: isServerTtsConfigured(),
-    serverElevenLabsTts: isServerElevenLabsConfigured(),
-    serverOpenRouterTts: isServerOpenRouterTtsConfigured(),
-    serverFishAudioTts: isServerFishAudioTtsConfigured(),
-    serverFalTts: isServerFalTtsConfigured(),
-    serverQwenTts: isServerQwenTtsConfigured(),
-    serverQwenCloudTts: isServerQwenCloudTtsConfigured(),
-    serverLlm: isServerLlmConfigured(),
+    deploymentMode: getDeploymentMode(),
+    billingEnabled: saas,
+    serverTts: saas && isServerTtsConfigured(),
+    serverElevenLabsTts: saas && isServerElevenLabsConfigured(),
+    serverOpenRouterTts: saas && isServerOpenRouterTtsConfigured(),
+    serverFishAudioTts: saas && isServerFishAudioTtsConfigured(),
+    serverFalTts: saas && isServerFalTtsConfigured(),
+    serverQwenTts: saas && isServerQwenTtsConfigured(),
+    serverQwenCloudTts: saas && isServerQwenCloudTtsConfigured(),
+    serverLlm: saas && isServerLlmConfigured(),
   });
 }

@@ -31,6 +31,9 @@ __pycache__/
 *.py[cod]
 *.pem
 .cursor/
+.codebase-memory/
+.cbm-err.txt
+.cbm-out.txt
 .env
 .env*.local
 

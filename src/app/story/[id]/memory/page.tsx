@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
-import { createClient } from "@/lib/supabase/client";
+import { useStorySession } from "@/lib/story/useStorySession";
 import {
   getStoryOverview,
   getTurns,
@@ -162,19 +162,14 @@ export default function StoryMemoryPage() {
     setPins(overview.storySettings.pinnedNotes ?? []);
   }, [storyId]);
 
+  const { authReady } = useStorySession(router);
+
   useEffect(() => {
-    createClient()
-      .auth.getUser()
-      .then(({ data }) => {
-        if (!data.user) {
-          router.replace("/login");
-          return;
-        }
-        load()
-          .catch((e) => setError(String(e)))
-          .finally(() => setLoading(false));
-      });
-  }, [load, router]);
+    if (!authReady) return;
+    load()
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
+  }, [authReady, load]);
 
   const buildPlotFromForm = (): StoryPlotState => ({
     ...plot,

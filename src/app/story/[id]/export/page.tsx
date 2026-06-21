@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
-import { createClient } from "@/lib/supabase/client";
+import { useStorySession } from "@/lib/story/useStorySession";
 import { listCharacters, listLorebooksForStory } from "@/lib/db/stories";
 
 function downloadJson(filename: string, data: unknown) {
@@ -30,28 +30,23 @@ export default function StoryExportPage() {
     Array<{ slug: string; book_json: unknown }>
   >([]);
 
+  const { authReady } = useStorySession(router);
+
   useEffect(() => {
-    createClient()
-      .auth.getUser()
-      .then(({ data }) => {
-        if (!data.user) {
-          router.replace("/login");
-          return;
-        }
-        Promise.all([listCharacters(storyId), listLorebooksForStory(storyId)])
-          .then(([c, b]) => {
-            setChars(c.map((x) => ({ slug: x.slug, card_json: x.card_json })));
-            setBooks(
-              b.map((x) => ({
-                slug: x.slug as string,
-                book_json: x.book_json,
-              })),
-            );
-            setReady(true);
-          })
-          .catch(() => setReady(true));
-      });
-  }, [storyId, router]);
+    if (!authReady) return;
+    Promise.all([listCharacters(storyId), listLorebooksForStory(storyId)])
+      .then(([c, b]) => {
+        setChars(c.map((x) => ({ slug: x.slug, card_json: x.card_json })));
+        setBooks(
+          b.map((x) => ({
+            slug: x.slug as string,
+            book_json: x.book_json,
+          })),
+        );
+        setReady(true);
+      })
+      .catch(() => setReady(true));
+  }, [authReady, storyId]);
 
   const exportAll = () => {
     for (const c of chars) {

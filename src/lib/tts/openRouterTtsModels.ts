@@ -75,7 +75,6 @@ export function normalizeOpenRouterTtsVoice(
   const trimmed = voice?.trim();
   if (!trimmed) return defaultOpenRouterTtsVoice(model);
   if (isKnownOpenRouterTtsVoice(model, trimmed)) return trimmed;
-  if (trimmed.length >= 4) return trimmed;
   return defaultOpenRouterTtsVoice(model);
 }
 

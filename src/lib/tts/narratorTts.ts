@@ -52,8 +52,13 @@ import {
 } from "@/lib/tts/elevenLabsVoices";
 import { readCostCentsHeader, TTS_COST_HEADER } from "@/lib/llm/openRouterCompletion";
 import { authFetch } from "@/lib/supabase/authFetch";
+import { isLocalMode } from "@/lib/deploymentMode";
+import { brand } from "@/lib/brand";
+import { loadOpenRouterSettings } from "@/lib/storage/openRouterSettings";
 import {
   isServerElevenLabsAvailable,
+  isServerFishAudioTtsAvailable,
+  isServerOpenRouterTtsAvailable,
   isServerQwenTtsAvailable,
 } from "@/lib/server/serverCapabilities";
 import {
@@ -68,6 +73,7 @@ import {
   normalizeFalTtsVoice,
 } from "@/lib/tts/falTtsModels";
 import {
+  formatOpenRouterTtsError,
   normalizeOpenRouterTtsModel,
   normalizeOpenRouterTtsVoice,
 } from "@/lib/tts/openRouterTtsModels";
@@ -86,6 +92,21 @@ function ttsChunkCharLimit(provider: TtsProvider, settings?: TtsSettings): numbe
     return falTtsMaxChars(settings.falTtsModel);
   }
   return 2400;
+}
+
+function fishTtsAuthHeaders(settings: TtsSettings): Record<string, string> {
+  if (!isServerFishAudioTtsAvailable() && settings.fishAudioApiKey?.trim()) {
+    return { Authorization: `Bearer ${settings.fishAudioApiKey.trim()}` };
+  }
+  return {};
+}
+
+function openRouterTtsAuthHeaders(): Record<string, string> {
+  if (!isServerOpenRouterTtsAvailable()) {
+    const key = loadOpenRouterSettings()?.apiKey?.trim();
+    if (key) return { Authorization: `Bearer ${key}` };
+  }
+  return {};
 }
 
 /** True when <<speaker:…>> blocks include cast / protagonist (not narrator-only). */
@@ -219,9 +240,59 @@ async function synthesizeChunkOpenRouter(
   const model = normalizeOpenRouterTtsModel(settings.openRouterTtsModel);
   const resolvedVoice = normalizeOpenRouterTtsVoice(model, voice);
 
+  const payload = {
+    model,
+    input: text,
+    voice: resolvedVoice,
+    response_format: "mp3" as const,
+  };
+
+  if (isLocalMode() && !isServerOpenRouterTtsAvailable()) {
+    const apiKey = loadOpenRouterSettings()?.apiKey?.trim();
+    if (!apiKey) {
+      throw new Error(
+        "OpenRouter API-Key in Einstellungen eintragen (gleicher Key wie LLM).",
+      );
+    }
+    const res = await fetch("https://openrouter.ai/api/v1/audio/speech", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer":
+          typeof window !== "undefined" ? window.location.origin : "",
+        "X-Title": brand.openRouterAppTitle,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const raw = await res.text();
+      let message = raw || `OpenRouter TTS failed (${res.status})`;
+      try {
+        const parsed = JSON.parse(raw) as { error?: string | { message?: string } };
+        if (typeof parsed.error === "string" && parsed.error.trim()) {
+          message = parsed.error.trim();
+        } else if (
+          parsed.error &&
+          typeof parsed.error === "object" &&
+          parsed.error.message?.trim()
+        ) {
+          message = parsed.error.message.trim();
+        }
+      } catch {
+        /* plain text */
+      }
+      throw new Error(formatOpenRouterTtsError(res.status, message, model));
+    }
+    return { blob: await res.blob(), ttsCostCents: 0 };
+  }
+
   const res = await authFetch("/api/tts/openrouter", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...openRouterTtsAuthHeaders(),
+    },
     body: JSON.stringify({
       text,
       model,
@@ -269,7 +340,10 @@ async function synthesizeChunkFishAudio(
 
   const res = await authFetch("/api/tts/fish", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...fishTtsAuthHeaders(settings),
+    },
     body: JSON.stringify({
       text: ttsText,
       model: settings.fishAudioModel,

@@ -25,6 +25,9 @@ export const deMessages = {
     signOut: "Abmelden",
     emptyStories:
       "Noch keine Geschichten — tippe oben auf + Neue Story oder wähle unten aus der Bibliothek.",
+    localModeHint:
+      "Lokal auf deinem Gerät — Stories in IndexedDB, keine Cloud-Account nötig. LLM/TTS in Einstellungen.",
+    localBadge: "Lokal",
     newStory: "+ Neue Story",
     epub: "EPUB",
   },
@@ -144,6 +147,10 @@ export const deMessages = {
     title: "Einstellungen",
     syncBanner:
       "Modell, Temperatur und Erzähler-Stimme werden mit deinem Account synchronisiert (Handy ↔ Desktop). Hintergrund- und Erzähler-Modell getrennt — spart Budget bei Memory-Sync.",
+    localModeBanner:
+      "Lokal-Modus: API-Keys werden nur in diesem Browser gespeichert (localStorage). Kein Login, keine Cloud-Synchronisation. OpenRouter und ElevenLabs optional — kostenlos mit lokalem TTS (Kokoro/edge-tts).",
+    localOpenRouterHint:
+      "OpenRouter API-Key im Browser — Anfragen gehen direkt an openrouter.ai (nicht über den Server).",
     llmTitle: "LLM — Modelle",
     llmHint:
       "Hintergrund für Memory, Zusammenfassungen und JSON — Erzähler für Story-Chat und Beat-Vorschläge. Kosten pro Modell auf dein Monatsbudget.",
@@ -221,7 +228,7 @@ export const deMessages = {
     stepHub: "Story-Hub:",
     stepHubText: "Cast für Stimmen, Gedächtnis & Welt bearbeiten.",
     disclaimer:
-      "KI-Antworten und Sprache werden über Drittanbieter erzeugt (OpenRouter, TTS). Limits siehst du unter Account. Nur Inhalte nutzen, für die du Rechte hast. Betreiber: Eyüp Kale.",
+      "KI-Antworten und Sprache werden über Drittanbieter erzeugt (OpenRouter, TTS). Nur Inhalte nutzen, für die du Rechte hast.",
     dismiss: "Verstanden — los geht's",
   },
   usage: {

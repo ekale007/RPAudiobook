@@ -13,8 +13,12 @@ import {
 } from "@/lib/server/wallet";
 import { ensureUserProfile } from "@/lib/server/userTier";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import { saasOnlyGuard } from "@/lib/server/saasOnly";
 
 export async function POST(req: Request) {
+  const blocked = saasOnlyGuard();
+  if (blocked) return blocked;
+
   if (!isStripeConfigured()) {
     return NextResponse.json(
       { error: "Stripe noch nicht konfiguriert (STRIPE_SECRET_KEY)" },

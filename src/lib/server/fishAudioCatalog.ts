@@ -255,6 +255,7 @@ function mergeVoiceLists(
 /** Saved IDs + own clones — metadata from Fish /model/{id}. */
 export async function getFishAudioVoiceCatalog(
   pinnedIds: string[] = [],
+  apiKeyOverride?: string | null,
 ): Promise<FishVoiceCatalogResult> {
   const pinnedKey = pinnedIds.join(",");
   if (
@@ -265,12 +266,12 @@ export async function getFishAudioVoiceCatalog(
     return catalogCache.result;
   }
 
-  const apiKey = getFishAudioApiKey();
+  const apiKey = apiKeyOverride?.trim() || getFishAudioApiKey();
   if (!apiKey) {
     return {
       voices: [],
       source: "static-no-key",
-      hint: "Kein Server-Key — FISH_AUDIO_API_KEY in Vercel setzen.",
+      hint: "Fish API-Key in Einstellungen eintragen (fish.audio → API Keys).",
     };
   }
 

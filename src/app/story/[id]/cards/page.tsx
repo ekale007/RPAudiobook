@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { CharacterAvatar } from "@/components/CharacterAvatar";
 import { CharacterAvatarUpload } from "@/components/CharacterAvatarUpload";
-import { createClient } from "@/lib/supabase/client";
+import { useStorySession } from "@/lib/story/useStorySession";
 import { getHoerbuchkiExtensions } from "@/lib/images/characterAvatar";
 import {
   getStoryOverview,
@@ -54,10 +54,11 @@ export default function StoryCharacterCardsPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [storyTitle, setStoryTitle] = useState("");
-  const [userId, setUserId] = useState<string | null>(null);
   const [characters, setCharacters] = useState<CharacterRow[]>([]);
   const [drafts, setDrafts] = useState<Record<string, StoryCharacterCard>>({});
   const [openId, setOpenId] = useState<string | null>(null);
+
+  const { userId, authReady } = useStorySession(router);
 
   const load = useCallback(async () => {
     const overview = await getStoryOverview(storyId);
@@ -76,19 +77,11 @@ export default function StoryCharacterCardsPage() {
   }, [storyId]);
 
   useEffect(() => {
-    createClient()
-      .auth.getUser()
-      .then(({ data }) => {
-        if (!data.user) {
-          router.replace("/login");
-          return;
-        }
-        setUserId(data.user.id);
-        load()
-          .catch((e) => setError(String(e)))
-          .finally(() => setLoading(false));
-      });
-  }, [load, router]);
+    if (!authReady) return;
+    load()
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
+  }, [authReady, load]);
 
   const patchDraft = (id: string, field: CardField, value: string) => {
     setDrafts((prev) => ({

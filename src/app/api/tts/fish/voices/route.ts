@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { getFishAudioVoiceCatalog } from "@/lib/server/fishAudioCatalog";
 import { loadFishAudioPinnedIdsForUser } from "@/lib/server/fishAudioUserPinned";
-import { requireUser } from "@/lib/server/requireUser";
+import { isSaasMode } from "@/lib/server/deploymentMode";
+import { requireApiActor } from "@/lib/server/requireApiActor";
+import { readBearerClientKey } from "@/lib/server/ttsClientKeys";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 import { normalizeFishAudioPinnedIds } from "@/lib/tts/fishAudioVoices";
 
-/** Fish Audio voices: saved IDs from account + optional query merge, own clones. */
+/** Fish Audio voices: pinned IDs + own clones (browser key in local deployment). */
 export async function GET(req: Request) {
-  const auth = await requireUser(req);
+  const auth = await requireApiActor(req);
   if ("error" in auth) return auth.error;
 
   const url = new URL(req.url);
@@ -16,15 +18,21 @@ export async function GET(req: Request) {
     pinnedRaw ? pinnedRaw.split(",") : [],
   );
 
-  const supabase = await createServerSupabaseFromRequest(req);
-  const pinnedIds = await loadFishAudioPinnedIdsForUser(
-    supabase,
-    auth.user.id,
-    queryPinned,
-  );
+  const saas = isSaasMode();
+  let pinnedIds = queryPinned;
+  if (saas) {
+    const supabase = await createServerSupabaseFromRequest(req);
+    pinnedIds = await loadFishAudioPinnedIdsForUser(
+      supabase,
+      auth.user.id,
+      queryPinned,
+    );
+  }
+
+  const clientKey = readBearerClientKey(req);
 
   try {
-    const catalog = await getFishAudioVoiceCatalog(pinnedIds);
+    const catalog = await getFishAudioVoiceCatalog(pinnedIds, clientKey);
     return NextResponse.json(catalog, {
       headers: { "Cache-Control": "private, max-age=60" },
     });

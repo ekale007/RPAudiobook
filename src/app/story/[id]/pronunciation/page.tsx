@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
-import { createClient } from "@/lib/supabase/client";
+import { useStorySession } from "@/lib/story/useStorySession";
 import { getStoryOverview, type CharacterRow } from "@/lib/db/stories";
 import {
   loadTtsSettings,
@@ -40,22 +40,19 @@ export default function StoryPronunciationPage() {
   const urlRef = useRef<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  const { authReady } = useStorySession(router);
+
   useEffect(() => {
-    createClient()
-      .auth.getUser()
-      .then(async ({ data }) => {
-        if (!data.user) {
-          router.replace("/login");
-          return;
-        }
-        const overview = await getStoryOverview(storyId);
-        setCast(overview.cast.filter((c) => c.role === "cast"));
-        const current = loadTtsSettings();
-        setTts(current);
-        setPronunciationText(
-          serializePronunciationMap(current.pronunciationMap ?? {}),
-        );
-      })
+    if (!authReady) return;
+    (async () => {
+      const overview = await getStoryOverview(storyId);
+      setCast(overview.cast.filter((c) => c.role === "cast"));
+      const current = loadTtsSettings();
+      setTts(current);
+      setPronunciationText(
+        serializePronunciationMap(current.pronunciationMap ?? {}),
+      );
+    })()
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
 
@@ -63,7 +60,7 @@ export default function StoryPronunciationPage() {
       audioRef.current?.pause();
       if (urlRef.current) URL.revokeObjectURL(urlRef.current);
     };
-  }, [router, storyId]);
+  }, [authReady, storyId]);
 
   const speakerOptions = useMemo(
     () => [

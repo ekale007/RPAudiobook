@@ -1,71 +1,78 @@
 # RP Audiobook
 
-Interaktive Rollenspiel-Geschichten im Browser mit optionaler Sprachausgabe und Cloud-Speicherung.
+Interactive RPG-style stories in the browser with optional text-to-speech narration.
 
-## Features
+**License:** [AGPL-3.0-or-later](LICENSE) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
 
-| Phase | Status |
-|-------|--------|
-| A — RPG chat, lore, import When Dawn Breaks | Done |
-| B — Narrator TTS (local edge-tts / ElevenLabs) | Done |
-| C — Story hub, chapters, export, mobile | Done |
-| D — Multi-voice + group chat | Done |
-| E — Chat edit, rewind, reroll, continue | Done |
+## Modes
 
-- **Cards & lore:** Character-card JSON import/export, keyword lore injection
-- **Structure:** Story → Band → Chapter → Turns + AI summaries
-- **Keys:** OpenRouter + TTS stay in **browser localStorage**
-- **Cloud:** Supabase for stories only
+| Mode | Setup | Data |
+|------|--------|------|
+| **Local-first** (OSS default) | No Supabase — `npm run start:local` | IndexedDB on your machine |
+| **SaaS** (optional self-host) | Supabase + server API keys in env | Cloud sync, wallet, admin |
 
-## Quick start
+See [docs/LOCAL-FIRST.md](docs/LOCAL-FIRST.md) and [docs/DEPLOYMENT-MODES.md](docs/DEPLOYMENT-MODES.md).
 
-1. Supabase: run SQL migrations `001`–`003` in `supabase/migrations/`
-2. `.env.local` from `.env.example`
-3. `npm install`
-4. `npm run dev` → http://localhost:3000 (phone: `http://<PC-IP>:3000`)
-5. Settings → OpenRouter key
-6. Sign in (**Password** tab — avoids Supabase email rate limits) → Import **When Dawn Breaks**
+## Quick start (local-first)
 
-Auth help: [docs/AUTH.md](docs/AUTH.md)
+1. `npm install`
+2. Copy `.env.example` → `.env.local` (optional; omit Supabase vars for local mode)
+3. **Windows:** `npm run start:local` — starts Kokoro TTS + Next.js
+4. **Or:** `npm run dev` → http://localhost:3000
+5. Settings → add your **OpenRouter** key (stored in browser only)
+6. Create or import a story — no account required
 
-### Narrator audio on PC
-
-**Kokoro (recommended, GPU, offline):**
+Optional Kokoro install (GPU/offline TTS):
 
 ```powershell
 .\scripts\install-kokoro.ps1
-.\.venv-kokoro\Scripts\Activate.ps1
 npm run tts:kokoro   # terminal 1
 npm run dev          # terminal 2
 ```
 
-Settings → **Local** → Engine **kokoro** → Voice `af_bella` or `af_heart` → Save.
+Settings → **Local** → engine **kokoro** → Save. Add `HF_TOKEN=hf_...` to `.env.local` for reliable model download — [docs/KOKORO-QWEN.md](docs/KOKORO-QWEN.md).
 
-Add `HF_TOKEN=hf_...` to `.env.local` (Hugging Face read token) so Kokoro can download the model reliably — see [docs/KOKORO-QWEN.md](docs/KOKORO-QWEN.md).
+**edge-tts (internet):** `pip install -r scripts/requirements-tts.txt` → `npm run tts:server`
 
-**edge-tts (quick, needs internet):** `pip install -r scripts/requirements-tts.txt` → `npm run tts:server`
+## Quick start (SaaS / Supabase)
+
+1. Supabase: run SQL migrations in `supabase/migrations/`
+2. `.env.local` from `.env.example` with `NEXT_PUBLIC_SUPABASE_*`
+3. Set legal env vars for public hosting: `NEXT_PUBLIC_LEGAL_OPERATOR_NAME`, `NEXT_PUBLIC_LEGAL_CONTACT_EMAIL`, `NEXT_PUBLIC_SITE_URL`
+4. `npm install` && `npm run dev`
+5. Sign in → cloud story sync
+
+Auth: [docs/AUTH.md](docs/AUTH.md)
+
+## Features
+
+- Character cards & lore import/export, keyword lore injection
+- Story → Band → Chapter → Turns with AI summaries
+- Multi-voice cast, chat edit / rewind / reroll
+- TTS: Kokoro (local), edge-tts, Fish Audio, ElevenLabs, OpenRouter TTS (BYOK in local mode)
+- Soundscape (ambience / SFX / music) client-side
 
 ## Docs
 
-- [docs/ROADMAP.md](docs/ROADMAP.md) — nächste Schritte, kritische Punkte, Mobile-Checkliste
-- [docs/LOCAL-TTS.md](docs/LOCAL-TTS.md) — edge-tts, Piper offline
-- [docs/KOKORO-QWEN.md](docs/KOKORO-QWEN.md) — GPU engines (1080 Ti)
-- [docs/MOBILE.md](docs/MOBILE.md) — phone testing
-- [docs/AUTH.md](docs/AUTH.md) — login & password reset
+| Doc | Topic |
+|-----|--------|
+| [docs/OPEN-SOURCE.md](docs/OPEN-SOURCE.md) | OSS release checklist |
+| [docs/LOCAL-FIRST.md](docs/LOCAL-FIRST.md) | Local mode architecture |
+| [docs/PROJECT-STATUS.md](docs/PROJECT-STATUS.md) | Status & roadmap |
+| [docs/README.md](docs/README.md) | Full index |
 
 ## Scripts
 
 | Command | Purpose |
 |---------|---------|
-| `npm run dev` | App (LAN-friendly `-H 0.0.0.0`) |
-| `npm run tts:server` | edge-tts (port 5123, internet) |
-| `npm run tts:kokoro` | Kokoro-82M (port 5124, GPU/CPU) |
-| `npm run seed:sync -- "D:\…\source"` | Refresh bundled library seed JSON |
-| `npm run start:local` | Kokoro + Next in zwei Fenstern (Windows) |
+| `npm run dev` | App (LAN `-H 0.0.0.0`) |
+| `npm run start:local` | Kokoro + Next (Windows, local-first) |
+| `npm run tts:kokoro` | Kokoro-82M (port 5124) |
+| `npm run tts:server` | edge-tts (port 5123) |
+| `npm run build` | Production build |
 
-## Navigation
+## Open source
 
-- **Home** → story list
-- **Story hub** `/story/[id]` → chapters, cast, export
-- **Chat** → play; **▶ Listen** on narrator replies
-- **Close chapter** → summary + new chapter
+This repository is meant for **running locally on your own machine**. Public multi-user hosting requires your own legal pages, API keys, and compliance work — see [docs/OPEN-SOURCE.md](docs/OPEN-SOURCE.md).
+
+Do not commit `.env.local` or personal contact details.

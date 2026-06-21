@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { StoryHubView } from "@/components/story-hub/StoryHubView";
-import { createClient } from "@/lib/supabase/client";
 import { getStoryConcept } from "@/lib/story/storyOrigin";
+import { useStorySession } from "@/lib/story/useStorySession";
 import type { StoryCharacterCard } from "@/lib/types";
 import {
   deleteChapter,
@@ -32,7 +32,7 @@ export default function StoryHubPage() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [titleBusy, setTitleBusy] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+  const { userId, authReady } = useStorySession(router);
 
   const load = useCallback(
     () =>
@@ -43,17 +43,9 @@ export default function StoryHubPage() {
   );
 
   useEffect(() => {
-    createClient()
-      .auth.getUser()
-      .then(({ data: auth }) => {
-        if (!auth.user) {
-          router.replace("/login");
-          return;
-        }
-        setUserId(auth.user.id);
-        load().catch((e) => setError(String(e)));
-      });
-  }, [storyId, router, load]);
+    if (!authReady) return;
+    load().catch((e) => setError(String(e)));
+  }, [authReady, load]);
 
   const handleDeleteChapter = async (ch: ChapterRow) => {
     if (!data) return;

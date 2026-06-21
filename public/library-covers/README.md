@@ -27,4 +27,4 @@ WebP/JPEG Hochformat **2:3**, ca. 600×900 px, ohne Titel im Bild.
 
 Pfade in `src/lib/story/libraryTemplates.ts` als `coverImageSrc`.
 
-**Lokal nachgenerieren:** [docs/LOCAL-COVERS.md](../docs/LOCAL-COVERS.md) — `npm run covers:missing`
+**Generierung:** Covers sind projektinterne Illustrationen (SDXL / lokale Pipeline). Nachgenerieren: [docs/LOCAL-COVERS.md](../../docs/LOCAL-COVERS.md) — `npm run covers:missing` · Prompts: [docs/COVER-PROMPTS.md](../../docs/COVER-PROMPTS.md)

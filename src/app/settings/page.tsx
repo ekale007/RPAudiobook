@@ -67,6 +67,7 @@ import {
   syncUserPreferences,
 } from "@/lib/storage/userPreferencesSync";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { isLocalMode } from "@/lib/deploymentMode";
 import {
   pickAllowedModel,
   useLlmModelCatalog,
@@ -86,7 +87,8 @@ export default function SettingsPage() {
   const serverQwenTts = serverCaps.serverQwenTts;
   const serverQwenCloudTts = serverCaps.serverQwenCloudTts;
   const capsReady = serverCaps.ready;
-  const betaMode = capsReady && serverLlm;
+  const localMode = isLocalMode();
+  const betaMode = capsReady && serverLlm && !localMode;
   const { models: llmModels, loading: modelsLoading } = useLlmModelCatalog();
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState(DEFAULT_OPENROUTER.model);
@@ -107,6 +109,7 @@ export default function SettingsPage() {
   const [orTtsVoice, setOrTtsVoice] = useState(DEFAULT_TTS.openRouterTtsVoice);
   const [fishModel, setFishModel] = useState(DEFAULT_TTS.fishAudioModel);
   const [fishRefId, setFishRefId] = useState(DEFAULT_TTS.fishAudioReferenceId);
+  const [fishApiKey, setFishApiKey] = useState("");
   const [fishPinnedIds, setFishPinnedIds] = useState<string[]>(
     DEFAULT_TTS.fishAudioPinnedIds,
   );
@@ -167,6 +170,7 @@ export default function SettingsPage() {
     setOrTtsVoice(tts.openRouterTtsVoice);
     setFishModel(tts.fishAudioModel);
     setFishRefId(tts.fishAudioReferenceId);
+    setFishApiKey(tts.fishAudioApiKey ?? "");
     setFishPinnedIds(tts.fishAudioPinnedIds ?? []);
     setFalTtsModel(tts.falTtsModel);
     setFalTtsVoice(tts.falTtsVoice);
@@ -262,6 +266,7 @@ export default function SettingsPage() {
       openRouterTtsVoice: orTtsVoice.trim(),
       fishAudioModel: fishModel.trim(),
       fishAudioReferenceId: fishRefId.trim(),
+      fishAudioApiKey: fishApiKey.trim(),
       fishAudioPinnedIds: fishPinnedIds,
       falTtsModel: falTtsModel.trim(),
       falTtsVoice: falTtsVoice.trim(),
@@ -315,6 +320,7 @@ export default function SettingsPage() {
         openRouterTtsVoice: nextOrVoice,
         fishAudioModel: nextFishModel,
         fishAudioReferenceId: nextFishRef,
+        fishAudioApiKey: fishApiKey.trim(),
         fishAudioPinnedIds: fishPinnedIds,
         falTtsModel: nextFalModel,
         falTtsVoice: nextFalVoice,
@@ -382,6 +388,7 @@ export default function SettingsPage() {
       orTtsVoice,
       fishModel,
       fishRefId,
+      fishApiKey,
       fishPinnedIds,
       falTtsModel,
       falTtsVoice,
@@ -398,6 +405,11 @@ export default function SettingsPage() {
       <AppHeader title={t("settings.title")} backHref="/" />
       <div className="flex flex-col gap-5 p-4">
         <LanguageSwitcher />
+        {localMode ? (
+          <p className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs text-zinc-300">
+            {t("settings.localModeBanner")}
+          </p>
+        ) : null}
         {loggedIn ? (
           <p className="rounded-lg border border-surface-border bg-surface-raised px-3 py-2 text-xs text-zinc-400">
             {t("settings.syncBanner")}
@@ -822,7 +834,7 @@ export default function SettingsPage() {
                 </p>
               ) : (
                 <p className="mb-3 text-xs text-zinc-500">
-                  Lokaler Dev-Modus ohne Server-LLM — API-Key im Browser.
+                  {t("settings.localOpenRouterHint")}
                 </p>
               )}
               <label className="mb-1 block text-xs text-zinc-400">API key</label>
@@ -902,34 +914,43 @@ export default function SettingsPage() {
             <section className="rounded-xl border border-surface-border bg-surface-raised p-4">
               <h2 className="mb-1 font-medium text-accent">Narrator TTS</h2>
               <p className="mb-3 text-xs text-zinc-500">
-                <strong>Local (free)</strong> uses a small server on your PC.
-                See <code className="text-zinc-400">docs/LOCAL-TTS.md</code>.
+                <strong>Local (free)</strong> = edge-tts / Kokoro / Qwen auf dem PC.
+                Cloud-Optionen nutzen deine API-Keys aus diesem Browser.
               </p>
-          <div className="mb-3 flex gap-2">
-            {(["local", "qwen", "elevenlabs"] as const).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setTtsProvider(p)}
-                className={`flex-1 rounded-lg py-2 text-sm ${
-                  ttsProvider === p
-                    ? "bg-accent text-black"
-                    : "border border-surface-border text-zinc-400"
-                }`}
-              >
-                {p === "local"
-                  ? "Local (free)"
-                  : p === "qwen"
-                    ? "Qwen (GPU)"
-                    : "ElevenLabs"}
-              </button>
-            ))}
-          </div>
-          {ttsProvider === "local" || ttsProvider === "qwen" ? (
-            <>
+              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {(
+                  [
+                    "local",
+                    "fish-audio",
+                    "openrouter-tts",
+                    "elevenlabs",
+                  ] as const
+                ).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setTtsProvider(p)}
+                    className={`rounded-lg px-2 py-2 text-xs sm:text-sm ${
+                      ttsProvider === p
+                        ? "bg-accent text-black"
+                        : "border border-surface-border text-zinc-400"
+                    }`}
+                  >
+                    {p === "local"
+                      ? "Local (free)"
+                      : p === "fish-audio"
+                        ? "Fish Audio"
+                        : p === "openrouter-tts"
+                          ? "OpenRouter"
+                          : "ElevenLabs"}
+                  </button>
+                ))}
+              </div>
               {ttsProvider === "local" ? (
                 <>
-                  <label className="mb-1 block text-xs text-zinc-400">Engine</label>
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    Engine
+                  </label>
                   <div className="mb-3 grid grid-cols-2 gap-2">
                     {(
                       ["edge", "kokoro", "qwen", "custom"] as LocalTtsEngine[]
@@ -958,117 +979,203 @@ export default function SettingsPage() {
                       {LOCAL_TTS_PRESETS[localEngine].docs}
                     </p>
                   ) : null}
+                  <p className="mb-2 text-xs text-zinc-500">
+                    PC:{" "}
+                    <code className="text-accent">
+                      {localEngine === "qwen"
+                        ? "npm run tts:qwen"
+                        : localEngine === "kokoro"
+                          ? "npm run tts:kokoro"
+                          : "npm run tts:server"}
+                    </code>{" "}
+                    + <code className="text-accent">npm run dev</code>
+                    {localEngine === "kokoro" ? (
+                      <>
+                        <br />
+                        First time:{" "}
+                        <code className="text-zinc-400">
+                          .\scripts\install-kokoro.ps1
+                        </code>
+                      </>
+                    ) : null}
+                    {localEngine === "qwen" ? (
+                      <>
+                        <br />
+                        First time:{" "}
+                        <code className="text-zinc-400">
+                          npm run tts:qwen:install
+                        </code>
+                        <br />
+                        <Link
+                          href="/dev/qwen-voices"
+                          className="text-accent underline"
+                        >
+                          Qwen Stimmen-Labor
+                        </Link>
+                      </>
+                    ) : null}
+                  </p>
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    Server URL
+                  </label>
+                  <input
+                    value={localUrl}
+                    onChange={(e) => setLocalUrl(e.target.value)}
+                    className="mb-3 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
+                  />
+                  {localEngine === "qwen" ? (
+                    <QwenVoicePicker
+                      serverUrl={localUrl}
+                      value={localVoice}
+                      onChange={setLocalVoice}
+                      serverProxy={serverQwenTts}
+                    />
+                  ) : localEngine === "kokoro" ? (
+                    <KokoroVoicePicker
+                      serverUrl={localUrl}
+                      value={localVoice}
+                      onChange={setLocalVoice}
+                    />
+                  ) : (
+                    <>
+                      <label className="mb-1 block text-xs text-zinc-400">
+                        Voice
+                      </label>
+                      <input
+                        value={localVoice}
+                        onChange={(e) => setLocalVoice(e.target.value)}
+                        className="mb-3 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
+                        placeholder="en-US-AndrewNeural"
+                      />
+                    </>
+                  )}
                 </>
-              ) : (
-                <p className="mb-2 text-xs text-zinc-500">
-                  Lokal: <code className="text-accent">npm run tts:qwen</code>{" "}
-                  oder RunPod — siehe{" "}
-                  <code className="text-zinc-400">docs/RUNPOD-QWEN.md</code>
-                </p>
-              )}
-              <p className="mb-2 text-xs text-zinc-500">
-                PC:{" "}
-                <code className="text-accent">
-                  {ttsProvider === "qwen" || localEngine === "qwen"
-                    ? "npm run tts:qwen"
-                    : localEngine === "kokoro"
-                      ? "npm run tts:kokoro"
-                      : "npm run tts:server"}
-                </code>{" "}
-                + <code className="text-accent">npm run dev</code>
-                {localEngine === "kokoro" && ttsProvider === "local" ? (
-                  <>
-                    <br />
-                    First time:{" "}
-                    <code className="text-zinc-400">
-                      .\scripts\install-kokoro.ps1
-                    </code>
-                    <br />
-                    HF token in <code className="text-zinc-400">.env.local</code>
-                    : <code className="text-zinc-400">HF_TOKEN=hf_...</code>
-                  </>
-                ) : null}
-                {(ttsProvider === "qwen" || localEngine === "qwen") ? (
-                  <>
-                    <br />
-                    First time:{" "}
-                    <code className="text-zinc-400">npm run tts:qwen:install</code>
-                    <br />
-                    HF token in <code className="text-zinc-400">.env.local</code>
-                    : <code className="text-zinc-400">HF_TOKEN=hf_...</code>
-                    <br />
-                    <Link href="/dev/qwen-voices" className="text-accent underline">
-                      Qwen Stimmen-Labor
-                    </Link>{" "}
-                    — Presets & instruct testen
-                  </>
-                ) : null}
-              </p>
-              <label className="mb-1 block text-xs text-zinc-400">
-                Server URL
-              </label>
-              <input
-                value={localUrl}
-                onChange={(e) => setLocalUrl(e.target.value)}
-                className="mb-3 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
-              />
-              {(ttsProvider === "qwen" || localEngine === "qwen") ? (
-                <QwenVoicePicker
-                  serverUrl={localUrl}
-                  value={localVoice}
-                  onChange={setLocalVoice}
-                  serverProxy={serverQwenTts}
-                />
-              ) : localEngine === "kokoro" ? (
-                <KokoroVoicePicker
-                  serverUrl={localUrl}
-                  value={localVoice}
-                  onChange={setLocalVoice}
-                />
+              ) : ttsProvider === "fish-audio" ? (
+                <>
+                  <p className="mb-2 text-xs text-zinc-500">
+                    Fish Audio S2-Pro — Emotion-Tags wie{" "}
+                    <code className="text-zinc-400">[whisper]</code>. Key von{" "}
+                    <a
+                      href="https://fish.audio"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-accent underline"
+                    >
+                      fish.audio
+                    </a>{" "}
+                    → API Keys.
+                  </p>
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    Fish Audio API key
+                  </label>
+                  <input
+                    type="password"
+                    value={fishApiKey}
+                    onChange={(e) => setFishApiKey(e.target.value)}
+                    className="mb-3 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
+                    placeholder="fish_…"
+                    autoComplete="off"
+                  />
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    Modell
+                  </label>
+                  <select
+                    value={fishModel}
+                    onChange={(e) => setFishModel(e.target.value)}
+                    className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-2 py-2 text-sm"
+                  >
+                    {FISH_AUDIO_MODEL_OPTIONS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label} — {m.hint}
+                      </option>
+                    ))}
+                  </select>
+                  <FishAudioVoiceSelect
+                    value={fishRefId}
+                    onChange={setFishRefId}
+                    fishModel={fishModel}
+                    pinnedIds={fishPinnedIds}
+                    onPinnedIdsChange={(ids) => {
+                      setFishPinnedIds(ids);
+                      saveFishAudioPinnedIds(ids);
+                    }}
+                    label="Erzähler-Stimme"
+                  />
+                </>
+              ) : ttsProvider === "openrouter-tts" ? (
+                <>
+                  <p className="mb-2 text-xs text-zinc-500">
+                    Nutzt den <strong>OpenRouter API-Key</strong> von oben —
+                    Abrechnung über dein OpenRouter-Guthaben.
+                  </p>
+                  {!apiKey.trim() ? (
+                    <p className="mb-2 text-xs text-amber-200">
+                      Zuerst OpenRouter-Key im Abschnitt oben speichern.
+                    </p>
+                  ) : null}
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    TTS-Modell
+                  </label>
+                  <select
+                    value={normalizeOpenRouterTtsModel(orTtsModel)}
+                    onChange={(e) => {
+                      const nextModel = normalizeOpenRouterTtsModel(
+                        e.target.value,
+                      );
+                      const nextVoice = defaultOpenRouterTtsVoice(nextModel);
+                      setOrTtsModel(nextModel);
+                      setOrTtsVoice(nextVoice);
+                    }}
+                    className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-2 py-2 text-sm"
+                  >
+                    {OPENROUTER_TTS_MODEL_OPTIONS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label} — {m.hint}
+                      </option>
+                    ))}
+                  </select>
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    Erzähler-Stimme
+                  </label>
+                  <OpenRouterTtsVoiceSelect
+                    model={normalizeOpenRouterTtsModel(orTtsModel)}
+                    value={orTtsVoice}
+                    onChange={setOrTtsVoice}
+                    label=""
+                  />
+                </>
               ) : (
                 <>
                   <label className="mb-1 block text-xs text-zinc-400">
-                    Voice
+                    API key
                   </label>
                   <input
-                    value={localVoice}
-                    onChange={(e) => setLocalVoice(e.target.value)}
+                    type="password"
+                    value={elApiKey}
+                    onChange={(e) => setElApiKey(e.target.value)}
                     className="mb-3 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
-                    placeholder="en-US-AndrewNeural"
+                    placeholder="xi-…"
+                    autoComplete="off"
+                  />
+                  <ElevenLabsVoiceSelect
+                    value={elVoiceId}
+                    onChange={setElVoiceId}
+                    label="Erzähler-Stimme"
+                  />
+                  <p className="mb-3 text-[11px] text-zinc-600">
+                    ▶ spielt die kostenlose ElevenLabs-Standardvorschau ab (keine
+                    Story-Tokens).
+                  </p>
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    Model
+                  </label>
+                  <input
+                    value={elModelId}
+                    onChange={(e) => setElModelId(e.target.value)}
+                    className="mb-3 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
                   />
                 </>
               )}
-            </>
-          ) : (
-            <>
-              <label className="mb-1 block text-xs text-zinc-400">
-                API key
-              </label>
-              <input
-                type="password"
-                value={elApiKey}
-                onChange={(e) => setElApiKey(e.target.value)}
-                className="mb-3 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
-                placeholder="xi-…"
-                autoComplete="off"
-              />
-              <ElevenLabsVoiceSelect
-                value={elVoiceId}
-                onChange={setElVoiceId}
-                label="Erzähler-Stimme"
-              />
-              <p className="mb-3 text-[11px] text-zinc-600">
-                ▶ spielt die kostenlose ElevenLabs-Standardvorschau ab (keine
-                Story-Tokens).
-              </p>
-              <label className="mb-1 block text-xs text-zinc-400">Model</label>
-              <input
-                value={elModelId}
-                onChange={(e) => setElModelId(e.target.value)}
-                className="mb-3 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
-              />
-            </>
-          )}
           <label className="mb-1 mt-3 block text-xs text-zinc-400">
             Aussprache-Overrides (global)
           </label>

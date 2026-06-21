@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
+import { isSaasMode } from "@/lib/server/deploymentMode";
 import { requireUser } from "@/lib/server/requireUser";
 import { resolveLlmChargeCents } from "@/lib/server/llmUsage";
 import { estimateTtsCostCents } from "@/lib/server/billingSettings";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
+  if (!isSaasMode()) {
+    return NextResponse.json({ costCents: 0 });
+  }
+
   const auth = await requireUser(req);
   if ("error" in auth) return auth.error;
 

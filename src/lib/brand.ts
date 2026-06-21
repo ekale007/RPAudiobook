@@ -10,7 +10,7 @@ export const brand = {
   walletProductName: "RP Audiobook Guthaben",
   mediaSessionArtist: "RP Audiobook",
   openRouterAppTitle: "RP Audiobook",
-  defaultSiteUrl: "https://rp-audiobook.vercel.app",
+  defaultSiteUrl: "http://localhost:3000",
   logoSrc: "/brand/logo.png",
   logoAlt: "RP Audiobook — book with headphones",
 } as const;

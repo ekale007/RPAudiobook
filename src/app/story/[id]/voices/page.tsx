@@ -9,10 +9,10 @@ import { FishAudioVoiceSelect } from "@/components/FishAudioVoiceSelect";
 import { FalTtsVoiceSelect } from "@/components/FalTtsVoiceSelect";
 import { OpenRouterTtsVoiceSelect } from "@/components/OpenRouterTtsVoiceSelect";
 import { QwenVoiceEditor } from "@/components/QwenVoiceEditor";
-import { createClient } from "@/lib/supabase/client";
+import { useStorySession } from "@/lib/story/useStorySession";
 import {
+  getStoryOverview,
   listCharacters,
-  parseStorySettings,
   updateStorySettings,
 } from "@/lib/db/stories";
 import {
@@ -116,64 +116,48 @@ export default function StoryVoicesPage() {
   const [fishPinnedIds, setFishPinnedIds] = useState<string[]>([]);
   const [expandedSlug, setExpandedSlug] = useState<string | null>("narrator");
 
-  useEffect(() => {
-    createClient()
-      .auth.getUser()
-      .then(({ data: auth }) => {
-        if (!auth.user) {
-          router.replace("/login");
-          return;
-        }
-        const tts = loadTtsSettings();
-        setTtsProvider(tts.provider);
-        setOrTtsModel(normalizeOpenRouterTtsModel(tts.openRouterTtsModel));
-        setFishModel(tts.fishAudioModel || "s2-pro");
-        setFalTtsModel(normalizeFalTtsModel(tts.falTtsModel));
-        setFishPinnedIds(tts.fishAudioPinnedIds ?? []);
-        setLocalEngine(tts.localEngine ?? "edge");
+  const { authReady } = useStorySession(router);
 
-        Promise.all([
-          listCharacters(storyId),
-          createClient()
-            .from("stories")
-            .select("settings, locale")
-            .eq("id", storyId)
-            .single(),
-        ])
-          .then(([chars, storyRes]) => {
-            if (storyRes.error) throw storyRes.error;
-            const locale = normalizeStoryLocale(storyRes.data.locale as string);
-            setStoryLocale(locale);
-            const settings = parseStorySettings(storyRes.data.settings);
-            setStorySettings(settings);
-            const castRows = chars.filter(
-              (c) => c.role === "cast" || c.role === "narrator",
-            );
-            setCast(castRows);
-            const vmOpts = {
-              localEngine:
-                tts.localEngine === "qwen" || tts.localEngine === "kokoro"
-                  ? tts.localEngine
-                  : "kokoro",
-              falTtsModel: tts.falTtsModel,
-            };
-            setVoiceMap(
-              resolveStoryVoiceMap(settings, tts.provider, locale, vmOpts),
-            );
-            setQwenSceneInstruct(settings.qwenSceneInstructEnabled !== false);
-            const slugs = castRows.map((c) => c.slug);
-            setQwenProfiles(
-              buildQwenProfilesFromSettings(settings, slugs),
-            );
-            setVoiceEnabledSlugs(
-              settings.voiceEnabledSlugs ??
-                defaultEnabledCastSlugs(castRows),
-            );
-            setProtagonistLabel(protagonistDisplayLabel(settings, locale));
-          })
-          .catch((e) => setError(String(e)));
-      });
-  }, [storyId, router]);
+  useEffect(() => {
+    if (!authReady) return;
+    const tts = loadTtsSettings();
+    setTtsProvider(tts.provider);
+    setOrTtsModel(normalizeOpenRouterTtsModel(tts.openRouterTtsModel));
+    setFishModel(tts.fishAudioModel || "s2-pro");
+    setFalTtsModel(normalizeFalTtsModel(tts.falTtsModel));
+    setFishPinnedIds(tts.fishAudioPinnedIds ?? []);
+    setLocalEngine(tts.localEngine ?? "edge");
+
+    Promise.all([listCharacters(storyId), getStoryOverview(storyId)])
+      .then(([chars, overview]) => {
+        const locale = normalizeStoryLocale(overview.story.locale as string);
+        setStoryLocale(locale);
+        const settings = overview.storySettings;
+        setStorySettings(settings);
+        const castRows = chars.filter(
+          (c) => c.role === "cast" || c.role === "narrator",
+        );
+        setCast(castRows);
+        const vmOpts = {
+          localEngine:
+            tts.localEngine === "qwen" || tts.localEngine === "kokoro"
+              ? tts.localEngine
+              : "kokoro",
+          falTtsModel: tts.falTtsModel,
+        };
+        setVoiceMap(
+          resolveStoryVoiceMap(settings, tts.provider, locale, vmOpts),
+        );
+        setQwenSceneInstruct(settings.qwenSceneInstructEnabled !== false);
+        const slugs = castRows.map((c) => c.slug);
+        setQwenProfiles(buildQwenProfilesFromSettings(settings, slugs));
+        setVoiceEnabledSlugs(
+          settings.voiceEnabledSlugs ?? defaultEnabledCastSlugs(castRows),
+        );
+        setProtagonistLabel(protagonistDisplayLabel(settings, locale));
+      })
+      .catch((e) => setError(String(e)));
+  }, [authReady, storyId]);
 
   const engine =
     localEngine === "qwen" || localEngine === "kokoro" ? localEngine : "kokoro";

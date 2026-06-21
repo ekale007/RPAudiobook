@@ -5,10 +5,13 @@ import { estimateOpenRouterTtsCostCents } from "@/lib/server/billingSettings";
 import {
   getOpenRouterApiKey,
   getOpenRouterTtsModel,
+  getRateLimitTtsPerHour,
   isServerOpenRouterTtsConfigured,
 } from "@/lib/server/env";
 import { checkRateLimit } from "@/lib/server/rateLimit";
-import { requireUser } from "@/lib/server/requireUser";
+import { isSaasMode } from "@/lib/server/deploymentMode";
+import { requireApiActor } from "@/lib/server/requireApiActor";
+import { readBearerClientKey } from "@/lib/server/ttsClientKeys";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 import { getTtsHourlyLimitForUser } from "@/lib/server/userTier";
 import { insertUsageEvent } from "@/lib/server/usageEvents";
@@ -28,16 +31,23 @@ export async function GET() {
   });
 }
 
-/** OpenRouter speech — POST /api/v1/audio/speech (server key). */
+/** OpenRouter speech — SaaS server key or browser OpenRouter key (local). */
 export async function POST(req: Request) {
-  const auth = await requireUser(req);
+  const auth = await requireApiActor(req);
   if ("error" in auth) return auth.error;
 
-  const supabase = await createServerSupabaseFromRequest(req);
-  const balanceErr = await requireSpendableBalance(supabase, auth.user.id, 1);
-  if (balanceErr) return balanceErr;
+  const saas = isSaasMode();
+  const supabase = saas ? await createServerSupabaseFromRequest(req) : null;
 
-  const ttsPerHour = await getTtsHourlyLimitForUser(supabase, auth.user.id);
+  if (saas && supabase) {
+    const balanceErr = await requireSpendableBalance(supabase, auth.user.id, 1);
+    if (balanceErr) return balanceErr;
+  }
+
+  const ttsPerHour =
+    saas && supabase
+      ? await getTtsHourlyLimitForUser(supabase, auth.user.id)
+      : getRateLimitTtsPerHour();
   const limit = checkRateLimit(`tts-openrouter:${auth.user.id}`, ttsPerHour);
   if (!limit.ok) {
     return NextResponse.json(
@@ -46,12 +56,15 @@ export async function POST(req: Request) {
     );
   }
 
-  const apiKey = getOpenRouterApiKey();
+  const serverKey = getOpenRouterApiKey();
+  const clientKey = readBearerClientKey(req);
+  const apiKey = saas ? (serverKey ?? clientKey) : clientKey;
   if (!apiKey) {
     return NextResponse.json(
       {
-        error:
-          "OpenRouter TTS not configured. Set OPENROUTER_API_KEY on the server.",
+        error: saas
+          ? "OpenRouter TTS not configured. Set OPENROUTER_API_KEY on the server."
+          : "OpenRouter API-Key oben unter OpenRouter eintragen (gleicher Key wie LLM).",
       },
       { status: 503 },
     );
@@ -115,19 +128,22 @@ export async function POST(req: Request) {
   }
 
   const generationId = upstream.headers.get("X-Generation-Id");
-  const ttsCostCents = await estimateOpenRouterTtsCostCents(
-    supabase,
-    text.length,
-  );
-  void insertUsageEvent(supabase, {
-    kind: "tts",
-    label: "TTS OpenRouter",
-    modelId: model,
-    providerRef: generationId,
-    characters: text.length,
-    costCents: ttsCostCents,
-  });
-  void applyUsageCharge(supabase, ttsCostCents);
+  let ttsCostCents = 0;
+  if (saas && supabase) {
+    ttsCostCents = await estimateOpenRouterTtsCostCents(
+      supabase,
+      text.length,
+    );
+    void insertUsageEvent(supabase, {
+      kind: "tts",
+      label: "TTS OpenRouter",
+      modelId: model,
+      providerRef: generationId,
+      characters: text.length,
+      costCents: ttsCostCents,
+    });
+    void applyUsageCharge(supabase, ttsCostCents);
+  }
 
   const audio = await upstream.arrayBuffer();
   return new NextResponse(audio, {

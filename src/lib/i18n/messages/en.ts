@@ -27,6 +27,9 @@ export const enMessages: Messages = {
     signOut: "Sign out",
     emptyStories:
       "No stories yet — tap + New Story above or pick one from the library below.",
+    localModeHint:
+      "Running locally on your device — stories in IndexedDB, no cloud account. Set LLM/TTS in Settings.",
+    localBadge: "Local",
     newStory: "+ New story",
     epub: "EPUB",
   },
@@ -146,6 +149,10 @@ export const enMessages: Messages = {
     title: "Settings",
     syncBanner:
       "Model, temperature, and narrator voice sync with your account (phone ↔ desktop). Background and narrator models are separate — saves budget on memory sync.",
+    localModeBanner:
+      "Local mode: API keys are stored in this browser only (localStorage). No login, no cloud sync. OpenRouter and ElevenLabs are optional — use free local TTS (Kokoro/edge-tts) instead.",
+    localOpenRouterHint:
+      "OpenRouter API key in the browser — requests go directly to openrouter.ai (not via the server).",
     llmTitle: "LLM — Models",
     llmHint:
       "Background for memory, summaries, and JSON — narrator for story chat and beat suggestions. Model costs count toward your monthly budget.",
@@ -223,7 +230,7 @@ export const enMessages: Messages = {
     stepHub: "Story hub:",
     stepHubText: "Edit cast voices, memory & world.",
     disclaimer:
-      "AI replies and speech are generated via third parties (OpenRouter, TTS). See Account for limits. Only use content you have rights to. Operator: Eyüp Kale.",
+      "AI replies and speech are generated via third parties (OpenRouter, TTS). Only use content you have rights to.",
     dismiss: "Got it — let's go",
   },
   usage: {

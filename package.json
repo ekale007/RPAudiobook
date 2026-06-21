@@ -1,7 +1,8 @@
 {
-  "name": "hoerbuch-ki",
+  "name": "rp-audiobook",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
+  "license": "AGPL-3.0-or-later",
   "scripts": {
     "predev": "node scripts/ensure-no-bom.mjs",
     "dev": "next dev -H 0.0.0.0",
@@ -35,7 +36,8 @@
     "covers:missing": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-covers.ps1 --missing",
     "covers:generate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-covers.ps1",
     "image-studio": "cd image-studio && npm run dev",
-    "agentmemory:seed": "node scripts/seed-agentmemory.mjs"
+    "agentmemory:seed": "node scripts/seed-agentmemory.mjs",
+    "cbm:index": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/index-cbm.ps1"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

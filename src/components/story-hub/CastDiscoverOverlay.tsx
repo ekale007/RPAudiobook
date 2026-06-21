@@ -8,7 +8,7 @@ import {
   type StoryCharacterCandidate,
 } from "@/lib/cast/castStoryAi";
 import { loadStoryScanContext, plotStateSummary } from "@/lib/cast/castStoryContext";
-import { createClient } from "@/lib/supabase/client";
+import { resolveStoryActorId } from "@/lib/story/useStorySession";
 import {
   createCastCharacter,
   updateCharacterCard,
@@ -125,10 +125,8 @@ export function CastDiscoverOverlay({
     setError(null);
     setMessage(null);
     try {
-      const {
-        data: { user },
-      } = await createClient().auth.getUser();
-      if (!user) throw new Error("Nicht angemeldet.");
+      const userId = await resolveStoryActorId();
+      if (!userId) throw new Error("Nicht angemeldet.");
 
       const scan = await loadStoryScanContext(
         storyId,
@@ -139,7 +137,7 @@ export function CastDiscoverOverlay({
       let characterId = c.existingId;
 
       if (c.kind === "new") {
-        const row = await createCastCharacter(storyId, user.id, {
+        const row = await createCastCharacter(storyId, userId, {
           slug: c.slug,
           name: c.name,
           character_memory: c.suggestedMemory,

@@ -23,16 +23,20 @@ import {
   type StoryRow,
 } from "@/lib/db/stories";
 import type { LibraryTemplateId } from "@/lib/story/libraryTemplates";
+import { getLibraryTemplateId } from "@/lib/story/storyOrigin";
 import {
-  getLibraryTemplateId,
-} from "@/lib/story/storyOrigin";
+  isLocalMode,
+  localDeploymentUserId,
+} from "@/lib/deploymentMode";
 import type { User } from "@supabase/supabase-js";
 
 export default function HomePage() {
   const { t } = useUiLocale();
+  const localMode = isLocalMode();
+  const supabaseOk = isSupabaseConfigured();
   const [user, setUser] = useState<User | null>(null);
   const [stories, setStories] = useState<StoryRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!localMode);
   const [importingId, setImportingId] = useState<LibraryTemplateId | null>(
     null,
   );
@@ -43,15 +47,18 @@ export default function HomePage() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [message, setMessage] = useState<string | null>(null);
-  const supabaseOk = isSupabaseConfigured();
 
   const refreshStories = async (includeArchived = showArchived) => {
-    if (!user) return;
+    if (!localMode && !user) return;
     const rows = await listStories(includeArchived);
     setStories(rows);
   };
 
   useEffect(() => {
+    if (localMode) {
+      setLoading(false);
+      return;
+    }
     if (!supabaseOk) {
       setLoading(false);
       return;
@@ -67,17 +74,23 @@ export default function HomePage() {
       setUser(session?.user ?? null);
     });
     return () => subscription.unsubscribe();
-  }, [supabaseOk]);
+  }, [localMode, supabaseOk]);
 
   useEffect(() => {
+    if (localMode) {
+      listStories(showArchived)
+        .then(setStories)
+        .catch((e) => setMessage(String(e)));
+      return;
+    }
     if (!user) return;
     listStories(showArchived)
       .then(setStories)
       .catch((e) => setMessage(String(e)));
-  }, [user, showArchived]);
+  }, [localMode, user, showArchived]);
 
   const handleLibraryImport = (templateId: LibraryTemplateId) => {
-    if (!user) return;
+    if (!localMode && !user) return;
     setMessage(null);
     setImportSetupTemplateId(templateId);
   };
@@ -86,12 +99,13 @@ export default function HomePage() {
     templateId: LibraryTemplateId,
     setup: StoryProtagonistImportSetup,
   ) => {
-    if (!user) return;
+    const userId = localMode ? localDeploymentUserId() : user?.id;
+    if (!userId) return;
     setImportingId(templateId);
     setMessage(null);
     try {
       const { storyId } = await importFromLibraryTemplate(
-        user.id,
+        userId,
         templateId,
         setup,
       );
@@ -103,7 +117,7 @@ export default function HomePage() {
     }
   };
 
-  if (!supabaseOk) {
+  if (!localMode && !supabaseOk) {
     return (
       <main className="flex min-h-dvh flex-col">
         <AppHeader title="" showBrand />
@@ -118,7 +132,7 @@ export default function HomePage() {
     );
   }
 
-  if (loading) {
+  if (!localMode && loading) {
     return (
       <main className="flex min-h-dvh items-center justify-center text-zinc-400">
         {t("common.loading")}
@@ -126,7 +140,7 @@ export default function HomePage() {
     );
   }
 
-  if (!user) {
+  if (!localMode && !user) {
     return (
       <main className="flex min-h-dvh flex-col">
         <AppHeader title="" showBrand />
@@ -178,7 +192,9 @@ export default function HomePage() {
       />
       <div className="flex flex-1 flex-col overflow-y-auto px-3 pb-8 pt-3 sm:px-4">
         <div className="mb-1 px-1">
-          <p className="text-xs text-zinc-500">{t("brand.tagline")}</p>
+          <p className="text-xs text-zinc-500">
+            {localMode ? t("home.localModeHint") : t("brand.tagline")}
+          </p>
         </div>
         <div className="mb-2 flex items-center justify-between gap-2">
           <h2 className="text-sm font-medium text-zinc-200">
@@ -194,18 +210,22 @@ export default function HomePage() {
               />
               {t("home.archive")}
             </label>
-            <button
-              type="button"
-              onClick={async () => {
-                const supabase = createClient();
-                await supabase.auth.signOut();
-                setUser(null);
-                setStories([]);
-              }}
-              className="text-[10px] text-zinc-600 hover:text-zinc-400"
-            >
-              {t("home.signOut")}
-            </button>
+            {!localMode ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  const supabase = createClient();
+                  await supabase.auth.signOut();
+                  setUser(null);
+                  setStories([]);
+                }}
+                className="text-[10px] text-zinc-600 hover:text-zinc-400"
+              >
+                {t("home.signOut")}
+              </button>
+            ) : (
+              <span className="text-[10px] text-zinc-600">{t("home.localBadge")}</span>
+            )}
           </div>
         </div>
 
@@ -306,7 +326,7 @@ export default function HomePage() {
         />
       ) : null}
 
-      <BetaOnboardingModal openGate />
+      {!localMode ? <BetaOnboardingModal openGate /> : null}
       <LegalFooter />
     </main>
   );

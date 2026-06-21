@@ -1,15 +1,16 @@
 import { brand } from "@/lib/brand";
 
 /**
- * Legal identity for RP Audiobook (override via .env.local if needed).
+ * Legal identity — set NEXT_PUBLIC_LEGAL_* in env for hosted deployments (Impressum).
+ * Local/OSS defaults are placeholders only.
  * @see https://www.gesetze-im-internet.de/ddg/__5.html (Impressum)
  */
 export const siteLegal = {
   productName: brand.productName,
   operatorName:
-    process.env.NEXT_PUBLIC_LEGAL_OPERATOR_NAME?.trim() || "Eyüp Kale",
+    process.env.NEXT_PUBLIC_LEGAL_OPERATOR_NAME?.trim() || "Not configured",
   contactEmail:
-    process.env.NEXT_PUBLIC_LEGAL_CONTACT_EMAIL?.trim() || "eyuepkale@gmail.com",
+    process.env.NEXT_PUBLIC_LEGAL_CONTACT_EMAIL?.trim() || "contact@example.com",
   /** Optional full postal address — omitted in UI when empty */
   postalAddress: process.env.NEXT_PUBLIC_LEGAL_ADDRESS?.trim() || "",
   country: "Deutschland",

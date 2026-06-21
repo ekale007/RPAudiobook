@@ -56,19 +56,16 @@ Audiobook cover illustration, vertical portrait 2:3, painterly cinematic digital
 
 Ohne Cloud-Budget: **[LOCAL-COVERS.md](./LOCAL-COVERS.md)** — `npm run covers:install` dann `npm run covers:missing` (SDXL-Turbo, GTX 1080 Ti).
 
-### Dev-Bildgenerator (Cover + Char-Porträts)
+### Bildstudio (Cover + Porträts, eigenständig)
 
-Nur lokal (`npm run dev`):
+Ordner `image-studio/` — siehe `image-studio/README.md`:
 
 ```powershell
-npm run images:server    # Port 5125, gleiches .venv-covers
+cd image-studio
+.\scripts\install.ps1
+npm install
 npm run dev
-# http://localhost:3000/dev/image-generator
 ```
-
-- **Buchcover** 768×1152 — direkt als Story-Cover speichern
-- **Charakterporträt** 768×768 — Avatar in `card_json.extensions.hoerbuchki.avatarStoragePath`
-- Links im Story-Hub (Settings) und unter Charakterkarten
 
 
 | Option                    | Pro                                | Contra                                                  |

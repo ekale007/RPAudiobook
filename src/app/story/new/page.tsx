@@ -12,6 +12,10 @@ import {
 import { StoryDraftEditor } from "@/components/story-editor/StoryDraftEditor";
 import { createClient } from "@/lib/supabase/client";
 import {
+  isLocalMode,
+  localDeploymentUserId,
+} from "@/lib/deploymentMode";
+import {
   createStoryFromSeedPack,
   type CreateStoryFromPackOptions,
 } from "@/lib/db/stories";
@@ -72,6 +76,10 @@ export default function NewStoryEditorPage() {
   const [remixAspects, setRemixAspects] = useState(DEFAULT_REMIX_ASPECTS);
 
   useEffect(() => {
+    if (isLocalMode()) {
+      setUserId(localDeploymentUserId());
+      return;
+    }
     createClient()
       .auth.getUser()
       .then(({ data }) => {

@@ -47,6 +47,14 @@ import {
   updateLocalCharacterCard,
   updateLocalStoryLorebook,
 } from "@/lib/db/localStories";
+import { isSaasMode } from "@/lib/deploymentMode";
+
+function getCloudSupabase() {
+  if (!isSaasMode()) {
+    throw new Error("Cloud stories require SaaS deployment (Supabase).");
+  }
+  return createClient();
+}
 
 export interface StoryRow {
   id: string;
@@ -100,7 +108,8 @@ export function parseStorySettings(raw: unknown): StorySettings {
 
 export async function listStories(includeArchived = false): Promise<StoryRow[]> {
   const local = await listLocalStories(includeArchived);
-  const supabase = createClient();
+  if (!isSaasMode()) return local;
+  const supabase = getCloudSupabase();
   const { data, error } = await supabase
     .from("stories")
     .select("id, title, locale, settings, cover_storage_path")
@@ -120,7 +129,7 @@ export async function setStoryArchived(
     await setLocalStoryArchived(storyId, archived);
     return;
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const { data: row, error: fetchErr } = await supabase
     .from("stories")
     .select("settings")
@@ -146,7 +155,7 @@ export async function deleteStory(storyId: string): Promise<void> {
     await deleteLocalStory(storyId);
     return;
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const { error } = await supabase.from("stories").delete().eq("id", storyId);
   if (error) throw error;
 }
@@ -159,7 +168,7 @@ export async function updateStoryLocale(
     await updateLocalStoryLocale(storyId, locale);
     return;
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const { error } = await supabase
     .from("stories")
     .update({ locale, updated_at: new Date().toISOString() })
@@ -177,7 +186,7 @@ export async function updateStoryTitle(
     await updateLocalStoryTitle(storyId, trimmed);
     return;
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const { error } = await supabase
     .from("stories")
     .update({ title: trimmed, updated_at: new Date().toISOString() })
@@ -205,7 +214,7 @@ export async function createStoryFromSeedPack(
   if (shouldStoreStoryLocally(opts.storyOrigin)) {
     return createLocalStoryFromSeedPack(opts);
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const {
     userId,
     pack,
@@ -428,7 +437,7 @@ export async function updateStorySettings(
   if (isLocalStoryId(storyId)) {
     return updateLocalStorySettings(storyId, patch);
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const { data: row, error: fetchErr } = await supabase
     .from("stories")
     .select("settings")
@@ -453,7 +462,7 @@ export async function touchStoryUpdated(storyId: string): Promise<void> {
     await touchLocalStoryUpdated(storyId);
     return;
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   await supabase
     .from("stories")
     .update({ updated_at: new Date().toISOString() })
@@ -490,7 +499,7 @@ export async function listCharacters(storyId: string): Promise<CharacterRow[]> {
     const { listLocalCharacters } = await import("@/lib/db/localStories");
     return listLocalCharacters(storyId);
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const { data, error } = await supabase
     .from("characters")
     .select(
@@ -516,7 +525,7 @@ export async function applyCharacterMemoryUpdates(
       chapterId,
     );
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const existing = await listCharacters(storyId);
 
   for (const u of updates) {
@@ -582,7 +591,7 @@ export async function createCastCharacter(
   if (isLocalStoryId(storyId)) {
     return createLocalCastCharacter(storyId, userId, payload);
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const slug = payload.slug.trim().toLowerCase().replace(/_/g, "-");
   const name = payload.name.trim() || "Figur";
   const { data, error } = await supabase
@@ -617,7 +626,7 @@ export async function updateCharacterManual(
     archived_reason?: string | null;
   },
 ): Promise<void> {
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const row: Record<string, unknown> = {};
   if (patch.character_memory !== undefined) {
     row.character_memory = patch.character_memory.trim() || null;
@@ -651,7 +660,7 @@ export async function updateStoryLorebook(
     await updateLocalStoryLorebook(lorebookId, storyId, book);
     return;
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const { error } = await supabase
     .from("lorebooks")
     .update({
@@ -672,7 +681,7 @@ export async function updateCharacterCard(
     await updateLocalCharacterCard(characterId, storyId, card);
     return;
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const name = card.name?.trim() || "Character";
   const { error } = await supabase
     .from("characters")
@@ -687,7 +696,7 @@ export async function listLorebooksForStory(storyId: string) {
   if (isLocalStoryId(storyId)) {
     return listLocalLorebooksForStory(storyId);
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const { data: links, error: lErr } = await supabase
     .from("story_lorebooks")
     .select("lorebook_id")
@@ -710,7 +719,7 @@ export async function getStoryBundle(
   if (isLocalStoryId(storyId)) {
     return getLocalStoryBundle(storyId, preferredChapterId);
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
 
   const { data: story, error: sErr } = await supabase
     .from("stories")
@@ -796,7 +805,7 @@ export async function getTurns(chapterId: string): Promise<TurnRow[]> {
   if (isLocalEntityId(chapterId)) {
     return getLocalTurns(chapterId);
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const { data, error } = await supabase
     .from("turns")
     .select("*")
@@ -826,7 +835,7 @@ export async function appendTurn(
       costs,
     );
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const row: Record<string, unknown> = {
     chapter_id: chapterId,
     index_in_chapter: index,
@@ -881,7 +890,7 @@ export async function updateChapterSummaries(
     await updateLocalChapterSummaries(chapterId, patch);
     return;
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const { error } = await supabase
     .from("chapters")
     .update(patch)
@@ -897,7 +906,7 @@ export async function updateChapterTitle(
     await updateLocalChapterTitle(chapterId, title);
     return;
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const { error } = await supabase
     .from("chapters")
     .update({ title })
@@ -931,7 +940,7 @@ export async function createNextChapter(
   if (isLocalEntityId(bandId)) {
     return createLocalNextChapter(bandId, index, title, phaseHint);
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const { data, error } = await supabase
     .from("chapters")
     .insert({
@@ -965,7 +974,7 @@ export async function deleteChapter(
   storyId: string,
   bandId: string,
 ): Promise<{ deletedActive: boolean; newActiveId: string | null }> {
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
 
   const { data: chapters, error: listErr } = await supabase
     .from("chapters")
@@ -1033,7 +1042,7 @@ export async function updateBandSummary(
     await updateLocalBandSummary(bandId, summary);
     return;
   }
-  const supabase = createClient();
+  const supabase = getCloudSupabase();
   const { error } = await supabase
     .from("bands")
     .update({ band_summary: summary })

@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { brand } from "@/lib/brand";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
+import { isLocalMode } from "@/lib/deploymentMode";
 
 export function AppHeader({
   title,
@@ -62,12 +63,14 @@ export function AppHeader({
 
         <div className="flex flex-1 items-center justify-end gap-2 sm:gap-3">
           <LanguageSwitcher compact />
-          <Link
-            href="/account"
-            className="shrink-0 text-xs text-zinc-400 sm:text-sm"
-          >
-            {t("nav.account")}
-          </Link>
+          {!isLocalMode() ? (
+            <Link
+              href="/account"
+              className="shrink-0 text-xs text-zinc-400 sm:text-sm"
+            >
+              {t("nav.account")}
+            </Link>
+          ) : null}
           <Link
             href="/settings"
             className="shrink-0 text-xs text-zinc-400 sm:text-sm"

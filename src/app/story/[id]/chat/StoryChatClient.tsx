@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { ChatView } from "@/components/ChatView";
-import { createClient } from "@/lib/supabase/client";
+import { useStorySession } from "@/lib/story/useStorySession";
 import { getStoryBundle } from "@/lib/db/stories";
 import { isLlmReady } from "@/lib/storage/openRouterSettings";
 import { isTtsReady, loadTtsSettings } from "@/lib/storage/ttsSettings";
@@ -31,22 +31,18 @@ function StoryChatInner() {
     null,
   );
 
+  const { authReady } = useStorySession(router);
+
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
-        router.replace("/login");
-        return;
-      }
-      getStoryBundle(storyId, chapterParam)
-        .then((b) => {
-          setBundle(b);
-          setStorySettings(b.storySettings);
-          setReady(true);
-        })
-        .catch((e) => setError(String(e)));
-    });
-  }, [storyId, chapterParam, router]);
+    if (!authReady) return;
+    getStoryBundle(storyId, chapterParam)
+      .then((b) => {
+        setBundle(b);
+        setStorySettings(b.storySettings);
+        setReady(true);
+      })
+      .catch((e) => setError(String(e)));
+  }, [authReady, storyId, chapterParam]);
 
   const hasKey = typeof window !== "undefined" && isLlmReady();
   const hasTts =

@@ -3,6 +3,7 @@ import type { OpenRouterSettings } from "@/lib/types";
 
 import { readCostCentsHeader, LLM_COST_HEADER } from "@/lib/llm/openRouterCompletion";
 import { authFetch } from "@/lib/supabase/authFetch";
+import { isLocalMode } from "@/lib/deploymentMode";
 import { isServerLlmAvailable } from "@/lib/server/serverCapabilities";
 import { resolveChatModelSettings } from "@/lib/storage/openRouterSettings";
 import {
@@ -66,7 +67,7 @@ export async function streamOpenRouterChat(
 ): Promise<void> {
   const chatSettings = resolveChatModelSettings(settings);
 
-  if (isServerLlmAvailable()) {
+  if (isServerLlmAvailable() && !isLocalMode()) {
     await streamViaServer(chatSettings, messages, callbacks, signal);
     return;
   }
@@ -286,6 +287,7 @@ async function estimateLlmCostFromUsage(
   usage: unknown,
   modelId: string,
 ): Promise<number | undefined> {
+  if (isLocalMode()) return undefined;
   if (!usage || typeof usage !== "object") return undefined;
   const u = usage as Record<string, unknown>;
   const promptTokens = Number(u.prompt_tokens ?? 0);
@@ -320,7 +322,7 @@ export async function completeOpenRouterWithUsage(
   messages: Array<{ role: string; content: string }>,
   opts?: CompleteOpts,
 ): Promise<OpenRouterCompleteResult> {
-  if (isServerLlmAvailable()) {
+  if (isServerLlmAvailable() && !isLocalMode()) {
     const res = await authFetch("/api/llm/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

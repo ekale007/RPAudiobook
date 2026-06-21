@@ -36,6 +36,7 @@ import { coerceElevenLabsVoiceId } from "@/lib/tts/elevenLabsVoices";
 import { normalizeElevenLabsModelId } from "@/lib/tts/elevenLabsModels";
 import { QWEN_CLOUD_DEFAULT_NARRATOR } from "@/lib/tts/qwenCloudVoices";
 import { QWEN_DEFAULT_NARRATOR } from "@/lib/tts/qwenVoices";
+import { loadOpenRouterSettings } from "@/lib/storage/openRouterSettings";
 
 export type TtsProvider =
   | "local"
@@ -62,6 +63,8 @@ export interface TtsSettings {
   /** Fish Audio model header + reference_id */
   fishAudioModel: string;
   fishAudioReferenceId: string;
+  /** Fish Audio API key (browser-only in local deployment). */
+  fishAudioApiKey: string;
   /** Manually saved Fish reference_ids (Lesezeichen-IDs aus der App). */
   fishAudioPinnedIds: string[];
   /** fal.ai endpoint id — POST fal.run/{id} */
@@ -83,6 +86,7 @@ export const DEFAULT_TTS: TtsSettings = {
   openRouterTtsVoice: "af_bella",
   fishAudioModel: DEFAULT_FISH_AUDIO_MODEL,
   fishAudioReferenceId: DEFAULT_FISH_AUDIO_REFERENCE_ID,
+  fishAudioApiKey: "",
   fishAudioPinnedIds: [],
   falTtsModel: DEFAULT_FAL_TTS_MODEL,
   falTtsVoice: "af_bella",
@@ -289,12 +293,15 @@ export function saveFishAudioPinnedIds(ids: string[]): void {
 export function isTtsReady(settings: TtsSettings): boolean {
   if (settings.provider === "local") return true;
   if (settings.provider === "openrouter-tts") {
-    return isServerOpenRouterTtsAvailable();
+    if (isServerOpenRouterTtsAvailable()) return true;
+    return Boolean(loadOpenRouterSettings()?.apiKey?.trim());
   }
   if (settings.provider === "fish-audio") {
+    const hasKey =
+      isServerFishAudioTtsAvailable() ||
+      Boolean(settings.fishAudioApiKey?.trim());
     return (
-      isServerFishAudioTtsAvailable() &&
-      looksLikeFishReferenceId(settings.fishAudioReferenceId)
+      hasKey && looksLikeFishReferenceId(settings.fishAudioReferenceId)
     );
   }
   if (settings.provider === "fal-ai") {

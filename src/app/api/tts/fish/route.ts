@@ -6,8 +6,11 @@ import {
   isServerFishAudioTtsConfigured,
 } from "@/lib/server/env";
 import { checkRateLimit } from "@/lib/server/rateLimit";
-import { requireUser } from "@/lib/server/requireUser";
+import { isSaasMode } from "@/lib/server/deploymentMode";
+import { requireApiActor } from "@/lib/server/requireApiActor";
+import { readBearerClientKey } from "@/lib/server/ttsClientKeys";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
+import { getRateLimitTtsPerHour } from "@/lib/server/env";
 import { getTtsHourlyLimitForUser } from "@/lib/server/userTier";
 import { insertUsageEvent } from "@/lib/server/usageEvents";
 import { applyUsageCharge, requireSpendableBalance } from "@/lib/server/wallet";
@@ -26,16 +29,23 @@ export async function GET() {
   });
 }
 
-/** Fish Audio S2-Pro — server key. */
+/** Fish Audio S2-Pro — SaaS server key or browser key (local deployment). */
 export async function POST(req: Request) {
-  const auth = await requireUser(req);
+  const auth = await requireApiActor(req);
   if ("error" in auth) return auth.error;
 
-  const supabase = await createServerSupabaseFromRequest(req);
-  const balanceErr = await requireSpendableBalance(supabase, auth.user.id, 1);
-  if (balanceErr) return balanceErr;
+  const saas = isSaasMode();
+  const supabase = saas ? await createServerSupabaseFromRequest(req) : null;
 
-  const ttsPerHour = await getTtsHourlyLimitForUser(supabase, auth.user.id);
+  if (saas && supabase) {
+    const balanceErr = await requireSpendableBalance(supabase, auth.user.id, 1);
+    if (balanceErr) return balanceErr;
+  }
+
+  const ttsPerHour =
+    saas && supabase
+      ? await getTtsHourlyLimitForUser(supabase, auth.user.id)
+      : getRateLimitTtsPerHour();
   const limit = checkRateLimit(`tts-fish:${auth.user.id}`, ttsPerHour);
   if (!limit.ok) {
     return NextResponse.json(
@@ -44,12 +54,15 @@ export async function POST(req: Request) {
     );
   }
 
-  const apiKey = getFishAudioApiKey();
+  const serverKey = getFishAudioApiKey();
+  const clientKey = readBearerClientKey(req);
+  const apiKey = saas ? (serverKey ?? clientKey) : clientKey;
   if (!apiKey) {
     return NextResponse.json(
       {
-        error:
-          "Fish Audio TTS not configured. Set FISH_AUDIO_API_KEY on the server.",
+        error: saas
+          ? "Fish Audio TTS not configured. Set FISH_AUDIO_API_KEY on the server."
+          : "Fish Audio API-Key in Einstellungen eintragen (wird nur lokal im Browser gespeichert).",
       },
       { status: 503 },
     );
@@ -135,15 +148,18 @@ export async function POST(req: Request) {
   }
 
   const utf8Bytes = new TextEncoder().encode(text).length;
-  const ttsCostCents = await estimateFishTtsCostCents(supabase, utf8Bytes);
-  void insertUsageEvent(supabase, {
-    kind: "tts",
-    label: "TTS Fish Audio",
-    modelId: model,
-    characters: text.length,
-    costCents: ttsCostCents,
-  });
-  void applyUsageCharge(supabase, ttsCostCents);
+  let ttsCostCents = 0;
+  if (saas && supabase) {
+    ttsCostCents = await estimateFishTtsCostCents(supabase, utf8Bytes);
+    void insertUsageEvent(supabase, {
+      kind: "tts",
+      label: "TTS Fish Audio",
+      modelId: model,
+      characters: text.length,
+      costCents: ttsCostCents,
+    });
+    void applyUsageCharge(supabase, ttsCostCents);
+  }
 
   const audio = await upstream.arrayBuffer();
   return new NextResponse(audio, {

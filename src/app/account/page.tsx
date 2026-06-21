@@ -11,6 +11,7 @@ import { UsageLogPanel } from "@/components/UsageLogPanel";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { isInviteOnlyBeta } from "@/lib/auth/betaAuth";
+import { isLocalMode } from "@/lib/deploymentMode";
 
 type AccountPayload = {
   email: string | null;
@@ -47,6 +48,10 @@ export default function AccountPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const inviteOnly = isInviteOnlyBeta();
 
+  useEffect(() => {
+    if (isLocalMode()) router.replace("/");
+  }, [router]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -82,6 +87,8 @@ export default function AccountPage() {
     router.push("/login");
     router.refresh();
   };
+
+  if (isLocalMode()) return null;
 
   return (
     <main className="flex min-h-dvh flex-col">

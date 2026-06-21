@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "description": "Synthetic reference clips (edge-tts) and OmniVoice probe targets for local RP Audiobook evaluation. Do not use for impersonation of real people.",
+  "refs": [
+    {
+      "id": "de_narrator_female",
+      "locale": "de",
+      "role": "narrator",
+      "edge_voice": "de-DE-KatjaNeural",
+      "audio": "refs/de_narrator_female.wav",
+      "ref_text": "Es war ein klarer Morgen, als die Geschichte begann. Die Straßen lagen noch ruhig da.",
+      "duration_hint_sec": "5-8"
+    },
+    {
+      "id": "de_narrator_male",
+      "locale": "de",
+      "role": "narrator",
+      "edge_voice": "de-DE-ConradNeural",
+      "audio": "refs/de_narrator_male.wav",
+      "ref_text": "Es war ein klarer Morgen, als die Geschichte begann. Die Straßen lagen noch ruhig da.",
+      "duration_hint_sec": "5-8"
+    },
+    {
+      "id": "de_protagonist_neutral",
+      "locale": "de",
+      "role": "protagonist",
+      "edge_voice": "de-DE-AmalaNeural",
+      "audio": "refs/de_protagonist_neutral.wav",
+      "ref_text": "Ich weiß noch nicht, wohin das führt, aber ich gehe trotzdem einen Schritt weiter.",
+      "duration_hint_sec": "4-6"
+    },
+    {
+      "id": "en_narrator_female",
+      "locale": "en",
+      "role": "narrator",
+      "edge_voice": "en-US-JennyNeural",
+      "audio": "refs/en_narrator_female.wav",
+      "ref_text": "It was a clear morning when the story began. The streets were still quiet.",
+      "duration_hint_sec": "5-8"
+    },
+    {
+      "id": "en_narrator_male",
+      "locale": "en",
+      "role": "narrator",
+      "edge_voice": "en-US-GuyNeural",
+      "audio": "refs/en_narrator_male.wav",
+      "ref_text": "It was a clear morning when the story began. The streets were still quiet.",
+      "duration_hint_sec": "5-8"
+    },
+    {
+      "id": "en_gb_narrator",
+      "locale": "en",
+      "role": "narrator",
+      "edge_voice": "en-GB-SoniaNeural",
+      "audio": "refs/en_gb_narrator.wav",
+      "ref_text": "It was a clear morning when the story began. The streets were still quiet.",
+      "duration_hint_sec": "5-8"
+    }
+  ],
+  "probes": [
+    {
+      "id": "de_clone_story_01",
+      "locale": "de",
+      "mode": "clone",
+      "ref_id": "de_narrator_female",
+      "text": "Die Tür knarrte leise, und für einen Moment hielt ich den Atem an."
+    },
+    {
+      "id": "de_clone_dialogue_01",
+      "locale": "de",
+      "mode": "clone",
+      "ref_id": "de_protagonist_neutral",
+      "text": "Warte, sag mir ehrlich: hast du das gewusst, oder ratest du nur?"
+    },
+    {
+      "id": "de_clone_male_01",
+      "locale": "de",
+      "mode": "clone",
+      "ref_id": "de_narrator_male",
+      "text": "Am Ende des Gangs stand ein schwaches Licht, das von irgendwoher zu kommen schien."
+    },
+    {
+      "id": "en_clone_story_01",
+      "locale": "en",
+      "mode": "clone",
+      "ref_id": "en_narrator_female",
+      "text": "The door creaked softly, and for a moment I held my breath."
+    },
+    {
+      "id": "en_clone_gb_01",
+      "locale": "en",
+      "mode": "clone",
+      "ref_id": "en_gb_narrator",
+      "text": "At the end of the corridor, a faint light seemed to come from nowhere."
+    },
+    {
+      "id": "de_design_warm_female",
+      "locale": "de",
+      "mode": "design",
+      "instruct": "female, middle-aged, moderate pitch",
+      "text": "Nimm dir Zeit. Nicht alles muss heute entschieden werden."
+    },
+    {
+      "id": "de_design_low_male",
+      "locale": "de",
+      "mode": "design",
+      "instruct": "male, low pitch",
+      "text": "Wir haben nur eine Chance. Wenn wir sie verpassen, ist es vorbei."
+    },
+    {
+      "id": "en_design_british_female",
+      "locale": "en",
+      "mode": "design",
+      "instruct": "female, british accent, low pitch",
+      "text": "Take your time. Not everything has to be decided today."
+    },
+    {
+      "id": "de_auto_voice",
+      "locale": "de",
+      "mode": "auto",
+      "text": "Ohne Referenz und ohne Anweisung — die Stimme wählt das Modell selbst."
+    },
+    {
+      "id": "de_nonverbal_laughter",
+      "locale": "de",
+      "mode": "clone",
+      "ref_id": "de_protagonist_neutral",
+      "text": "[laughter] Das hätte ich wirklich nicht erwartet, ehrlich gesagt."
+    }
+  ]
+}

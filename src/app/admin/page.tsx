@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
+import { isLocalMode } from "@/lib/deploymentMode";
 import {
   AdminProviderPricingSection,
   draftFromProviderPricing,
@@ -98,6 +100,7 @@ type BillingSettingsState = {
 };
 
 export default function AdminPage() {
+  const router = useRouter();
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [periodMonth, setPeriodMonth] = useState("");
@@ -173,6 +176,10 @@ export default function AdminPage() {
     const json = (await res.json()) as { events: AdminLogEvent[] };
     setLog(json.events);
   }, []);
+
+  useEffect(() => {
+    if (isLocalMode()) router.replace("/");
+  }, [router]);
 
   useEffect(() => {
     void loadUsers();
