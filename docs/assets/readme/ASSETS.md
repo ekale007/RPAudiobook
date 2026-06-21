@@ -8,7 +8,7 @@ GitHub README **does not** inline-play repo-relative `.mp3` links (they open the
 
 | Approach | Where |
 |----------|--------|
-| **README `<audio>` + jsDelivr** | [README](../../README.md#demo) — uses `cdn.jsdelivr.net/gh/ekale007/RPAudiobook@master/...` |
+| **README `<video>` + raw GitHub** | [README](../../README.md#demo) |
 | **Demo page** | [docs/demo/index.html](../demo/index.html) → `https://ekale007.github.io/RPAudiobook/demo/` after Pages enabled |
 
 Enable Pages: repo **Settings → Pages → Build from branch `master`, folder `/docs`**.

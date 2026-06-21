@@ -55,15 +55,15 @@
 
 **EN — Narrator**
 
-<video controls preload="metadata" width="100%" src="https://cdn.jsdelivr.net/gh/ekale007/RPAudiobook@master/docs/assets/readme/demo-narrator-en.mp3"></video>
+<video controls preload="metadata" width="100%" src="https://raw.githubusercontent.com/ekale007/RPAudiobook/master/docs/assets/readme/demo-narrator-en.mp3"></video>
 
 **Multi-voice cast**
 
-<video controls preload="metadata" width="100%" src="https://cdn.jsdelivr.net/gh/ekale007/RPAudiobook@master/docs/assets/readme/demo-multivoice.mp3"></video>
+<video controls preload="metadata" width="100%" src="https://raw.githubusercontent.com/ekale007/RPAudiobook/master/docs/assets/readme/demo-multivoice.mp3"></video>
 
 **Soundscape**
 
-<video controls preload="metadata" width="100%" src="https://cdn.jsdelivr.net/gh/ekale007/RPAudiobook@master/docs/assets/readme/demo-soundscape.mp3"></video>
+<video controls preload="metadata" width="100%" src="https://raw.githubusercontent.com/ekale007/RPAudiobook/master/docs/assets/readme/demo-soundscape.mp3"></video>
 
 <sub>Players not showing? Use the <a href="https://ekale007.github.io/RPAudiobook/demo/">demo page</a> or
 <a href="https://raw.githubusercontent.com/ekale007/RPAudiobook/master/docs/assets/readme/demo-narrator-en.mp3">direct stream</a> (opens the browser audio player).</sub>
