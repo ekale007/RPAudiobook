@@ -24,5 +24,9 @@ export function formatAuthError(
     return translate(locale, "authErrors.emailNotConfirmed");
   }
 
+  if (/signups? not allowed/i.test(msg)) {
+    return translate(locale, "authErrors.signupsNotAllowed");
+  }
+
   return msg;
 }

@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatAuthError } from "@/lib/auth/errors";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import { isInviteOnlyBeta } from "@/lib/auth/betaAuth";
+import { OAuthButtons, OAuthDivider } from "@/components/auth/OAuthButtons";
 import { LocalModeRedirect } from "@/components/LocalModeRedirect";
 
 function SignUpPageContent() {
@@ -69,6 +70,14 @@ function SignUpPageContent() {
         ) : (
           <form onSubmit={signUpPassword} className="flex flex-col gap-3">
             <p className="text-xs text-zinc-500">{t("signup.pitch")}</p>
+            <OAuthButtons
+              disabled={busy}
+              onError={(message) => {
+                setInfo(null);
+                setError(message);
+              }}
+            />
+            <OAuthDivider />
             <label className="text-sm text-zinc-400">{t("login.email")}</label>
             <input
               type="email"

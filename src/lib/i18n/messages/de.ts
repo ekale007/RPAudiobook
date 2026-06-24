@@ -105,6 +105,15 @@ export const deMessages = {
     resetParamSent:
       "Falls die E-Mail existiert, haben wir einen Link zum Passwort-Reset geschickt.",
     loading: "Laden…",
+    oauthOr: "oder",
+    continueWith: "Weiter mit {provider}",
+  },
+  oauth: {
+    google: "Google",
+    github: "GitHub",
+    discord: "Discord",
+    apple: "Apple",
+    azure: "Microsoft",
   },
   signup: {
     title: "Registrieren",
@@ -332,6 +341,8 @@ export const deMessages = {
       "E-Mail nicht bestätigt. In Supabase „Confirm email“ für Dev deaktivieren oder per Mail bestätigen.",
     anonymousHint:
       "Anonymous Sign-ins in Supabase aktivieren → Authentication → Providers.",
+    signupsNotAllowed:
+      "Registrierung ist deaktiviert (Invite-only). Nutze deinen Einladungslink oder melde dich mit einem bestehenden Account an.",
   },
   storyHub: {
     continue: "Weiterspielen",

@@ -107,6 +107,15 @@ export const enMessages: Messages = {
     resetParamSent:
       "If that email exists, we sent a password reset link.",
     loading: "Loading…",
+    oauthOr: "or",
+    continueWith: "Continue with {provider}",
+  },
+  oauth: {
+    google: "Google",
+    github: "GitHub",
+    discord: "Discord",
+    apple: "Apple",
+    azure: "Microsoft",
   },
   signup: {
     title: "Sign up",
@@ -334,6 +343,8 @@ export const enMessages: Messages = {
       "Email not confirmed. Disable Confirm email in Supabase for dev or confirm via email.",
     anonymousHint:
       "Enable anonymous sign-ins in Supabase → Authentication → Providers.",
+    signupsNotAllowed:
+      "Sign-ups are disabled (invite-only). Use your invite link or sign in with an existing account.",
   },
   storyHub: {
     continue: "Continue playing",

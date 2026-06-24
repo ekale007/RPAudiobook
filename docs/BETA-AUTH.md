@@ -49,6 +49,7 @@ Free-Tier: wenige Auth-Mails pro Stunde. Für mehr Nutzer: **Project Settings �
 | Variable | Offene Beta | Invite-only |
 |----------|-------------|-------------|
 | `NEXT_PUBLIC_BETA_INVITE_ONLY` | leer / `0` | `1` |
+| `NEXT_PUBLIC_OAUTH_PROVIDERS` | `google,github,discord` (optional) | gleich — OAuth-Login auch für eingeladene Nutzer |
 
 Wenn **nicht** gesetzt bzw. `0`:
 

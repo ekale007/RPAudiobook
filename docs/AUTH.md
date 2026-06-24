@@ -14,6 +14,10 @@ In Vercel: `NEXT_PUBLIC_BETA_INVITE_ONLY=1`
 
 Works on phone at `http://<PC-IP>:3000` without opening email for every visit.
 
+## OAuth (Google, GitHub, Discord, …)
+
+See **[OAUTH-AUTH.md](./OAUTH-AUTH.md)** — enable providers in Supabase, set `NEXT_PUBLIC_OAUTH_PROVIDERS` on Vercel.
+
 ## Forgot password
 
 1. **Login** → **Forgot password?**

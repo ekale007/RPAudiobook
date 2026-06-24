@@ -21,6 +21,7 @@ import {
   isInviteOnlyBeta,
   showAnonymousDevLogin,
 } from "@/lib/auth/betaAuth";
+import { OAuthButtons, OAuthDivider } from "@/components/auth/OAuthButtons";
 
 type LoginView = "sign-in" | "forgot-password";
 
@@ -129,6 +130,14 @@ function LoginForm() {
           ) : (
             <p className="text-xs text-zinc-500">{t("login.signInPitch")}</p>
           )}
+          <OAuthButtons
+            disabled={busy}
+            onError={(message) => {
+              setInfo(null);
+              setError(message);
+            }}
+          />
+          <OAuthDivider />
           <label className="text-sm text-zinc-400">{t("login.email")}</label>
           <input
             type="email"
