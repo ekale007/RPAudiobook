@@ -21,6 +21,10 @@ import {
   stripSteeringTurnPrefix,
 } from "@/lib/chat/playerSteering";
 import {
+  isTimeSkipSteeringDisplay,
+  timeSkipModeFromDisplay,
+} from "@/lib/chat/timeskip";
+import {
   normalizeStoryContentLocale,
   PROTAGONIST_SPEAKER_SLUG,
 } from "@/lib/story/protagonist";
@@ -297,6 +301,11 @@ export function ChatTurnBubble({
   };
 
   const steeringLabel = (() => {
+    if (isTimeSkipSteeringDisplay(displayContent)) {
+      return timeSkipModeFromDisplay(displayContent) === "montage"
+        ? t("chat.steeringTimeSkipPreview")
+        : t("chat.steeringTimeSkip");
+    }
     if (
       displayContent.includes("⚡") &&
       (displayContent.includes("„") || displayContent.includes('"'))

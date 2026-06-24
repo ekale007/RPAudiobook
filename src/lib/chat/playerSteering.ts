@@ -1,5 +1,9 @@
 import { appendLightContinuationHint } from "@/lib/chat/continuationSeam";
 import { defaultContinuePrompt } from "@/lib/chat/storyBeatSuggestions";
+import {
+  buildTimeSkipContinuationPrompt,
+  isTimeSkipSteeringDisplay,
+} from "@/lib/chat/timeskip";
 import { resolveContinuationWriterTask } from "@/lib/chat/unansweredQuestion";
 import {
   parseSpeakerBlocks,
@@ -294,6 +298,10 @@ export function buildSteeringContinuationPrompt(
   if (kind === "reaction") {
     const id = reactionIdFromDisplay(display);
     if (id) return buildReactionSteeringPrompt(id, storyLocale);
+  }
+
+  if (isTimeSkipSteeringDisplay(display)) {
+    return buildTimeSkipContinuationPrompt(display, storyLocale);
   }
 
   const locale = normalizeStoryLocale(storyLocale) as StoryContentLocale;

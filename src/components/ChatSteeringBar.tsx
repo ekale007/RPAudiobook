@@ -5,6 +5,8 @@ import type {
   QuickReactionId,
   SteeringInputMode,
 } from "@/lib/chat/playerSteering";
+import type { TimeSkipId, TimeSkipMode } from "@/lib/chat/timeskip";
+import { TimeSkipBar } from "@/components/TimeSkipBar";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import { normalizeStoryContentLocale } from "@/lib/story/protagonist";
 
@@ -25,6 +27,7 @@ export function ChatSteeringBar({
   onInputChange,
   onSend,
   onQuickReaction,
+  onTimeSkip,
   onEnsureExpanded,
   placeholder,
   disabled,
@@ -42,6 +45,7 @@ export function ChatSteeringBar({
   onInputChange: (value: string) => void;
   onSend: () => void;
   onQuickReaction: (id: QuickReactionId) => void;
+  onTimeSkip?: (id: TimeSkipId, mode: TimeSkipMode) => void;
   /** Open the input panel without toggling closed. */
   onEnsureExpanded?: () => void;
   placeholder: string;
@@ -175,6 +179,13 @@ export function ChatSteeringBar({
             <span>{t("steering.act")}</span>
           </button>
         </div>
+
+        {onTimeSkip ? (
+          <TimeSkipBar
+            disabled={disabled || generating}
+            onTimeSkip={onTimeSkip}
+          />
+        ) : null}
 
         {children}
 

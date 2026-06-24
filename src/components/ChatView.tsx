@@ -22,6 +22,11 @@ import {
   type QuickReactionId,
   type SteeringInputMode,
 } from "@/lib/chat/playerSteering";
+import {
+  formatTimeSkipUserTurn,
+  type TimeSkipId,
+  type TimeSkipMode,
+} from "@/lib/chat/timeskip";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import {
   readTtsAutoplayPreference,
@@ -1136,6 +1141,11 @@ export function ChatView({
     await sendSteering(formatSteeringReactionUserTurn(reaction, storyLocale));
   };
 
+  const sendTimeSkip = async (id: TimeSkipId, mode: TimeSkipMode) => {
+    if (generating || autoSession || readOnly || !turns.length) return;
+    await sendSteering(formatTimeSkipUserTurn(id, mode, storyLocale));
+  };
+
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || generating || autoSession || readOnly) return;
@@ -1987,6 +1997,7 @@ export function ChatView({
               onInputChange={setInput}
               onSend={() => void sendMessage()}
               onQuickReaction={(id) => void sendQuickReaction(id)}
+              onTimeSkip={(id, mode) => void sendTimeSkip(id, mode)}
               onEnsureExpanded={() => setInputExpanded(true)}
               placeholder={steeringPlaceholder}
               disabled={
