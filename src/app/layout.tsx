@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PwaBootstrap } from "@/components/PwaBootstrap";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { ServerCapabilitiesBootstrap } from "@/components/ServerCapabilitiesBootstrap";
@@ -46,6 +47,7 @@ export default function RootLayout({
           {children}
           <PwaInstallBanner />
         </UiLocaleProvider>
+        <SpeedInsights />
       </body>
     </html>
   );

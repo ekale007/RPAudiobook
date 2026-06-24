@@ -76,6 +76,7 @@ export class TtsAutoplayQueue {
   ): Promise<void> {
     queueHandoffActive = true;
     this.pauseOthersExcept(turnId);
+    this.userPausedTurnId = null;
     this.playingTurnId = turnId;
     setExclusiveTtsTurn(turnId);
     try {
@@ -109,11 +110,15 @@ export class TtsAutoplayQueue {
     if (!this.draining) void this.drain();
   }
 
-  pauseActive(): void {
-    const id = this.playingTurnId;
+  pauseActive(turnId?: string): void {
+    const id = turnId ?? this.playingTurnId;
     if (!id) return;
     this.userPausedTurnId = id;
     this.players.get(id)?.pause();
+  }
+
+  isUserPaused(): boolean {
+    return this.userPausedTurnId != null;
   }
 
   /** Lock-screen play — only resume a user-paused clip, never restart while playing. */

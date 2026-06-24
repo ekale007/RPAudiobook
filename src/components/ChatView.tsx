@@ -121,6 +121,7 @@ import {
   type TtsStorageQuota,
 } from "@/lib/tts/storeTurnAudioCloud";
 import { TtsMobileUnlockBar } from "@/components/TtsMobileUnlockBar";
+import { TtsPlaybackBar } from "@/components/TtsPlaybackBar";
 import { saveTtsAutoplay } from "@/lib/storage/ttsPlaybackSettings";
 import { ChatScrollPane } from "@/components/ChatScrollPane";
 import Link from "next/link";
@@ -262,6 +263,7 @@ export function ChatView({
   const [hasTts, setHasTts] = useState(false);
   const [ttsQueueActive, setTtsQueueActive] = useState(false);
   const [ttsPlayingTurnId, setTtsPlayingTurnId] = useState<string | null>(null);
+  const [ttsUserPaused, setTtsUserPaused] = useState(false);
   const [ttsQueuedTurnIds, setTtsQueuedTurnIds] = useState<string[]>([]);
   const [ttsBlockedTurnId, setTtsBlockedTurnId] = useState<string | null>(null);
   const [ttsCloudQuota, setTtsCloudQuota] = useState<TtsStorageQuota | null>(
@@ -352,6 +354,7 @@ export function ChatView({
 
   const handleTtsPlaybackChange = useCallback(
     (turnId: string, active: boolean) => {
+      if (!active) setTtsUserPaused(false);
       setTtsPlayingTurnId((prev) => {
         const next = active ? turnId : prev === turnId ? null : prev;
         ttsPlayingTurnIdRef.current = next;
@@ -360,6 +363,24 @@ export function ChatView({
     },
     [],
   );
+
+  const pauseTtsPlayback = useCallback(() => {
+    const id =
+      ttsQueueRef.current.activeTurnId ?? ttsPlayingTurnIdRef.current;
+    if (!id) return;
+    ttsQueueRef.current.pauseActive(id);
+    setTtsUserPaused(true);
+  }, []);
+
+  const resumeTtsPlayback = useCallback(() => {
+    if (ttsQueueRef.current.isUserPaused()) {
+      ttsQueueRef.current.resumeActiveIfPaused();
+    } else {
+      const id = ttsPlayingTurnIdRef.current;
+      if (id) void ttsQueueRef.current.getPlayer(id)?.resumeIfPaused();
+    }
+    setTtsUserPaused(false);
+  }, []);
 
   useEffect(() => {
     if (!hasTts) {
@@ -422,6 +443,7 @@ export function ChatView({
     ttsQueueRef.current.stop();
     setTtsQueueActive(false);
     setTtsQueuedTurnIds([]);
+    setTtsUserPaused(false);
     stopAudioSession();
   }, []);
 
@@ -1597,12 +1619,23 @@ export function ChatView({
       };
     }
     if (ttsQueueActive && !beatsLoading) {
+      const drivePausedNow = isDriveSession && drivePaused;
+      const pausedNow = drivePausedNow || ttsUserPaused;
       return {
         label: isDriveSession
           ? t("chat.driveReading", { label: driveBaseLabel })
-          : t("chat.ttsPlayingStatus"),
+          : ttsUserPaused
+            ? t("chat.ttsPausedStatus")
+            : t("chat.ttsPlayingStatus"),
         onCancel: isDriveSession ? cancelAutoSession : stopTtsAutoplay,
-        ...driveControls,
+        onPause: isDriveSession
+          ? drivePaused
+            ? resumeDriveMode
+            : pauseDriveMode
+          : pausedNow
+            ? resumeTtsPlayback
+            : pauseTtsPlayback,
+        pauseLabel: pausedNow ? t("chat.resume") : t("chat.pause"),
       };
     }
     if (isDriveSession) {
@@ -1642,6 +1675,9 @@ export function ChatView({
     pauseDriveMode,
     resumeDriveMode,
     stopTtsAutoplay,
+    pauseTtsPlayback,
+    resumeTtsPlayback,
+    ttsUserPaused,
     autoChapterPhase,
     autoChapterStatus,
     t,
@@ -1672,6 +1708,20 @@ export function ChatView({
     if (steeringInputMode === "act") return t("chat.placeholderAct");
     return t("chat.placeholderSteering");
   }, [steeringMode, steeringInputMode, t]);
+
+  const ttsBarVisible =
+    hasTts &&
+    !ttsReadOnly &&
+    !ttsBlockedTurnId &&
+    (ttsPlayingTurnId != null ||
+      ttsQueueActive ||
+      ttsQueuedTurnIds.length > 0);
+
+  const ttsBarLabel = ttsUserPaused
+    ? t("chat.ttsPausedStatus")
+    : ttsPlayingTurnId
+      ? t("chat.ttsPlayingStatus")
+      : t("chat.ttsQueuedStatus");
 
   return (
     <div
@@ -1773,6 +1823,15 @@ export function ChatView({
       ) : null}
 
       <div className="safe-bottom border-t border-surface-border bg-surface px-3 py-3">
+        {ttsBarVisible ? (
+          <TtsPlaybackBar
+            label={ttsBarLabel}
+            paused={ttsUserPaused}
+            onPause={pauseTtsPlayback}
+            onResume={resumeTtsPlayback}
+            onStop={stopTtsAutoplay}
+          />
+        ) : null}
         <MobileCollapsibleTools
           title={t("chat.toolsTitle")}
           hint={
