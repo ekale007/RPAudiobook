@@ -44,7 +44,7 @@ import {
 } from "@/lib/tts/voiceActivation";
 import { assistantTurnProseText } from "@/lib/chat/parseSpeakerBlocks";
 import { localTtsRouteCacheSuffix } from "@/lib/tts/ttsLocaleRouting";
-import { resolveSegmentOverridesForTurn } from "@/lib/chat/resolveDialogueAttribution";
+import { resolveSegmentOverridesForTurn, turnNeedsDialogueAttribution } from "@/lib/chat/resolveDialogueAttribution";
 import {
   buildTtsCacheKey,
   getCachedAudio,
@@ -456,14 +456,15 @@ export const MessageAudioPlayer = forwardRef<
         let blob: Blob | null = null;
 
         let resolvedOverrides = segmentOverrides ?? {};
-        const hasPassedOverrides = Object.entries(resolvedOverrides).some(
-          ([snippet, slug]) =>
-            snippet.trim().length > 0 && slug && slug !== "narrator",
-        );
-        if (rawContent?.trim() && cast?.length && !hasPassedOverrides) {
+        const contentForAttribution = rawContent?.trim() ?? "";
+        const needsAttribution =
+          contentForAttribution.length > 0 &&
+          cast?.length &&
+          turnNeedsDialogueAttribution(contentForAttribution, storyLocale);
+        if (needsAttribution && cast) {
           resolvedOverrides = await resolveSegmentOverridesForTurn(
             turnId,
-            rawContent,
+            contentForAttribution,
             cast,
             {
               locale: storyLocale,

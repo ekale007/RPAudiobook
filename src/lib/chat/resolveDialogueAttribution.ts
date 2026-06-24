@@ -4,7 +4,12 @@ import {
 } from "@/lib/chat/dialogueAttributionLlm";
 import { buildDialogueAttributionMap } from "@/lib/chat/dialogueScript";
 import { extractMarkedSnippets } from "@/lib/chat/dialogueQuotes";
-import { assistantTurnProseText } from "@/lib/chat/parseSpeakerBlocks";
+import {
+  assistantTurnProseText,
+  hasSpeakerTags,
+  parseSpeakerBlocks,
+  preprocessAssistantMarkup,
+} from "@/lib/chat/parseSpeakerBlocks";
 import type { CharacterRow } from "@/lib/db/stories";
 import {
   normalizeStoryContentLocale,
@@ -24,6 +29,38 @@ export type DialogueAttributionOptions = {
   locale?: StoryContentLocale | string | null;
   protagonist?: StoryProtagonistProfile | null;
 };
+
+/** True when TTS should wait for LLM/heuristic attribution before synthesis. */
+export function turnNeedsDialogueAttribution(
+  rawContent: string,
+  locale?: StoryContentLocale | string | null,
+): boolean {
+  const trimmed = rawContent.trim();
+  if (!trimmed) return false;
+  const loc = normalizeStoryContentLocale(locale ?? "en");
+  const prose = assistantTurnProseText(trimmed);
+  if (extractMarkedSnippets(prose, loc).length > 0) return true;
+
+  const marked = preprocessAssistantMarkup(trimmed);
+  if (!hasSpeakerTags(marked)) return false;
+
+  const blocks = parseSpeakerBlocks(marked);
+  const speakerSlugs = new Set(
+    blocks.map((b) => b.speakerSlug).filter(Boolean),
+  );
+  if (
+    speakerSlugs.size > 1 ||
+    (speakerSlugs.size === 1 && !speakerSlugs.has("narrator"))
+  ) {
+    return true;
+  }
+
+  for (const block of blocks) {
+    const inner = assistantTurnProseText(block.content);
+    if (extractMarkedSnippets(inner, loc).length > 0) return true;
+  }
+  return false;
+}
 
 function cacheToMap(
   cached: NonNullable<ReturnType<typeof loadDialogueAttributionCache>>,

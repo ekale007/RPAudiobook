@@ -33,7 +33,11 @@ import {
   type AutoPlayTurnCount,
   type DriveModeMinutes,
 } from "@/lib/chat/autoContinue";
-import { ensureDialogueAttribution, prefetchDialogueAttributionBatch } from "@/lib/chat/resolveDialogueAttribution";
+import {
+  ensureDialogueAttribution,
+  prefetchDialogueAttributionBatch,
+  turnNeedsDialogueAttribution,
+} from "@/lib/chat/resolveDialogueAttribution";
 import { formatScriptAttributionDebug } from "@/lib/chat/dialogueScript";
 import {
   parseAssistantBlocks,
@@ -850,12 +854,28 @@ export function ChatView({
     setTurns(merged);
 
     const orSettings = loadOpenRouterSettings();
-    if (orSettings) {
+    const attributionOpts = {
+      locale: storyLocale,
+      protagonist: storySettings.protagonist,
+    };
+    if (
+      orSettings &&
+      turnNeedsDialogueAttribution(inserted.content, storyLocale)
+    ) {
+      await ensureDialogueAttribution(
+        inserted.id,
+        inserted.content,
+        allCast,
+        orSettings,
+        attributionOpts,
+      ).catch(() => undefined);
+    } else if (orSettings) {
       void ensureDialogueAttribution(
         inserted.id,
         inserted.content,
         allCast,
         orSettings,
+        attributionOpts,
       ).catch(() => undefined);
     }
 
@@ -874,17 +894,12 @@ export function ChatView({
     }
     syncKnownTurns(merged);
 
-    if (autoSessionRef.current) {
-      void maybeSummarize(merged).catch((e) =>
-        console.warn("Rolling summary (background) failed:", e),
-      );
-      void maybeAutoCreateChapter(merged).catch((e) =>
-        console.warn("Auto chapter (background) failed:", e),
-      );
-    } else {
-      await maybeSummarize(merged);
-      await maybeAutoCreateChapter(merged);
-    }
+    void maybeSummarize(merged).catch((e) =>
+      console.warn("Rolling summary (background) failed:", e),
+    );
+    void maybeAutoCreateChapter(merged).catch((e) =>
+      console.warn("Auto chapter (background) failed:", e),
+    );
   };
 
   const runGeneration = async (
