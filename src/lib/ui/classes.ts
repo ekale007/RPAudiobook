@@ -3,6 +3,16 @@ export const ui = {
   panel:
     "rounded-lg border border-surface-border/80 bg-surface-raised/85 backdrop-blur-sm",
   panelInset: "rounded-lg border border-surface-border/60 bg-surface/60",
+  card:
+    "rounded-lg border border-surface-border bg-surface-raised/90 transition hover:border-accent/25",
+  iconBtn:
+    "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-zinc-500 transition hover:border-surface-border hover:text-zinc-200 active:scale-[0.96] disabled:opacity-40",
+  menu:
+    "absolute right-0 top-full z-30 mt-1 min-w-[8.5rem] overflow-hidden rounded-lg border border-surface-border bg-surface-raised shadow-lg shadow-black/40",
+  menuItem:
+    "flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-zinc-200 transition hover:bg-accent/10 disabled:opacity-40",
+  menuItemDanger:
+    "flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-300 transition hover:bg-red-500/10 disabled:opacity-40",
   btn:
     "inline-flex items-center justify-center rounded-lg border border-surface-border bg-surface-raised/90 px-2.5 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-accent/35 hover:text-zinc-50 active:scale-[0.98] disabled:opacity-40",
   btnAccent:

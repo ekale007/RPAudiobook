@@ -12,6 +12,7 @@ import {
   isPlotStateEmpty,
   isPlotStatePlaceholder,
 } from "@/lib/memory/plotState";
+import { ui } from "@/lib/ui/classes";
 
 type HubTab = "story" | "cast" | "settings";
 
@@ -32,14 +33,14 @@ function HubCard({
     <section
       className={`rounded-lg border p-2.5 ${
         accent
-          ? "border-accent/30 bg-accent/5"
-          : "border-surface-border bg-surface-raised"
+          ? "border-accent/30 bg-accent/[0.06]"
+          : "border-surface-border bg-surface-raised/90"
       } ${className}`}
     >
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <h2
-          className={`text-xs font-medium ${
-            accent ? "text-accent" : "text-zinc-400"
+          className={`text-[10px] font-medium uppercase tracking-wide ${
+            accent ? "text-accent" : "text-zinc-500"
           }`}
         >
           {title}
@@ -63,7 +64,7 @@ function SettingsLink({
   return (
     <Link
       href={href}
-      className="flex items-center gap-2.5 rounded-lg border border-surface-border bg-surface-raised px-2.5 py-2 transition hover:border-accent/30"
+      className={`${ui.card} flex items-center gap-2.5 px-2.5 py-2 active:scale-[0.99]`}
     >
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium text-zinc-200">{title}</p>
@@ -71,7 +72,7 @@ function SettingsLink({
           {description}
         </p>
       </div>
-      <span className="shrink-0 text-sm text-zinc-600" aria-hidden>
+      <span className="shrink-0 text-base text-zinc-600" aria-hidden>
         ›
       </span>
     </Link>
@@ -159,22 +160,22 @@ export function StoryHubView({
   const plotState = storySettings.plotState;
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-hidden">
       {activeChapterId ? (
         <Link
           href={`/story/${storyId}/chat?chapter=${activeChapterId}`}
-          className="mx-3 mt-2 shrink-0 rounded-lg bg-accent py-2 text-center text-sm font-medium text-black sm:mx-4"
+          className="mx-3 mt-2.5 shrink-0 rounded-lg bg-accent py-2.5 text-center text-sm font-semibold text-black transition active:scale-[0.99] sm:mx-4"
         >
           {t("storyHub.continue")}
         </Link>
       ) : (
-        <p className="mx-3 mt-2 shrink-0 rounded-lg border border-amber-800/40 bg-amber-950/25 px-3 py-2 text-center text-[11px] text-amber-100 sm:mx-4">
+        <p className="mx-3 mt-2.5 shrink-0 rounded-lg border border-amber-800/40 bg-amber-950/25 px-3 py-2 text-center text-[11px] text-amber-100 sm:mx-4">
           {t("storyHub.noActiveChapter")}
         </p>
       )}
 
       <nav
-        className="mt-2 shrink-0 border-b border-surface-border px-3 sm:px-4"
+        className="mt-2.5 shrink-0 border-b border-surface-border px-3 sm:px-4"
         aria-label={t("storyHub.navAria")}
         role="tablist"
       >
@@ -186,9 +187,9 @@ export function StoryHubView({
               role="tab"
               onClick={() => setTab(id)}
               aria-selected={tab === id}
-              className={`flex-1 touch-manipulation rounded-t-md px-2 py-2 text-xs font-medium transition ${
+              className={`flex-1 touch-manipulation rounded-t-lg px-2 py-2 text-xs font-medium transition ${
                 tab === id
-                  ? "border-b-2 border-accent bg-surface-raised text-accent"
+                  ? "border-b-2 border-accent bg-surface-raised/80 text-accent"
                   : "text-zinc-500 hover:text-zinc-300"
               }`}
             >
@@ -198,7 +199,7 @@ export function StoryHubView({
         </div>
       </nav>
 
-      <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-3 pb-8 sm:gap-3 sm:p-4">
+      <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-3 pb-10 sm:gap-3 sm:p-4">
         {tab === "story" ? (
           <>
             {userId ? (
@@ -293,7 +294,7 @@ export function StoryHubView({
             </HubCard>
 
             <section>
-              <h2 className="mb-1.5 text-xs font-medium text-zinc-400">
+              <h2 className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
                 {t("storyHub.chapters")}
               </h2>
               <ul className="flex flex-col gap-1.5">
@@ -305,29 +306,16 @@ export function StoryHubView({
                   return (
                     <li
                       key={ch.id}
-                      className={`relative overflow-hidden rounded-lg border ${
+                      className={`overflow-hidden rounded-lg border ${
                         isActive
                           ? "border-accent/40 bg-accent/10"
-                          : "border-surface-border bg-surface-raised"
+                          : "border-surface-border bg-surface-raised/90"
                       }`}
                     >
-                      {canDeleteAny ? (
-                        <button
-                          type="button"
-                          disabled={deleteBusyId === ch.id}
-                          onClick={() => onDeleteChapter(ch)}
-                          className="absolute right-1.5 top-1.5 z-10 px-1 text-sm text-red-400/80 disabled:opacity-40"
-                          aria-label={t("storyHub.deleteChapterAria", {
-                            title: ch.title,
-                          })}
-                        >
-                          {deleteBusyId === ch.id ? "…" : "×"}
-                        </button>
-                      ) : null}
-                      <div className="flex flex-col items-center gap-2.5 px-3 py-3">
-                        <div className="w-full text-center">
-                          <div className="flex flex-wrap items-center justify-center gap-1.5">
-                            <span className="text-sm font-medium text-zinc-100">
+                      <div className="flex items-center gap-2 p-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate text-sm font-medium text-zinc-100">
                               {ch.title}
                             </span>
                             <span
@@ -350,7 +338,7 @@ export function StoryHubView({
                         </div>
                         <Link
                           href={`/story/${storyId}/chat?chapter=${ch.id}`}
-                          className={`min-w-[8.5rem] rounded-lg px-5 py-2.5 text-center text-sm font-semibold ${
+                          className={`shrink-0 rounded-lg px-4 py-1.5 text-center text-xs font-semibold transition active:scale-[0.97] ${
                             isActive
                               ? "bg-accent text-black"
                               : "border border-accent/35 bg-accent/10 text-accent"
@@ -358,6 +346,19 @@ export function StoryHubView({
                         >
                           {isActive ? t("storyHub.play") : t("storyHub.read")}
                         </Link>
+                        {canDeleteAny ? (
+                          <button
+                            type="button"
+                            disabled={deleteBusyId === ch.id}
+                            onClick={() => onDeleteChapter(ch)}
+                            className={`${ui.iconBtn} h-7 w-7 hover:border-red-400/40 hover:text-red-300`}
+                            aria-label={t("storyHub.deleteChapterAria", {
+                              title: ch.title,
+                            })}
+                          >
+                            {deleteBusyId === ch.id ? "…" : "×"}
+                          </button>
+                        ) : null}
                       </div>
                       {hasSummary ? (
                         <div className="border-t border-surface-border/50 px-2 py-1.5">
@@ -374,7 +375,7 @@ export function StoryHubView({
                               onClick={() =>
                                 onToggleSummary(summaryExpanded ? null : ch.id)
                               }
-                              className="mt-0.5 text-[10px] text-accent underline"
+                              className="mt-0.5 text-[10px] text-accent hover:underline"
                             >
                               {summaryExpanded
                                 ? t("storyHub.less")

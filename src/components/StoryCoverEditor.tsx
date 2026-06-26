@@ -7,6 +7,8 @@ import {
 } from "@/lib/db/storyCoverStorage";
 import { StoryCover } from "@/components/StoryCover";
 import { getLibraryTemplateId } from "@/lib/story/storyOrigin";
+import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
+import { ui } from "@/lib/ui/classes";
 
 export function StoryCoverEditor({
   storyId,
@@ -43,22 +45,24 @@ export function StoryCoverEditor({
   onSaveTitle?: () => void;
   onCancelRename?: () => void;
 }) {
+  const { t } = useUiLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showUpload, setShowUpload] = useState(!merged);
   const libraryTemplateId = getLibraryTemplateId(settings);
 
   const handleFile = async (file: File | null) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      setError("Bitte ein Bild (JPG, PNG oder WebP) wählen.");
+      setError(t("cover.invalidType"));
       return;
     }
     setBusy(true);
     setError(null);
     try {
       const path = await uploadStoryCover(userId, storyId, file);
-      if (!path) throw new Error("Upload fehlgeschlagen");
+      if (!path) throw new Error(t("cover.uploadFailed"));
       await setStoryCoverPath(storyId, path);
       onUpdated(path);
     } catch (e) {
@@ -96,23 +100,23 @@ export function StoryCoverEditor({
         className="hidden"
         onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
       />
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
           disabled={busy}
           onClick={() => inputRef.current?.click()}
-          className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent disabled:opacity-50"
+          className={ui.btnAccent}
         >
-          {busy ? "…" : merged ? "Cover" : "Cover hochladen"}
+          {busy ? "…" : t("cover.upload")}
         </button>
         {coverStoragePath ? (
           <button
             type="button"
             disabled={busy}
             onClick={removeCover}
-            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 disabled:opacity-50"
+            className={ui.btn}
           >
-            Entfernen
+            {t("cover.remove")}
           </button>
         ) : null}
       </div>
@@ -122,10 +126,7 @@ export function StoryCoverEditor({
 
   if (merged) {
     return (
-      <section className="rounded-lg border border-surface-border bg-surface-raised p-2.5">
-        <h2 className="mb-2 text-xs font-medium text-zinc-400">
-          Cover & Summary
-        </h2>
+      <section className={`${ui.card} p-2.5`}>
         <div className="flex gap-2.5">
           <StoryCover
             title={title}
@@ -140,39 +141,39 @@ export function StoryCoverEditor({
                 <input
                   value={titleDraft}
                   onChange={(e) => onTitleDraftChange?.(e.target.value)}
-                  className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm"
+                  className={ui.input}
                   autoFocus
                 />
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                   <button
                     type="button"
                     disabled={titleBusy}
                     onClick={onSaveTitle}
-                    className="rounded-md bg-accent px-2.5 py-1 text-[11px] font-medium text-black disabled:opacity-50"
+                    className={ui.btnPrimary}
                   >
-                    {titleBusy ? "…" : "Speichern"}
+                    {titleBusy ? "…" : t("story.save")}
                   </button>
                   <button
                     type="button"
                     onClick={onCancelRename}
-                    className="rounded-md border border-zinc-700 px-2.5 py-1 text-[11px] text-zinc-400"
+                    className={ui.btn}
                   >
-                    Abbrechen
+                    {t("story.cancel")}
                   </button>
                 </div>
               </div>
             ) : (
               <>
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-medium leading-snug text-zinc-100">
+                  <p className="text-sm font-semibold leading-snug text-zinc-100">
                     {title}
                   </p>
                   <button
                     type="button"
                     onClick={onStartRename}
-                    className="shrink-0 text-[10px] text-accent underline"
+                    className="shrink-0 text-[10px] text-accent hover:underline"
                   >
-                    Umbenennen
+                    {t("story.rename")}
                   </button>
                 </div>
                 {description ? (
@@ -181,27 +182,32 @@ export function StoryCoverEditor({
                   </p>
                 ) : (
                   <p className="mt-1.5 text-[11px] italic text-zinc-600">
-                    Keine Beschreibung hinterlegt
+                    {t("cover.noDescription")}
                   </p>
                 )}
+                <button
+                  type="button"
+                  onClick={() => setShowUpload((v) => !v)}
+                  className="mt-1.5 text-[10px] text-zinc-500 hover:text-zinc-300"
+                >
+                  {t("cover.change")} {showUpload ? "▲" : "▾"}
+                </button>
               </>
             )}
           </div>
         </div>
-        <div className="mt-2 border-t border-surface-border/50 pt-2">
-          {uploadButtons}
-        </div>
+        {showUpload && !editingTitle ? (
+          <div className="mt-2 border-t border-surface-border/50 pt-2">
+            {uploadButtons}
+          </div>
+        ) : null}
       </section>
     );
   }
 
   return (
-    <section
-      className={`rounded-lg border border-surface-border bg-surface-raised ${
-        compact ? "p-2" : "rounded-xl p-3"
-      }`}
-    >
-      <h2 className="mb-1.5 text-xs font-medium text-zinc-500">Cover</h2>
+    <section className={`${ui.card} ${compact ? "p-2" : "p-3"}`}>
+      <h2 className={`mb-1.5 ${ui.label}`}>{t("cover.title")}</h2>
       <div className="flex gap-2.5">
         <StoryCover
           title={title}
@@ -213,8 +219,7 @@ export function StoryCoverEditor({
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           {!compact ? (
             <p className="text-xs leading-relaxed text-zinc-500">
-              JPG, PNG oder WebP · max. 5 MB. Ohne Upload wird das
-              Bibliotheks-Farbschema genutzt.
+              {t("cover.uploadHint")}
             </p>
           ) : null}
           {uploadButtons}

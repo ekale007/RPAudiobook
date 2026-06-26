@@ -30,7 +30,27 @@ import {
   isLocalMode,
   localDeploymentUserId,
 } from "@/lib/deploymentMode";
+import { ui } from "@/lib/ui/classes";
 import type { User } from "@supabase/supabase-js";
+
+function StorySkeletonList() {
+  return (
+    <ul className="flex flex-col gap-1.5" aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <li
+          key={i}
+          className="flex items-center gap-2.5 rounded-lg border border-surface-border bg-surface-raised/60 p-2"
+        >
+          <div className="h-12 w-9 shrink-0 animate-pulse rounded-md bg-surface-border/60" />
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3 w-2/3 animate-pulse rounded bg-surface-border/60" />
+            <div className="h-2.5 w-1/3 animate-pulse rounded bg-surface-border/40" />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function HomePage() {
   const { t } = useUiLocale();
@@ -45,6 +65,7 @@ export default function HomePage() {
   const [importSetupTemplateId, setImportSetupTemplateId] =
     useState<LibraryTemplateId | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [storiesLoaded, setStoriesLoaded] = useState(false);
   const [busyStoryId, setBusyStoryId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -86,13 +107,15 @@ export default function HomePage() {
     if (localMode) {
       listStories(showArchived)
         .then(setStories)
-        .catch((e) => setMessage(String(e)));
+        .catch((e) => setMessage(String(e)))
+        .finally(() => setStoriesLoaded(true));
       return;
     }
     if (!user) return;
     listStories(showArchived)
       .then(setStories)
-      .catch((e) => setMessage(String(e)));
+      .catch((e) => setMessage(String(e)))
+      .finally(() => setStoriesLoaded(true));
   }, [localMode, user, showArchived]);
 
   const handleLibraryImport = async (templateId: LibraryTemplateId) => {
@@ -136,9 +159,11 @@ export default function HomePage() {
     return (
       <main className="flex min-h-dvh flex-col">
         <AppHeader title="" showBrand />
-        <div className="flex flex-1 flex-col justify-center gap-4 p-6 text-center">
-          <p className="text-zinc-300">{t("home.supabaseHint")}</p>
-          <Link href="/settings" className="text-accent underline">
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-4 p-6 text-center">
+          <p className="text-sm leading-relaxed text-zinc-300">
+            {t("home.supabaseHint")}
+          </p>
+          <Link href="/settings" className={`${ui.btnAccent} justify-center py-2.5`}>
             {t("nav.settings")}
           </Link>
         </div>
@@ -149,8 +174,12 @@ export default function HomePage() {
 
   if (!localMode && loading) {
     return (
-      <main className="flex min-h-dvh items-center justify-center text-zinc-400">
-        {t("common.loading")}
+      <main className="flex min-h-dvh flex-col">
+        <AppHeader title="" showBrand />
+        <div className="mx-auto w-full max-w-3xl flex-1 px-3 pt-3 sm:px-4">
+          <div className="mb-3 h-10 animate-pulse rounded-lg bg-surface-raised/70" />
+          <StorySkeletonList />
+        </div>
       </main>
     );
   }
@@ -159,20 +188,20 @@ export default function HomePage() {
     return (
       <main className="flex min-h-dvh flex-col">
         <AppHeader title="" showBrand />
-        <div className="flex flex-1 flex-col justify-center gap-6 p-6">
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-5 p-6">
           <p className="text-center text-sm leading-relaxed text-zinc-300">
             {t("home.guestPitch")}
           </p>
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
             <Link
               href="/login"
-              className="rounded-xl bg-accent py-3 text-center font-medium text-black"
+              className={`${ui.btnPrimary} justify-center py-2.5 text-sm`}
             >
               {t("home.signIn")}
             </Link>
             <Link
               href="/signup"
-              className="rounded-xl border border-surface-border py-3 text-center text-sm font-medium text-zinc-200"
+              className={`${ui.btn} justify-center py-2.5 text-sm`}
             >
               {t("home.signUp")}
             </Link>
@@ -185,46 +214,42 @@ export default function HomePage() {
 
   return (
     <main className="flex min-h-dvh flex-col">
-      <AppHeader
-        title=""
-        showBrand
-        centerSlot={
-          <div className="flex items-center gap-1.5">
-            <Link
-              href="/story/import"
-              className="whitespace-nowrap rounded-full border border-surface-border px-2.5 py-1.5 text-[10px] font-medium text-zinc-300 sm:px-3 sm:text-[11px]"
-            >
-              {t("home.epub")}
-            </Link>
-            <Link
-              href="/story/new"
-              className="whitespace-nowrap rounded-full bg-accent px-3 py-1.5 text-[11px] font-semibold text-black shadow-sm sm:px-4 sm:text-xs"
-            >
-              {t("home.newStory")}
-            </Link>
-          </div>
-        }
-      />
-      <div className="flex flex-1 flex-col overflow-y-auto px-3 pb-8 pt-3 sm:px-4">
-        <div className="mb-1 px-1">
-          <p className="text-xs text-zinc-500">
-            {localMode ? t("home.localModeHint") : t("brand.tagline")}
-          </p>
+      <AppHeader title="" showBrand />
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-y-auto px-3 pb-10 pt-3 sm:px-4">
+        <div className="mb-3 flex items-center gap-2">
+          <Link
+            href="/story/new"
+            className={`${ui.btnPrimary} flex-1 py-2.5 text-sm`}
+          >
+            {t("home.newStory")}
+          </Link>
+          <Link
+            href="/story/import"
+            className={`${ui.btn} py-2.5 text-sm`}
+          >
+            {t("home.epub")}
+          </Link>
         </div>
+
+        <p className="mb-2 px-0.5 text-[11px] leading-snug text-zinc-500">
+          {localMode ? t("home.localModeHint") : t("brand.tagline")}
+        </p>
+
         <div className="mb-2 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-medium text-zinc-200">
+          <h2 className="text-sm font-semibold tracking-tight text-zinc-100">
             {t("home.yourStories")}
           </h2>
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-1.5 text-[10px] text-zinc-500">
-              <input
-                type="checkbox"
-                checked={showArchived}
-                onChange={(e) => setShowArchived(e.target.checked)}
-                className="scale-90"
-              />
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setShowArchived((v) => !v)}
+              aria-pressed={showArchived}
+              className={`${ui.btn} px-2 py-1 text-[10px] ${
+                showArchived ? "border-accent/50 bg-accent/12 text-accent" : ""
+              }`}
+            >
               {t("home.archive")}
-            </label>
+            </button>
             {!localMode ? (
               <button
                 type="button"
@@ -234,12 +259,12 @@ export default function HomePage() {
                   setUser(null);
                   setStories([]);
                 }}
-                className="text-[10px] text-zinc-600 hover:text-zinc-400"
+                className="px-1 text-[10px] text-zinc-600 transition hover:text-zinc-400"
               >
                 {t("home.signOut")}
               </button>
             ) : (
-              <span className="text-[10px] text-zinc-600">{t("home.localBadge")}</span>
+              <span className={ui.chip}>{t("home.localBadge")}</span>
             )}
           </div>
         </div>
@@ -248,6 +273,9 @@ export default function HomePage() {
           <p className="mb-2 text-center text-xs text-zinc-400">{message}</p>
         ) : null}
 
+        {!storiesLoaded ? (
+          <StorySkeletonList />
+        ) : (
         <ul className="flex flex-col gap-1.5">
           {stories.map((s) => (
             <li key={s.id}>
@@ -311,11 +339,14 @@ export default function HomePage() {
             </li>
           ))}
         </ul>
+        )}
 
-        {stories.length === 0 ? (
-          <p className="py-4 text-center text-xs text-zinc-500">
-            {t("home.emptyStories")}
-          </p>
+        {storiesLoaded && stories.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-surface-border/80 px-4 py-6 text-center">
+            <p className="text-xs leading-relaxed text-zinc-500">
+              {t("home.emptyStories")}
+            </p>
+          </div>
         ) : null}
 
         <StoryLibraryShelf

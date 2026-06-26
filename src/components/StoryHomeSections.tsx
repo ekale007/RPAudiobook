@@ -1,7 +1,8 @@
 "use client";
 
+import { useRef, useState } from "react";
 import Link from "next/link";
-import { LibraryTurntable } from "@/components/LibraryTurntable";
+import { LibraryGrid } from "@/components/LibraryGrid";
 import type { LibraryTemplateId } from "@/lib/story/libraryTemplates";
 import { StoryCover } from "@/components/StoryCover";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
@@ -9,6 +10,7 @@ import {
   getStoryOrigin,
   storyOriginLabel,
 } from "@/lib/story/storyOrigin";
+import { ui } from "@/lib/ui/classes";
 
 export function StoryLibraryShelf({
   importingId,
@@ -17,7 +19,7 @@ export function StoryLibraryShelf({
   importingId: LibraryTemplateId | null;
   onImport: (id: LibraryTemplateId) => void;
 }) {
-  return <LibraryTurntable importingId={importingId} onImport={onImport} />;
+  return <LibraryGrid importingId={importingId} onImport={onImport} />;
 }
 
 export function StoryListCard({
@@ -51,84 +53,153 @@ export function StoryListCard({
 }) {
   const { locale, t } = useUiLocale();
   const originLabel = storyOriginLabel(getStoryOrigin(storySettings), locale);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(
+    null,
+  );
+  const menuOpen = menuPos !== null;
+  const closeMenu = () => setMenuPos(null);
+  const openMenu = () => {
+    const r = menuBtnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    setMenuPos({
+      top: r.bottom + 4,
+      right: Math.max(8, window.innerWidth - r.right),
+    });
+  };
 
-  return (
-    <div className="overflow-hidden rounded-lg border border-surface-border bg-surface-raised">
-      <div className="flex gap-2 p-2">
+  if (renaming) {
+    return (
+      <div className={`${ui.card} flex gap-2.5 p-2`}>
         <StoryCover
           title={story.title}
           coverStoragePath={story.cover_storage_path}
           libraryTemplateId={libraryTemplateId}
-          className="h-11 w-8 shrink-0 rounded-md"
-          aspectClass="aspect-auto h-11 w-8"
+          className="h-12 w-9 shrink-0 rounded-md"
+          aspectClass="aspect-auto h-12 w-9"
+          compact
+        />
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <input
+            value={renameDraft}
+            onChange={(e) => onRenameDraftChange(e.target.value)}
+            className={ui.input}
+            autoFocus
+          />
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onSaveRename}
+              className={ui.btnPrimary}
+            >
+              {busy ? "…" : t("story.save")}
+            </button>
+            <button type="button" onClick={onCancelRename} className={ui.btn}>
+              {t("story.cancel")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${ui.card} flex items-stretch`}>
+      <Link
+        href={`/story/${story.id}`}
+        className="flex min-w-0 flex-1 items-center gap-2.5 p-2 transition active:scale-[0.99]"
+      >
+        <StoryCover
+          title={story.title}
+          coverStoragePath={story.cover_storage_path}
+          libraryTemplateId={libraryTemplateId}
+          className="h-12 w-9 shrink-0 rounded-md"
+          aspectClass="aspect-auto h-12 w-9"
           compact
         />
         <div className="min-w-0 flex-1">
-          {renaming ? (
-            <div className="flex flex-col gap-1.5">
-              <input
-                value={renameDraft}
-                onChange={(e) => onRenameDraftChange(e.target.value)}
-                className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm"
-                autoFocus
-              />
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={onSaveRename}
-                  className="rounded-md bg-accent px-2 py-0.5 text-xs font-medium text-black disabled:opacity-50"
-                >
-                  {t("story.save")}
-                </button>
-                <button
-                  type="button"
-                  onClick={onCancelRename}
-                  className="rounded-md border border-zinc-700 px-2 py-0.5 text-xs text-zinc-400"
-                >
-                  {t("story.cancel")}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <Link href={`/story/${story.id}`} className="block py-0.5">
-              <span className="text-sm font-medium leading-tight text-zinc-100">
-                {story.title}
-              </span>
-              <span className="mt-0.5 block text-[10px] text-zinc-500">
-                {originLabel}
-              </span>
-            </Link>
-          )}
+          <span className="block truncate text-sm font-medium leading-tight text-zinc-100">
+            {story.title}
+          </span>
+          <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-zinc-500">
+            <span className={ui.chip}>{originLabel}</span>
+            {isArchived ? (
+              <span className={ui.chip}>{t("story.archive")}</span>
+            ) : null}
+          </span>
         </div>
+        <span className="shrink-0 text-base text-zinc-600" aria-hidden>
+          ›
+        </span>
+      </Link>
+
+      <div className="flex items-center pr-1">
+        <button
+          ref={menuBtnRef}
+          type="button"
+          aria-label={t("home.manage")}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          onClick={() => (menuOpen ? closeMenu() : openMenu())}
+          className={ui.iconBtn}
+        >
+          <span className="text-lg leading-none" aria-hidden>
+            ⋯
+          </span>
+        </button>
       </div>
-      {renaming ? null : (
-        <div className="flex flex-wrap gap-1 border-t border-surface-border/50 px-2 py-1.5">
-          <button
-            type="button"
-            className="rounded-md border border-zinc-700/80 px-1.5 py-0.5 text-[10px] text-zinc-400"
-            onClick={onStartRename}
+
+      {menuOpen && menuPos ? (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            aria-hidden
+            onClick={closeMenu}
+          />
+          <div
+            className="fixed z-50 min-w-[9rem] max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-surface-border bg-surface-raised shadow-lg shadow-black/40"
+            style={{ top: menuPos.top, right: menuPos.right }}
+            role="menu"
           >
-            {t("story.rename")}
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            className="rounded-md border border-zinc-700/80 px-1.5 py-0.5 text-[10px] text-zinc-400 disabled:opacity-50"
-            onClick={onArchive}
-          >
-            {isArchived ? t("story.restore") : t("story.archive")}
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            className="rounded-md border border-red-900/50 px-1.5 py-0.5 text-[10px] text-red-400/90 disabled:opacity-50"
-            onClick={onDelete}
-          >
-            {t("story.delete")}
-          </button>
-        </div>
-      )}
+            <button
+              type="button"
+              role="menuitem"
+              className={ui.menuItem}
+              onClick={() => {
+                closeMenu();
+                onStartRename();
+              }}
+            >
+              {t("story.rename")}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={busy}
+              className={ui.menuItem}
+              onClick={() => {
+                closeMenu();
+                onArchive();
+              }}
+            >
+              {isArchived ? t("story.restore") : t("story.archive")}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={busy}
+              className={ui.menuItemDanger}
+              onClick={() => {
+                closeMenu();
+                onDelete();
+              }}
+            >
+              {t("story.delete")}
+            </button>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
