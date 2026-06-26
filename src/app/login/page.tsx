@@ -120,7 +120,7 @@ function LoginForm() {
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-6">
+    <div className="flex flex-1 flex-col gap-3 p-4">
       {view === "sign-in" ? (
         <form onSubmit={signInPassword} className="flex flex-col gap-3">
           {inviteOnly ? (
@@ -144,7 +144,7 @@ function LoginForm() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="rounded-xl border border-surface-border bg-surface-raised px-3 py-2 text-base"
+            className="rounded-lg border border-surface-border bg-surface-raised/90 px-2.5 py-2 text-sm"
             autoComplete="email"
           />
           <label className="text-sm text-zinc-400">{t("login.password")}</label>
@@ -154,7 +154,7 @@ function LoginForm() {
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="rounded-xl border border-surface-border bg-surface-raised px-3 py-2 text-base"
+            className="rounded-lg border border-surface-border bg-surface-raised/90 px-2.5 py-2 text-sm"
             autoComplete="current-password"
           />
           <button
@@ -171,7 +171,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={busy}
-            className="rounded-xl bg-accent py-3 text-base font-medium text-black disabled:opacity-50"
+            className="rounded-lg bg-accent py-2.5 text-sm font-semibold text-black disabled:opacity-50"
           >
             {t("login.signIn")}
           </button>
@@ -219,7 +219,7 @@ function LoginForm() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="rounded-xl border border-surface-border bg-surface-raised px-3 py-2 text-base"
+            className="rounded-lg border border-surface-border bg-surface-raised/90 px-2.5 py-2 text-sm"
             autoComplete="email"
             disabled={resetSent}
           />
@@ -227,7 +227,7 @@ function LoginForm() {
             <button
               type="submit"
               disabled={busy}
-              className="rounded-xl bg-accent py-3 text-base font-medium text-black disabled:opacity-50"
+              className="rounded-lg bg-accent py-2.5 text-sm font-semibold text-black disabled:opacity-50"
             >
               {t("login.sendResetLink")}
             </button>

@@ -31,7 +31,10 @@ image-studio/
 __pycache__/
 *.py[cod]
 *.pem
-.cursor/
+.cursor/*
+!.cursor/skills/
+!.cursor/skills/**
+.tmp-taste-skill/
 .codebase-memory/
 .cbm-err.txt
 .cbm-out.txt

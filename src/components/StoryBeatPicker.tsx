@@ -23,7 +23,7 @@ function NarratorContinueRow({
         type="button"
         disabled={disabled || loading}
         onClick={onQuickContinue}
-        className="min-w-0 flex-1 rounded-xl border border-violet-400/35 bg-violet-500/10 py-2.5 text-sm font-medium text-violet-200 transition hover:border-violet-400/55 hover:bg-violet-500/15 disabled:opacity-40"
+        className="min-w-0 flex-1 rounded-xl border border-violet-400/30 bg-violet-500/10 py-2 text-xs font-medium text-violet-200 transition hover:border-violet-400/50 hover:bg-violet-500/15 disabled:opacity-40"
       >
         Erzähler macht weiter
       </button>
@@ -34,7 +34,7 @@ function NarratorContinueRow({
             type="button"
             disabled={disabled || loading}
             onClick={() => onAutoPlay(n)}
-            className="flex h-full min-h-[42px] items-center rounded-lg border border-violet-400/25 px-2.5 text-xs font-medium text-violet-300/90 transition hover:border-violet-400/45 hover:bg-violet-500/10 disabled:opacity-40"
+            className="flex h-full min-h-[36px] items-center rounded-lg border border-violet-400/25 px-2 text-[10px] font-medium text-violet-300/90 transition hover:border-violet-400/45 hover:bg-violet-500/10 disabled:opacity-40"
             title={`${n} Erzähler-Abschnitte schreiben (ohne Vorlesen)`}
           >
             {n}×
@@ -66,8 +66,8 @@ export function StoryBeatPicker({
 }) {
   if (options?.length) {
     return (
-      <div className="mb-2 space-y-2">
-        <p className="text-center text-xs text-zinc-500">
+      <div className="mb-1.5 space-y-1.5">
+        <p className="text-center text-[10px] text-zinc-500">
           Wohin soll die Story? Tippe eine Richtung an.
         </p>
         {options.map((opt) => (
@@ -76,7 +76,7 @@ export function StoryBeatPicker({
             type="button"
             disabled={disabled}
             onClick={() => onSelectBeat(opt)}
-            className="w-full rounded-xl border border-accent/40 bg-surface-raised px-3 py-2.5 text-left transition hover:border-accent/70 disabled:opacity-40"
+            className="w-full rounded-lg border border-accent/35 bg-surface-raised/90 px-2.5 py-2 text-left text-sm transition hover:border-accent/55 disabled:opacity-40"
           >
             <span className="block text-sm font-medium text-accent">
               {opt.title}

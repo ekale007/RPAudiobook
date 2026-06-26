@@ -7,6 +7,7 @@ import {
   type TimeSkipMode,
 } from "@/lib/chat/timeskip";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
+import { ui } from "@/lib/ui/classes";
 
 export function TimeSkipBar({
   disabled,
@@ -19,19 +20,19 @@ export function TimeSkipBar({
   const [mode, setMode] = useState<TimeSkipMode>("direct");
 
   const modeBtn = (value: TimeSkipMode) =>
-    `rounded-lg border px-2.5 py-1 text-[11px] font-medium transition disabled:opacity-40 ${
+    `${ui.btn} px-2 py-0.5 text-[10px] ${
       mode === value
-        ? "border-accent/55 bg-accent/15 text-accent"
-        : "border-surface-border bg-surface-raised text-zinc-400 hover:border-accent/35"
+        ? "border-accent/50 bg-accent/12 text-accent"
+        : "text-zinc-400"
     }`;
 
   return (
-    <div className="rounded-xl border border-surface-border/80 bg-surface-raised/60 p-2.5">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs font-medium text-zinc-300">
+    <div className={`${ui.panelInset} p-2`}>
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
           {t("timeskip.title")}
         </span>
-        <div className="flex items-center gap-1" role="group" aria-label={t("timeskip.modeLabel")}>
+        <div className="flex items-center gap-0.5" role="group" aria-label={t("timeskip.modeLabel")}>
           <button
             type="button"
             disabled={disabled}
@@ -52,14 +53,14 @@ export function TimeSkipBar({
           </button>
         </div>
       </div>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-1">
         {TIME_SKIP_PRESETS.map((preset) => (
           <button
             key={preset.id}
             type="button"
             disabled={disabled}
             onClick={() => onTimeSkip(preset.id, mode)}
-            className="rounded-lg border border-surface-border bg-surface px-2.5 py-1.5 text-[11px] text-zinc-200 transition hover:border-accent/40 disabled:opacity-40"
+            className={`${ui.btn} px-2 py-1 text-[10px] text-zinc-200`}
             title={
               mode === "montage"
                 ? t("timeskip.buttonMontageTitle", {
@@ -72,7 +73,7 @@ export function TimeSkipBar({
           </button>
         ))}
       </div>
-      <p className="mt-2 text-[10px] leading-snug text-zinc-600">
+      <p className="mt-1.5 text-[10px] leading-snug text-zinc-600">
         {mode === "montage" ? t("timeskip.montageHint") : t("timeskip.directHint")}
       </p>
     </div>

@@ -9,6 +9,7 @@ import type { TimeSkipId, TimeSkipMode } from "@/lib/chat/timeskip";
 import { TimeSkipBar } from "@/components/TimeSkipBar";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import { normalizeStoryContentLocale } from "@/lib/story/protagonist";
+import { ui } from "@/lib/ui/classes";
 
 const REACTIONS: Array<{
   id: QuickReactionId;
@@ -46,7 +47,6 @@ export function ChatSteeringBar({
   onSend: () => void;
   onQuickReaction: (id: QuickReactionId) => void;
   onTimeSkip?: (id: TimeSkipId, mode: TimeSkipMode) => void;
-  /** Open the input panel without toggling closed. */
   onEnsureExpanded?: () => void;
   placeholder: string;
   disabled?: boolean;
@@ -54,7 +54,6 @@ export function ChatSteeringBar({
   onCancel?: () => void;
   children?: ReactNode;
   locale?: string | null;
-  /** When false (read-only chat), primary action is a normal Send. */
   steeringMode?: boolean;
   steeringInputMode?: SteeringInputMode;
   onSteeringInputModeChange?: (mode: SteeringInputMode) => void;
@@ -111,21 +110,21 @@ export function ChatSteeringBar({
   };
 
   const modeBtnClass = (mode: SteeringInputMode) =>
-    `flex items-center gap-1 rounded-xl border px-3 py-2 text-sm font-medium transition disabled:opacity-40 ${
+    `${ui.btn} gap-1 px-2.5 py-1.5 ${
       steeringInputMode === mode
-        ? "border-accent/55 bg-accent/15 text-accent"
-        : "border-surface-border bg-surface-raised text-zinc-300 hover:border-accent/40"
+        ? "border-accent/50 bg-accent/12 text-accent"
+        : "text-zinc-300"
     }`;
 
   return (
-    <div className="space-y-2">
+    <div className={ui.sectionGap}>
       <button
         type="button"
         onClick={onToggleExpanded}
-        className="flex w-full items-center justify-between gap-2 rounded-xl border border-surface-border bg-surface-raised/80 px-3 py-2.5 text-left backdrop-blur-sm transition hover:border-accent/35"
+        className={`${ui.panel} flex w-full items-center justify-between gap-2 px-2.5 py-2 text-left transition hover:border-accent/30`}
         aria-expanded={expanded}
       >
-        <span className="text-sm font-medium text-zinc-200">
+        <span className="text-xs font-medium text-zinc-200">
           {t("steering.input")}
         </span>
         <span className="shrink-0 text-[10px] text-zinc-500" aria-hidden>
@@ -136,26 +135,28 @@ export function ChatSteeringBar({
       <div
         className={
           expanded
-            ? "space-y-2"
+            ? ui.sectionGap
             : "pointer-events-none h-0 overflow-hidden opacity-0"
         }
         aria-hidden={!expanded}
       >
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1">
           {REACTIONS.map((r) => (
             <button
               key={r.id}
               type="button"
               disabled={disabled || generating}
               onClick={() => onQuickReaction(r.id)}
-              className="flex items-center gap-1 rounded-xl border border-surface-border bg-surface-raised px-3 py-2 text-sm transition hover:border-accent/40 disabled:opacity-40"
+              className={`${ui.btn} gap-1 px-2 py-1`}
               title={t(r.labelKey)}
               aria-label={t(r.labelKey)}
             >
-              <span className="text-lg leading-none" aria-hidden>
+              <span className="text-base leading-none" aria-hidden>
                 {r.emoji}
               </span>
-              <span className="text-xs text-zinc-400">{t(r.labelKey)}</span>
+              <span className="hidden text-[10px] text-zinc-400 sm:inline">
+                {t(r.labelKey)}
+              </span>
             </button>
           ))}
           <button
@@ -189,14 +190,14 @@ export function ChatSteeringBar({
 
         {children}
 
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           <textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => onInputChange(e.target.value)}
             rows={2}
             placeholder={placeholder}
-            className="flex-1 resize-none rounded-xl border border-surface-border bg-surface-raised px-3 py-2 text-base outline-none focus:border-accent"
+            className={`${ui.input} min-h-[2.75rem] flex-1 resize-none text-sm`}
             disabled={disabled || generating}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -206,11 +207,7 @@ export function ChatSteeringBar({
             }}
           />
           {generating ? (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="shrink-0 rounded-xl border border-red-500/50 bg-red-500/15 px-4 py-2 text-sm font-medium text-red-300"
-            >
+            <button type="button" onClick={onCancel} className={ui.btnDanger}>
               {t("steering.stop")}
             </button>
           ) : (
@@ -218,7 +215,7 @@ export function ChatSteeringBar({
               type="button"
               onClick={onSend}
               disabled={disabled || !input.trim()}
-              className="shrink-0 rounded-xl bg-accent px-4 py-2 text-sm font-medium text-black disabled:opacity-40"
+              className={ui.btnPrimary}
             >
               {steeringMode ? t("steering.steer") : t("steering.send")}
             </button>

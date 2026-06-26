@@ -28,6 +28,7 @@ import {
   type TimeSkipMode,
 } from "@/lib/chat/timeskip";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
+import { ui } from "@/lib/ui/classes";
 import {
   readTtsAutoplayPreference,
   TtsAutoplayToggle,
@@ -1832,7 +1833,7 @@ export function ChatView({
         <TtsMobileUnlockBar onResume={resumeBlockedTts} />
       ) : null}
 
-      <div className="safe-bottom border-t border-surface-border bg-surface px-3 py-3">
+      <div className={`${ui.dock} px-2.5 py-2`}>
         {ttsBarVisible ? (
           <TtsPlaybackBar
             label={ttsBarLabel}
@@ -1860,12 +1861,9 @@ export function ChatView({
           onActivityPause={toolsActivity?.onPause}
           activityPauseLabel={toolsActivity?.pauseLabel}
         >
-          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+          <div className="mb-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
             {ttsCloudQuota ? (
-              <span
-                className="shrink-0 rounded-full border border-surface-border px-3 py-1 text-zinc-500"
-                title={t("chat.cloudQuotaTitle")}
-              >
+              <span className={ui.chip} title={t("chat.cloudQuotaTitle")}>
                 {t("chat.cloudQuota", {
                   used: String(ttsCloudQuota.used),
                   max: String(ttsCloudQuota.max),

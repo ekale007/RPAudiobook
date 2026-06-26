@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { GeistMono } from "geist/font/mono";
+import { GeistSans } from "geist/font/sans";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PwaBootstrap } from "@/components/PwaBootstrap";
@@ -26,7 +28,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#0f0f12",
+  themeColor: "#0c0c0f",
 };
 
 export default function RootLayout({
@@ -40,7 +42,9 @@ export default function RootLayout({
         <link rel="icon" href={brand.logoSrc} type="image/png" />
         <link rel="apple-touch-icon" href={brand.logoSrc} />
       </head>
-      <body className="min-h-dvh antialiased">
+      <body
+        className={`${GeistSans.variable} ${GeistMono.variable} min-h-dvh bg-surface font-sans antialiased text-zinc-100`}
+      >
         <PwaBootstrap />
         <ServerCapabilitiesBootstrap />
         <UserPreferencesBootstrap />

@@ -323,12 +323,12 @@ export function ChatTurnBubble({
 
   return (
     <div
-      className={`mb-3 flex ${turn.role === "user" ? "justify-end" : "justify-start"} ${
-        navFocused ? "rounded-2xl ring-1 ring-accent/30" : ""
+      className={`mb-2 flex ${turn.role === "user" ? "justify-end" : "justify-start"} ${
+        navFocused ? "rounded-xl ring-1 ring-accent/25" : ""
       }`}
     >
       <div
-        className={`max-w-[92%] rounded-2xl px-4 py-2.5 text-sm transition-[box-shadow,border-color,background-color] duration-300 ${
+        className={`max-w-[92%] rounded-xl px-3 py-2 text-sm transition-[box-shadow,border-color,background-color] duration-200 ${
           turn.role === "user"
             ? "bg-accent/20 text-zinc-100"
             : ttsQueued
