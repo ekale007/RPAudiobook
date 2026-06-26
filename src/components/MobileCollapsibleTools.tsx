@@ -19,6 +19,8 @@ export function MobileCollapsibleTools({
   hint,
   children,
   defaultOpen = false,
+  open: controlledOpen,
+  onOpenChange,
   activityLabel,
   onActivityCancel,
   onActivityPause,
@@ -28,15 +30,23 @@ export function MobileCollapsibleTools({
   hint?: string;
   children: ReactNode;
   defaultOpen?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   activityLabel?: string | null;
   onActivityCancel?: () => void;
   onActivityPause?: () => void;
   activityPauseLabel?: string;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const open = controlledOpen ?? internalOpen;
   const active = Boolean(activityLabel?.trim());
 
-  const toggle = () => setOpen((v) => !v);
+  const setOpen = (next: boolean) => {
+    onOpenChange?.(next);
+    if (controlledOpen === undefined) setInternalOpen(next);
+  };
+
+  const toggle = () => setOpen(!open);
 
   return (
     <div className="mb-1.5">

@@ -512,6 +512,7 @@ export const deMessages = {
   },
   timeskip: {
     title: "Zeitsprung",
+    choose: "Zeitsprung wählen…",
     modeLabel: "Sprung-Art",
     direct: "Direkt",
     montage: "Vorschau",

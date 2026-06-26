@@ -514,6 +514,7 @@ export const enMessages: Messages = {
   },
   timeskip: {
     title: "Time skip",
+    choose: "Choose time skip…",
     modeLabel: "Skip style",
     direct: "Direct",
     montage: "Preview",

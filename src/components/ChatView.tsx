@@ -189,6 +189,7 @@ export function ChatView({
   const [turns, setTurns] = useState<TurnRow[]>([]);
   const [input, setInput] = useState("");
   const [inputExpanded, setInputExpanded] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [steeringInputMode, setSteeringInputMode] =
     useState<SteeringInputMode>("auto");
   const [generating, setGenerating] = useState(false);
@@ -1696,6 +1697,21 @@ export function ChatView({
 
   const chapterLabel = chapterTitle ?? chapter.title;
   const chapterTransitionOpen = autoChapterPhase != null;
+
+  const isMobileChatDock = () =>
+    typeof window !== "undefined" &&
+    window.matchMedia("(max-width: 767px)").matches;
+
+  const handleToolsOpenChange = (next: boolean) => {
+    setToolsOpen(next);
+    if (next && isMobileChatDock()) setInputExpanded(false);
+  };
+
+  const handleInputExpandedChange = (next: boolean) => {
+    setInputExpanded(next);
+    if (next && isMobileChatDock()) setToolsOpen(false);
+  };
+
   const chapterCloudAudio = useMemo(
     () => analyzeChapterCloudAudio(turns),
     [turns],
@@ -1845,6 +1861,8 @@ export function ChatView({
         ) : null}
         <MobileCollapsibleTools
           title={t("chat.toolsTitle")}
+          open={toolsOpen}
+          onOpenChange={handleToolsOpenChange}
           hint={
             toolsActivity
               ? undefined
@@ -1926,18 +1944,6 @@ export function ChatView({
                 />
               </>
             ) : null}
-            <Link
-              href={`/story/${storyId}`}
-              className="shrink-0 rounded-full border border-surface-border px-3 py-1 text-zinc-400"
-            >
-              {t("chat.storyLink")}
-            </Link>
-            <Link
-              href={`/story/${storyId}/voices`}
-              className="shrink-0 rounded-full border border-surface-border px-3 py-1 text-zinc-400"
-            >
-              {t("chat.voicesLink")}
-            </Link>
             {!readOnly ? (
               <Link
                 href={`/story/${storyId}/chapter`}
@@ -1990,13 +1996,13 @@ export function ChatView({
             ) : null}
             <ChatSteeringBar
               expanded={inputExpanded}
-              onToggleExpanded={() => setInputExpanded((v) => !v)}
+              onToggleExpanded={() => handleInputExpandedChange(!inputExpanded)}
               input={input}
               onInputChange={setInput}
               onSend={() => void sendMessage()}
               onQuickReaction={(id) => void sendQuickReaction(id)}
               onTimeSkip={(id, mode) => void sendTimeSkip(id, mode)}
-              onEnsureExpanded={() => setInputExpanded(true)}
+              onEnsureExpanded={() => handleInputExpandedChange(true)}
               placeholder={steeringPlaceholder}
               disabled={
                 autoSession || readOnly || chapterTransitionOpen || turns.length === 0

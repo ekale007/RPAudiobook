@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   TIME_SKIP_PRESETS,
   type TimeSkipId,
@@ -18,6 +18,7 @@ export function TimeSkipBar({
 }) {
   const { t } = useUiLocale();
   const [mode, setMode] = useState<TimeSkipMode>("direct");
+  const selectRef = useRef<HTMLSelectElement>(null);
 
   const modeBtn = (value: TimeSkipMode) =>
     `${ui.btn} px-2 py-0.5 text-[10px] ${
@@ -26,13 +27,23 @@ export function TimeSkipBar({
         : "text-zinc-400"
     }`;
 
+  const handlePresetPick = (raw: string) => {
+    if (!raw) return;
+    onTimeSkip(raw as TimeSkipId, mode);
+    if (selectRef.current) selectRef.current.selectedIndex = 0;
+  };
+
   return (
     <div className={`${ui.panelInset} p-2`}>
-      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5">
-        <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
           {t("timeskip.title")}
         </span>
-        <div className="flex items-center gap-0.5" role="group" aria-label={t("timeskip.modeLabel")}>
+        <div
+          className="flex shrink-0 items-center gap-0.5"
+          role="group"
+          aria-label={t("timeskip.modeLabel")}
+        >
           <button
             type="button"
             disabled={disabled}
@@ -52,30 +63,27 @@ export function TimeSkipBar({
             {t("timeskip.montage")}
           </button>
         </div>
+        <select
+          ref={selectRef}
+          disabled={disabled}
+          defaultValue=""
+          onChange={(e) => handlePresetPick(e.target.value)}
+          className={`${ui.input} min-h-0 flex-1 py-1.5 text-xs md:max-w-[11rem]`}
+          aria-label={t("timeskip.choose")}
+          title={
+            mode === "montage" ? t("timeskip.montageHint") : t("timeskip.directHint")
+          }
+        >
+          <option value="" disabled>
+            {t("timeskip.choose")}
+          </option>
+          {TIME_SKIP_PRESETS.map((preset) => (
+            <option key={preset.id} value={preset.id}>
+              {t(preset.labelKey)}
+            </option>
+          ))}
+        </select>
       </div>
-      <div className="flex flex-wrap gap-1">
-        {TIME_SKIP_PRESETS.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            disabled={disabled}
-            onClick={() => onTimeSkip(preset.id, mode)}
-            className={`${ui.btn} px-2 py-1 text-[10px] text-zinc-200`}
-            title={
-              mode === "montage"
-                ? t("timeskip.buttonMontageTitle", {
-                    label: t(preset.labelKey),
-                  })
-                : t("timeskip.buttonDirectTitle", { label: t(preset.labelKey) })
-            }
-          >
-            {t(preset.labelKey)}
-          </button>
-        ))}
-      </div>
-      <p className="mt-1.5 text-[10px] leading-snug text-zinc-600">
-        {mode === "montage" ? t("timeskip.montageHint") : t("timeskip.directHint")}
-      </p>
     </div>
   );
 }
