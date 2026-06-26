@@ -328,14 +328,26 @@ export async function createStoryFromSeedPack(
   return { storyId, chapterId: chapter.id as string };
 }
 
+/** All stories (incl. archived) imported from this library template. */
+export async function listLibraryImportStories(
+  templateId: LibraryTemplateId,
+): Promise<{ id: string; title: string; archived: boolean }[]> {
+  const rows = await listStories(true);
+  return rows
+    .filter((row) => getLibraryTemplateId(row.settings) === templateId)
+    .map((row) => ({
+      id: row.id,
+      title: row.title,
+      archived: isStoryArchived(row.settings),
+    }));
+}
+
 /** Active (non-archived) story for this library template, if any. */
 export async function getActiveLibraryImportStory(
   templateId: LibraryTemplateId,
 ): Promise<{ id: string; title: string } | null> {
-  const rows = await listStories(false);
-  const hit = rows.find(
-    (row) => getLibraryTemplateId(row.settings) === templateId,
-  );
+  const rows = await listLibraryImportStories(templateId);
+  const hit = rows.find((row) => !row.archived);
   return hit ? { id: hit.id, title: hit.title } : null;
 }
 
@@ -369,18 +381,11 @@ export async function importFromLibraryTemplate(
   const template = getLibraryTemplate(templateId);
   if (!template) throw new Error("Unknown library template");
 
-  const existing = await getActiveLibraryImportStory(templateId);
-  if (existing) {
-    const err = new Error("LIBRARY_TEMPLATE_ALREADY_IMPORTED") as Error & {
-      storyId: string;
-      storyTitle: string;
-    };
-    err.storyId = existing.id;
-    err.storyTitle = existing.title;
-    throw err;
-  }
-
-  const title = template.title.trim();
+  const siblings = await listLibraryImportStories(templateId);
+  const title = nextLibraryImportTitle(
+    template.title.trim(),
+    siblings.map((s) => s.title),
+  );
 
   const pack = template.loadPack();
   const locale = normalizeStoryLocale(template.locale);

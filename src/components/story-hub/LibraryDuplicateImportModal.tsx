@@ -9,11 +9,13 @@ export function LibraryDuplicateImportModal({
   storyTitle,
   storyId,
   onClose,
+  onNewPlaythrough,
 }: {
   open: boolean;
   storyTitle: string;
   storyId: string;
   onClose: () => void;
+  onNewPlaythrough: () => void;
 }) {
   const { t } = useUiLocale();
 
@@ -27,20 +29,27 @@ export function LibraryDuplicateImportModal({
       <p className="mb-4 text-sm text-zinc-300">
         {t("library.duplicateBody", { title: storyTitle })}
       </p>
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="flex flex-col gap-2">
         <button
           type="button"
-          onClick={onClose}
-          className="flex-1 rounded-xl border border-surface-border py-2.5 text-sm text-zinc-300"
+          onClick={onNewPlaythrough}
+          className="rounded-xl bg-accent py-2.5 text-sm font-medium text-zinc-950"
         >
-          {t("library.duplicateDismiss")}
+          {t("library.duplicateNewPlaythrough")}
         </button>
         <Link
           href={`/story/${storyId}`}
-          className="flex-1 rounded-xl bg-accent py-2.5 text-center text-sm font-medium text-zinc-950"
+          className="rounded-xl border border-surface-border py-2.5 text-center text-sm text-zinc-300"
         >
           {t("library.duplicateOpen")}
         </Link>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-xl border border-transparent py-2 text-sm text-zinc-500"
+        >
+          {t("library.duplicateDismiss")}
+        </button>
       </div>
     </OverlayPanel>
   );

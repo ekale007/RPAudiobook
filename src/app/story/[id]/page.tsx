@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { StoryHubView } from "@/components/story-hub/StoryHubView";
-import { getStoryConcept } from "@/lib/story/storyOrigin";
+import { getStoryConcept, getLibraryTemplateId } from "@/lib/story/storyOrigin";
 import { useStorySession } from "@/lib/story/useStorySession";
 import type { StoryCharacterCard } from "@/lib/types";
 import {
@@ -138,6 +138,8 @@ export default function StoryHubPage() {
         activeChapterId={activeChapter?.id}
         onCastUpdated={load}
         onLocaleUpdated={load}
+        onConceptSaved={load}
+        libraryTemplateId={getLibraryTemplateId(storySettings)}
         error={error}
         editingTitle={editingTitle}
         titleDraft={titleDraft}

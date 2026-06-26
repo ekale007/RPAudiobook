@@ -3,6 +3,8 @@
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { CastHubPanel } from "@/components/story-hub/CastHubPanel";
+import { StoryHubEditSection } from "@/components/story-hub/StoryHubEditSection";
+import { StoryHubLibrarySection } from "@/components/story-hub/StoryHubLibrarySection";
 import { StoryLocaleSection } from "@/components/story-hub/StoryLocaleSection";
 import { StoryCoverEditor } from "@/components/StoryCoverEditor";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
@@ -12,6 +14,8 @@ import {
   isPlotStateEmpty,
   isPlotStatePlaceholder,
 } from "@/lib/memory/plotState";
+import type { LibraryTemplateId } from "@/lib/story/libraryTemplates";
+import { getLibraryTemplate } from "@/lib/story/libraryTemplates";
 import { ui } from "@/lib/ui/classes";
 
 type HubTab = "story" | "cast" | "settings";
@@ -109,6 +113,8 @@ export function StoryHubView({
   onToggleSummary,
   onCastUpdated,
   onLocaleUpdated,
+  onConceptSaved,
+  libraryTemplateId,
 }: {
   storyId: string;
   userId: string | null;
@@ -139,6 +145,8 @@ export function StoryHubView({
   onToggleSummary: (id: string | null) => void;
   onCastUpdated?: () => void;
   onLocaleUpdated?: () => void;
+  onConceptSaved?: () => void;
+  libraryTemplateId?: string | null;
 }) {
   const { t } = useUiLocale();
   const [tab, setTab] = useState<HubTab>("story");
@@ -158,6 +166,9 @@ export function StoryHubView({
   );
 
   const plotState = storySettings.plotState;
+  const libraryTemplate = libraryTemplateId
+    ? getLibraryTemplate(libraryTemplateId as LibraryTemplateId)
+    : null;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-hidden">
@@ -219,6 +230,21 @@ export function StoryHubView({
                 onTitleDraftChange={onTitleDraftChange}
                 onSaveTitle={onSaveTitle}
                 onCancelRename={onCancelRename}
+              />
+            ) : null}
+
+            <StoryHubEditSection
+              storyId={storyId}
+              storyConcept={storyConcept}
+              onConceptSaved={onConceptSaved}
+            />
+
+            {libraryTemplateId && userId && libraryTemplate ? (
+              <StoryHubLibrarySection
+                storyId={storyId}
+                userId={userId}
+                templateId={libraryTemplateId as LibraryTemplateId}
+                templateTitle={libraryTemplate.title}
               />
             ) : null}
 
@@ -416,6 +442,16 @@ export function StoryHubView({
               href={`/story/${storyId}/world`}
               title={t("storyHub.worldTitle")}
               description={t("storyHub.worldDesc")}
+            />
+            <SettingsLink
+              href={`/story/${storyId}/cards`}
+              title={t("storyHub.cardsTitle")}
+              description={t("storyHub.cardsDesc")}
+            />
+            <SettingsLink
+              href={`/story/${storyId}/voices`}
+              title={t("storyHub.voicesTitle")}
+              description={t("storyHub.voicesDesc")}
             />
             <SettingsLink
               href={`/story/${storyId}/memory`}

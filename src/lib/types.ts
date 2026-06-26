@@ -108,6 +108,8 @@ export interface StorySettings {
   plotState?: StoryPlotState | null;
   /** Player-pinned facts for the narrator */
   pinnedNotes?: StoryPin[];
+  /** Short pitch / logline — overrides template default in prompts */
+  storyConcept?: string | null;
 }
 
 export const DEFAULT_STORY_SETTINGS: StorySettings = {
