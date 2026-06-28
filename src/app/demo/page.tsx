@@ -106,61 +106,23 @@ export default function DemoPage() {
           TTS-Autoplay, Mobile PWA.
         </p>
 
-        {/* Video placeholder — when video is uploaded, swap this div for a <video> */}
+        {/* Video placeholder — final <video> tag will be added once the iPhone recording is done. */}
         <div className="overflow-hidden rounded-2xl border border-surface-border bg-surface-raised/60">
           <div className="relative aspect-video w-full bg-gradient-to-br from-violet-950/40 via-surface to-surface">
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
               <div className="text-5xl">🎬</div>
-              <p className="px-4 text-sm text-zinc-300">
-                Video wird hochgeladen, sobald die Aufnahme fertig ist.
+              <p className="px-4 text-base font-medium text-zinc-200">
+                Video-Demo kommt bald.
               </p>
-              <p className="px-4 text-xs text-zinc-500">
-                Empfohlen: iPhone-Bildschirmaufnahme in Querformat, 60-90 Sek,
-                mit Kopfhörer-Audio.
+              <p className="px-4 max-w-md text-xs text-zinc-500">
+                Wir nehmen gerade eine echte iPhone-Session auf (Login,
+                Bibliothek, Chat mit TTS-Autoplay, Mobile PWA). Bis dahin
+                kannst du dir die Audio-Samples unten anhören oder den
+                Chat-Verlauf lesen.
               </p>
             </div>
           </div>
         </div>
-
-        <details className="mt-4 rounded-lg border border-surface-border bg-surface-raised/40 p-4 text-sm">
-          <summary className="cursor-pointer font-medium text-zinc-300">
-            Aufnahme-Anleitung
-          </summary>
-          <ol className="mt-3 space-y-2 text-zinc-400">
-            <li>
-              <strong className="text-zinc-200">1. iPhone vorbereiten:</strong>{" "}
-              Einstellungen → Kontrollzentrum → Bildschirmaufnahme hinzufügen.
-            </li>
-            <li>
-              <strong className="text-zinc-200">2. Nicht stören + Wischen
-              ausschalten</strong> damit nichts die Aufnahme unterbricht.
-            </li>
-            <li>
-              <strong className="text-zinc-200">3. Querformat</strong>{" "}
-              (iPhone drehen) — sieht auf YouTube/Social besser aus.
-            </li>
-            <li>
-              <strong className="text-zinc-200">4. Kopfhörer mit Kabel</strong>{" "}
-              verwenden — bessere Audio-Qualität beim Dreh.
-            </li>
-            <li>
-              <strong className="text-zinc-200">5. Demo-Skript</strong>{" "}
-              abspulen: Login → Bibliothek → Story öffnen → 2-3 Chat-Turns
-              → TTS-Autoplay zeigen → Sperrbildschirm-Modus.
-            </li>
-            <li>
-              <strong className="text-zinc-200">6. Upload:</strong> Datei nach{" "}
-              <code className="rounded bg-surface px-1 py-0.5 text-xs">
-                public/demo/
-              </code>{" "}
-              legen (z.B.{" "}
-              <code className="rounded bg-surface px-1 py-0.5 text-xs">
-                public/demo/tour.mp4
-              </code>
-              ) und oben einbauen.
-            </li>
-          </ol>
-        </details>
       </section>
 
       {/* Audio samples */}

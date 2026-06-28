@@ -1,8 +1,13 @@
-/** Fish Audio S2-Pro — POST https://api.fish.audio/v1/tts */
+/** Fish Audio — POST https://api.fish.audio/v1/tts
+ *  Models: s1 (legacy), s2-pro, s2.1-pro (paid), s2.1-pro-free (free dev tier) */
 
 import type { VoiceMap } from "@/lib/types";
 
-export type FishAudioModel = "s2-pro" | "s1";
+export type FishAudioModel =
+  | "s2.1-pro-free"
+  | "s2.1-pro"
+  | "s2-pro"
+  | "s1";
 
 export const FISH_AUDIO_MODEL_OPTIONS: Array<{
   id: FishAudioModel;
@@ -10,14 +15,24 @@ export const FISH_AUDIO_MODEL_OPTIONS: Array<{
   hint: string;
 }> = [
   {
+    id: "s2.1-pro-free",
+    label: "S2.1 Pro (Free)",
+    hint: "Kostenlose Dev-Tarif · perfekt zum Testen",
+  },
+  {
+    id: "s2.1-pro",
+    label: "S2.1 Pro",
+    hint: "Neuestes Modell · $15/1M UTF-8 Bytes",
+  },
+  {
     id: "s2-pro",
     label: "S2-Pro",
-    hint: "~$15/M UTF-8 Bytes · Emotion-Tags [whisper]",
+    hint: "Vorherige Generation · $15/1M Bytes · [whisper] Emotion-Tags",
   },
   {
     id: "s1",
     label: "S1",
-    hint: "~$15/M · (parenthesis) Emotion-Tags",
+    hint: "$15/1M · (parenthesis) Emotion-Tags",
   },
 ];
 
@@ -25,12 +40,20 @@ export const FISH_AUDIO_MODEL_OPTIONS: Array<{
 export const DEFAULT_FISH_AUDIO_REFERENCE_ID =
   "802e3bc2b27e49c2995d23ef70e6ac89";
 
-export const DEFAULT_FISH_AUDIO_MODEL: FishAudioModel = "s2-pro";
+/** Default to the free tier so new users can try TTS without paying. */
+export const DEFAULT_FISH_AUDIO_MODEL: FishAudioModel = "s2.1-pro-free";
 
 export function normalizeFishAudioModel(model?: string | null): FishAudioModel {
   const trimmed = model?.trim();
-  if (trimmed === "s1") return "s1";
-  return "s2-pro";
+  if (
+    trimmed === "s1" ||
+    trimmed === "s2-pro" ||
+    trimmed === "s2.1-pro" ||
+    trimmed === "s2.1-pro-free"
+  ) {
+    return trimmed;
+  }
+  return DEFAULT_FISH_AUDIO_MODEL;
 }
 
 /** Fish model / reference_id (hex, typically 32 chars). */
