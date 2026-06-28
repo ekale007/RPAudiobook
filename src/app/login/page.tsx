@@ -120,13 +120,26 @@ function LoginForm() {
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-3 p-4">
+      <div className="flex flex-1 flex-col gap-3 p-4">
       {view === "sign-in" ? (
         <form onSubmit={signInPassword} className="flex flex-col gap-3">
           {inviteOnly ? (
-            <p className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-xs leading-relaxed text-violet-200">
-              {t("login.betaPitch")}
-            </p>
+            <>
+              <p className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-xs leading-relaxed text-violet-200">
+                {t("login.betaPitch")}
+              </p>
+              <p className="rounded-lg border border-surface-border bg-surface-raised/40 px-3 py-2 text-xs leading-relaxed text-zinc-400">
+                <strong className="text-zinc-300">Keinen Invite?</strong>{" "}
+                Trag dich auf die{" "}
+                <a
+                  href="/waitlist"
+                  className="text-accent underline hover:text-accent/80"
+                >
+                  Warteliste
+                </a>{" "}
+                ein. Wir öffnen die Beta schrittweise.
+              </p>
+            </>
           ) : (
             <p className="text-xs text-zinc-500">{t("login.signInPitch")}</p>
           )}
