@@ -101,16 +101,22 @@ export default function WelcomePage() {
             </p>
             <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
-                href="/login"
+                href="/demo"
                 className="w-full rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-black transition hover:bg-accent/90 sm:w-auto"
               >
-                Zur App (Invite nötig)
+                ▶ Demo anhören
               </Link>
               <Link
                 href="/waitlist"
-                className="w-full rounded-lg border border-surface-border bg-surface-raised px-6 py-3 text-sm font-semibold transition hover:border-zinc-600 sm:w-auto"
+                className="w-full rounded-lg border border-violet-400/40 bg-violet-500/15 px-6 py-3 text-sm font-semibold text-violet-100 transition hover:bg-violet-500/25 sm:w-auto"
               >
                 Auf die Warteliste
+              </Link>
+              <Link
+                href="/login"
+                className="w-full rounded-lg border border-surface-border bg-surface-raised px-6 py-3 text-sm font-semibold transition hover:border-zinc-600 sm:w-auto"
+              >
+                Login mit Invite
               </Link>
             </div>
             <p className="mt-4 text-xs text-zinc-500">
@@ -118,7 +124,8 @@ export default function WelcomePage() {
               <Link href="/login" className="text-accent underline">
                 /login
               </Link>
-              . Keiner? Trag dich auf der Warteliste ein.
+              . Keiner? Trag dich auf der Warteliste ein oder hör dir die Demo
+              an.
             </p>
           </div>
         </div>

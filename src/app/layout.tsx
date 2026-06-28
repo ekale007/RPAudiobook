@@ -12,6 +12,7 @@ import { UiLocaleProvider } from "@/lib/i18n/UiLocaleProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://rp-audiobook.vercel.app"),
   title: {
     default: brand.productName,
     template: `%s — ${brand.productName}`,
