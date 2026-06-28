@@ -405,6 +405,8 @@ export const enMessages: Messages = {
     worldDesc: "Maintain lore entries, keys, and world description",
     memoryTitle: "Story memory",
     memoryDesc: "Maintain plot state and pinned notes",
+    timelineTitle: "Story timeline",
+    timelineDesc: "Chronological event log with filters",
     pronunciationTitle: "Pronunciation hub",
     pronunciationDesc: "Test and store phonetic names",
     closeChapterTitle: "Close chapter",

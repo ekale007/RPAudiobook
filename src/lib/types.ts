@@ -63,6 +63,7 @@ import type { StorySoundscape } from "@/lib/audio/soundscape";
 import type { TtsProvider } from "@/lib/storage/ttsSettings";
 import type { StoryPlotState } from "@/lib/memory/plotState";
 import type { StoryPin } from "@/lib/memory/storyPins";
+import type { StoryTimeline } from "@/lib/memory/storyTimeline";
 
 /** Per-provider cast voice maps — `local-kokoro` / `local-qwen` when provider is `local`. */
 export type VoiceMapStorageKey =
@@ -108,6 +109,8 @@ export interface StorySettings {
   plotState?: StoryPlotState | null;
   /** Player-pinned facts for the narrator */
   pinnedNotes?: StoryPin[];
+  /** Phase 3: chronological event log used by the timeline page */
+  timeline?: StoryTimeline | null;
   /** Short pitch / logline — overrides template default in prompts */
   storyConcept?: string | null;
 }

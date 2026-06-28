@@ -403,6 +403,8 @@ export const deMessages = {
     worldDesc: "Lore-Einträge, Keys und Weltbeschreibung pflegen",
     memoryTitle: "Story-Gedächtnis",
     memoryDesc: "Plot-State und Pinnpunkte pflegen",
+    timelineTitle: "Story-Zeitschiene",
+    timelineDesc: "Chronologische Ereignis-Übersicht mit Filtern",
     pronunciationTitle: "Aussprache-Zentrale",
     pronunciationDesc: "Phonetische Namen testen und hinterlegen",
     closeChapterTitle: "Kapitel schließen",

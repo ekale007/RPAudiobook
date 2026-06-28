@@ -8,8 +8,10 @@ import { useStorySession } from "@/lib/story/useStorySession";
 import {
   getStoryOverview,
   getTurns,
+  listCharacters,
   updateStorySettings,
 } from "@/lib/db/stories";
+import type { CharacterRow } from "@/lib/db/stories";
 import { extractPlotState, PlotStateExtractError } from "@/lib/memory/plotState";
 import {
   EMPTY_PLOT_STATE,
@@ -22,6 +24,10 @@ import {
   type ThreatStatus,
 } from "@/lib/memory/plotState";
 import { newStoryPin, type StoryPin } from "@/lib/memory/storyPins";
+import {
+  parseCharacterMemory,
+  type CharacterSheet,
+} from "@/lib/memory/characterMemory";
 import { loadOpenRouterSettings } from "@/lib/storage/openRouterSettings";
 import { formatLlmLimitError } from "@/components/LlmUsagePanel";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
@@ -136,6 +142,10 @@ export default function StoryMemoryPage() {
   const [plot, setPlot] = useState<StoryPlotState>({ ...EMPTY_PLOT_STATE });
   const [pins, setPins] = useState<StoryPin[]>([]);
   const [newPinText, setNewPinText] = useState("");
+  // Phase 3c: structured cast sheets for the read-only character cards on this
+  // page. Editable character cards live on /story/[id]/cast — here we just want
+  // a glance-friendly view of what the LLM currently knows.
+  const [cast, setCast] = useState<CharacterRow[]>([]);
 
   const [presentText, setPresentText] = useState("");
   const [absentText, setAbsentText] = useState("");
@@ -160,6 +170,15 @@ export default function StoryMemoryPage() {
     setPublicText(listToLines(ps.publicKnowledge));
 
     setPins(overview.storySettings.pinnedNotes ?? []);
+
+    // Phase 3c: pull cast rows so we can render the structured sheet cards.
+    // listCharacters is the same data source the chat loop uses.
+    try {
+      const rows = await listCharacters(storyId);
+      setCast(rows.filter((c) => c.role === "cast"));
+    } catch {
+      setCast([]);
+    }
   }, [storyId]);
 
   const { authReady } = useStorySession(router);
@@ -559,6 +578,8 @@ export default function StoryMemoryPage() {
           Plot &amp; Pinnpunkte speichern
         </button>
 
+        <CastSheetSection cast={cast} />
+
         {notice ? <p className="text-sm text-green-400/90">{notice}</p> : null}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
 
@@ -570,5 +591,170 @@ export default function StoryMemoryPage() {
         </Link>
       </div>
     </main>
+  );
+}
+
+/**
+ * Phase 3c: structured character cards. Read-only on this page — full
+ * editing lives on /story/[id]/cast. We just want a glance-friendly view of
+ * what the LLM currently knows about each named character.
+ */
+function CastSheetSection({ cast }: { cast: CharacterRow[] }) {
+  const active = cast.filter((c) => (c.status ?? "active") === "active");
+  const archived = cast.filter((c) => c.status === "archived");
+
+  if (!cast.length) {
+    return (
+      <section className="rounded-xl border border-surface-border bg-surface-raised/40 p-4">
+        <h2 className="mb-1 text-sm font-medium text-accent">Figuren</h2>
+        <p className="text-xs text-zinc-500">
+          Noch keine Figuren erfasst. Sobald du chattest, legt die KI sie hier an.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-xl border border-surface-border bg-surface-raised/40 p-4">
+      <h2 className="mb-3 text-sm font-medium text-accent">
+        Figuren ({active.length} aktiv{archived.length ? `, ${archived.length} archiviert` : ""})
+      </h2>
+      <ul className="space-y-2">
+        {active.map((c) => (
+          <CastSheetCard key={c.id} character={c} archived={false} />
+        ))}
+        {archived.map((c) => (
+          <CastSheetCard key={c.id} character={c} archived />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function CastSheetCard({
+  character,
+  archived,
+}: {
+  character: CharacterRow;
+  archived: boolean;
+}) {
+  const { sheet, rawText } = parseCharacterMemory(character.character_memory);
+  const initials = character.name
+    .split(/\s+/)
+    .map((s) => s[0]?.toUpperCase() ?? "")
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("") || "?";
+
+  const statusTone = archived
+    ? "border-zinc-700/50 bg-zinc-800/40 text-zinc-300"
+    : "border-emerald-500/30 bg-emerald-500/5 text-emerald-100";
+
+  return (
+    <li
+      className={`rounded-lg border p-3 ${statusTone}`}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={`flex h-9 w-9 flex-none items-center justify-center rounded-full border text-xs font-semibold ${
+            archived
+              ? "border-zinc-700 bg-zinc-800 text-zinc-400"
+              : "border-emerald-500/40 bg-emerald-500/15 text-emerald-200"
+          }`}
+          aria-hidden
+        >
+          {initials}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <h3 className="text-sm font-medium">{character.name}</h3>
+            <span className="text-[10px] text-zinc-500">
+              {archived ? "archiviert" : "aktiv"}
+            </span>
+            {sheet?.status && sheet.status !== "unknown" ? (
+              <span className="rounded border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300">
+                {sheet.status}
+              </span>
+            ) : null}
+            {sheet?.role ? (
+              <span className="text-[11px] text-zinc-400">· {sheet.role}</span>
+            ) : null}
+            {sheet?.lastUpdatedAt ? (
+              <span className="ml-auto text-[10px] text-zinc-500">
+                Sync {new Date(sheet.lastUpdatedAt).toLocaleString("de-DE", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            ) : null}
+          </div>
+
+          {sheet ? (
+            <div className="mt-2 grid gap-1.5 text-[11px] sm:grid-cols-2">
+              {sheet.location ? (
+                <SheetRow label="Ort" value={sheet.location} />
+              ) : null}
+              {sheet.attitude ? (
+                <SheetRow label="Haltung" value={sheet.attitude} />
+              ) : null}
+              {sheet.relationships?.length ? (
+                <SheetRow
+                  label="Beziehungen"
+                  value={sheet.relationships
+                    .map((r) => `${r.slug} (${r.type})`)
+                    .join(", ")}
+                />
+              ) : null}
+              {sheet.inventory?.length ? (
+                <SheetRow
+                  label="Inventar"
+                  value={sheet.inventory.join(", ")}
+                />
+              ) : null}
+              {sheet.knownFacts?.length ? (
+                <SheetRow
+                  label="Weiß"
+                  value={sheet.knownFacts.join(" · ")}
+                />
+              ) : null}
+              {sheet.lastScene ? (
+                <SheetRow
+                  label="Letzte Szene"
+                  value={sheet.lastScene}
+                  className="sm:col-span-2"
+                />
+              ) : null}
+            </div>
+          ) : rawText ? (
+            <p className="mt-2 text-[11px] leading-relaxed text-zinc-300">
+              {rawText}
+            </p>
+          ) : (
+            <p className="mt-2 text-[11px] italic text-zinc-500">
+              Noch keine Notizen — füllt sich beim nächsten Chat-Sync.
+            </p>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function SheetRow({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <span className="text-zinc-500">{label}: </span>
+      <span className="text-zinc-200">{value}</span>
+    </div>
   );
 }
