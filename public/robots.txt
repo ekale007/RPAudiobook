@@ -1,0 +1,26 @@
+# RP Audiobook - robots.txt
+# https://rp-audiobook.vercel.app
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /account/
+Disallow: /settings/
+Disallow: /signup/
+Disallow: /story/*/chat
+Disallow: /story/*/chapter
+Disallow: /story/*/cast
+Disallow: /story/*/voices
+Disallow: /story/*/cards
+Disallow: /story/*/memory
+Disallow: /story/*/world
+Disallow: /story/*/export
+Disallow: /story/*/pronunciation
+Disallow: /auth/
+
+# Sitemap location
+Sitemap: https://rp-audiobook.vercel.app/sitemap.xml
+
+# Crawl-delay for politeness
+Crawl-delay: 1

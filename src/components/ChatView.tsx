@@ -1361,6 +1361,24 @@ export function ChatView({
     let prefetched: Promise<DrivePrefetchResult> | null = null;
 
     try {
+      // Drive-start: read the last existing assistant bubble first
+      // (if any), so the user catches up on context before the next turn.
+      // If no assistant turn exists yet (fresh story with drive on), this
+      // is a no-op and the loop below generates + reads the first one.
+      const initialAssistants = history.filter(
+        (t) => t.role === "assistant" && !t.id.startsWith("tmp-"),
+      );
+      if (initialAssistants.length > 0 && Date.now() < endAt) {
+        const seedResult = await waitForLatestAssistantTts(history, {
+          forDrive: true,
+        });
+        if (autoSessionStopRef.current) return;
+        if (!handleDriveTtsResult(seedResult)) return;
+        history = await getTurns(chapterId);
+        setTurns(history);
+        await waitWhileDrivePaused();
+      }
+
       while (Date.now() < endAt && !autoSessionStopRef.current) {
         await waitWhileDrivePaused();
         if (autoSessionStopRef.current) break;

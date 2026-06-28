@@ -7,6 +7,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { brand } from "@/lib/brand";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import { isLocalMode } from "@/lib/deploymentMode";
+import { isInviteOnlyBeta } from "@/lib/auth/betaAuth";
 
 export function AppHeader({
   title,
@@ -63,6 +64,16 @@ export function AppHeader({
 
         <div className="flex flex-1 items-center justify-end gap-1.5 sm:gap-2">
           <LanguageSwitcher compact />
+          {isInviteOnlyBeta() ? (
+            <Link
+              href="/waitlist"
+              className="shrink-0 rounded-md border border-violet-400/40 bg-violet-500/15 px-2 py-1 text-[10px] font-medium text-violet-200 transition hover:border-violet-400/60 hover:bg-violet-500/25 sm:text-xs"
+              aria-label="Auf die Warteliste"
+            >
+              <span className="hidden sm:inline">Warteliste</span>
+              <span className="sm:hidden">β+</span>
+            </Link>
+          ) : null}
           {!isLocalMode() ? (
             <Link
               href="/account"

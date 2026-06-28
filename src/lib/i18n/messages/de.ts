@@ -19,6 +19,10 @@ export const deMessages = {
       "Melde dich an, um Geschichten zu speichern und auf Handy oder PC weiterzuhören. Chat, Stimmen und Verbrauch laufen über RP Audiobook — kein eigener API-Key nötig.",
     signIn: "Anmelden",
     signUp: "Registrieren",
+    waitlist: "Auf die Warteliste",
+    inviteOnlyHint:
+      "Du brauchst einen Invite, um dich anzumelden. Trag dich auf die Warteliste ein, oder lies mehr auf der Übersichtsseite.",
+    learnMore: "Mehr über RP Audiobook",
     loading: "Lade…",
     yourStories: "Deine Geschichten",
     archive: "Archiv",
@@ -208,7 +212,7 @@ export const deMessages = {
     saved: "Gespeichert",
     ttsTitle: "Sprachausgabe (TTS)",
     ttsHint:
-      "ElevenLabs = Premium. OpenRouter TTS = günstige Cloud-Modelle (Gemini, Kokoro, Voxtral). Fish Audio = S2-Pro mit Emotion-Tags wie [whisper]. fal.ai = Kokoro, Inworld, Eleven v3, MiniMax. Cast-Stimmen pro Story unter Figuren-Stimmen.",
+      "ElevenLabs = Premium. OpenRouter TTS = günstige Cloud-Modelle (Gemini, Kokoro, Voxtral). Fish Audio = S2.1 Pro mit Emotion-Tags wie [whisper] — jetzt auch im kostenlosen Dev-Tarif verfügbar. fal.ai = Kokoro, Inworld, Eleven v3, MiniMax. Cast-Stimmen pro Story unter Figuren-Stimmen.",
     narratorVoice: "Erzähler-Stimme",
     voiceAutoSave: "Stimme wird beim Auswählen automatisch gespeichert.",
     ttsModel: "TTS-Modell",
@@ -227,7 +231,7 @@ export const deMessages = {
     fishInactive:
       "Fish Audio nicht aktiv — FISH_AUDIO_API_KEY in Vercel/.env setzen.",
     fishActive:
-      "Fish Audio S2-Pro aktiv — Emotion-Tags inline, z. B. [excited] oder [whisper]. API braucht Guthaben auf deinem Fish-Konto (Billing) — sonst Fehler 402.",
+      "Fish Audio S2.1 Pro aktiv — Emotion-Tags inline, z. B. [excited] oder [whisper]. Der Free-Tarif (s2.1-pro-free) ist für Entwicklung & Tests kostenlos; produktive Nutzung erfordert Guthaben auf deinem Fish-Konto — sonst Fehler 402.",
     model: "Modell",
     falInactive:
       "fal.ai nicht aktiv — FAL_API_KEY oder FAL_KEY in Vercel/.env setzen.",

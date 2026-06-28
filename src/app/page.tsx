@@ -29,6 +29,7 @@ import {
   localDeploymentUserId,
 } from "@/lib/deploymentMode";
 import { ui } from "@/lib/ui/classes";
+import { isInviteOnlyBeta } from "@/lib/auth/betaAuth";
 import type { User } from "@supabase/supabase-js";
 
 function StorySkeletonList() {
@@ -174,23 +175,53 @@ export default function HomePage() {
       <main className="flex min-h-dvh flex-col">
         <AppHeader title="" showBrand />
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-5 p-6">
-          <p className="text-center text-sm leading-relaxed text-zinc-300">
-            {t("home.guestPitch")}
-          </p>
-          <div className="flex flex-col gap-2">
-            <Link
-              href="/login"
-              className={`${ui.btnPrimary} justify-center py-2.5 text-sm`}
-            >
-              {t("home.signIn")}
-            </Link>
-            <Link
-              href="/signup"
-              className={`${ui.btn} justify-center py-2.5 text-sm`}
-            >
-              {t("home.signUp")}
-            </Link>
-          </div>
+          {isInviteOnlyBeta() ? (
+            <>
+              <p className="text-center text-sm leading-relaxed text-zinc-300">
+                {t("home.inviteOnlyHint")}
+              </p>
+              <div className="flex flex-col gap-2">
+                <Link
+                  href="/login"
+                  className={`${ui.btnAccent} justify-center py-2.5 text-sm`}
+                >
+                  {t("home.signIn")}
+                </Link>
+                <Link
+                  href="/waitlist"
+                  className={`${ui.btnPrimary} justify-center py-2.5 text-sm`}
+                >
+                  {t("home.waitlist")}
+                </Link>
+                <Link
+                  href="/welcome"
+                  className={`${ui.btn} justify-center py-2.5 text-sm`}
+                >
+                  {t("home.learnMore")}
+                </Link>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-center text-sm leading-relaxed text-zinc-300">
+                {t("home.guestPitch")}
+              </p>
+              <div className="flex flex-col gap-2">
+                <Link
+                  href="/login"
+                  className={`${ui.btnPrimary} justify-center py-2.5 text-sm`}
+                >
+                  {t("home.signIn")}
+                </Link>
+                <Link
+                  href="/signup"
+                  className={`${ui.btn} justify-center py-2.5 text-sm`}
+                >
+                  {t("home.signUp")}
+                </Link>
+              </div>
+            </>
+          )}
         </div>
         <LegalFooter className="mt-auto" />
       </main>

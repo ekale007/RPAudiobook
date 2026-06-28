@@ -21,6 +21,10 @@ export const enMessages: Messages = {
       "Sign in to save stories and continue on phone or desktop. Chat, voices, and usage run through RP Audiobook — no API key required.",
     signIn: "Sign in",
     signUp: "Sign up",
+    waitlist: "Join the waitlist",
+    inviteOnlyHint:
+      "You need an invite to sign in. Join the waitlist, or read more on the welcome page.",
+    learnMore: "More about RP Audiobook",
     loading: "Loading…",
     yourStories: "Your stories",
     archive: "Archive",
@@ -229,7 +233,7 @@ export const enMessages: Messages = {
     fishInactive:
       "Fish Audio not active — set FISH_AUDIO_API_KEY in Vercel/.env.",
     fishActive:
-      "Fish Audio S2-Pro active — inline emotion tags, e.g. [excited] or [whisper]. API needs balance on your Fish account (billing) — otherwise error 402.",
+      "Fish Audio S2.1 Pro active — inline emotion tags, e.g. [excited] or [whisper]. The free tier (s2.1-pro-free) is available for development & testing at no cost; production use needs balance on your Fish account — otherwise error 402.",
     model: "Model",
     falInactive:
       "fal.ai not active — set FAL_API_KEY or FAL_KEY in Vercel/.env.",
