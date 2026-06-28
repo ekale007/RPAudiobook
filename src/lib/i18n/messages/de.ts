@@ -19,6 +19,10 @@ export const deMessages = {
       "Melde dich an, um Geschichten zu speichern und auf Handy oder PC weiterzuhören. Chat, Stimmen und Verbrauch laufen über RP Audiobook — kein eigener API-Key nötig.",
     signIn: "Anmelden",
     signUp: "Registrieren",
+    waitlist: "Auf die Warteliste",
+    inviteOnlyHint:
+      "Du brauchst einen Invite, um dich anzumelden. Trag dich auf die Warteliste ein, oder lies mehr auf der Übersichtsseite.",
+    learnMore: "Mehr über RP Audiobook",
     loading: "Lade…",
     yourStories: "Deine Geschichten",
     archive: "Archiv",

@@ -21,6 +21,10 @@ export const enMessages: Messages = {
       "Sign in to save stories and continue on phone or desktop. Chat, voices, and usage run through RP Audiobook — no API key required.",
     signIn: "Sign in",
     signUp: "Sign up",
+    waitlist: "Join the waitlist",
+    inviteOnlyHint:
+      "You need an invite to sign in. Join the waitlist, or read more on the welcome page.",
+    learnMore: "More about RP Audiobook",
     loading: "Loading…",
     yourStories: "Your stories",
     archive: "Archive",
