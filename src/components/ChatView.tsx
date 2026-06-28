@@ -65,7 +65,6 @@ import { summarizeChapter } from "@/lib/chapter/summarize";
 import { resolveChapterIntro } from "@/lib/chapter/chapterIntro";
 import { shouldAutoCreateNextChapter } from "@/lib/chapter/autoChapter";
 import { ChapterProgressBar } from "@/components/ChapterProgressBar";
-import { MemoryStatusBar } from "@/components/MemoryStatusBar";
 import {
   analyzeChapterCloudAudio,
   exportChapterAudioFromCloud,
@@ -1892,14 +1891,25 @@ export function ChatView({
       }}
     >
       {!readOnly && turns.length > 0 ? (
-        <ChapterProgressBar rows={turns} />
-      ) : null}
-      {!readOnly ? (
-        <MemoryStatusBar
-          plot={plotState}
-          castCount={allCast.length}
-          pinsCount={storySettings.pinnedNotes?.length ?? 0}
-          syncing={memorySyncActive || castSyncActive}
+        <ChapterProgressBar
+          rows={turns}
+          storyId={storyId}
+          memory={{
+            plot: plotState,
+            castCount: allCast.length,
+            pinsCount: storySettings.pinnedNotes?.length ?? 0,
+            syncing: memorySyncActive || castSyncActive,
+          }}
+          closeChapter={
+            turns.length > 0
+              ? {
+                  label: t("chat.closeChapter"),
+                  busyLabel: t("common.saving") || t("chat.closingChapter") || "…",
+                  busy: false,
+                  onClick: () => router.push(`/story/${storyId}/chapter`),
+                }
+              : undefined
+          }
         />
       ) : null}
 
@@ -2081,14 +2091,6 @@ export function ChatView({
                   }}
                 />
               </>
-            ) : null}
-            {!readOnly ? (
-              <Link
-                href={`/story/${storyId}/chapter`}
-                className="shrink-0 rounded-full border border-surface-border px-3 py-1 text-zinc-400"
-              >
-                {t("chat.closeChapter")}
-              </Link>
             ) : null}
             <button
               type="button"
