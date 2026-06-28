@@ -129,6 +129,11 @@ export function StoryHubEditSection({
           title={t("storyHub.memoryTitle")}
           description={t("storyHub.memoryDesc")}
         />
+        <EditLink
+          href={`/story/${storyId}/timeline`}
+          title={t("storyHub.timelineTitle")}
+          description={t("storyHub.timelineDesc")}
+        />
       </div>
     </section>
   );

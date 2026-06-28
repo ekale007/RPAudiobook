@@ -65,6 +65,7 @@ import { summarizeChapter } from "@/lib/chapter/summarize";
 import { resolveChapterIntro } from "@/lib/chapter/chapterIntro";
 import { shouldAutoCreateNextChapter } from "@/lib/chapter/autoChapter";
 import { ChapterProgressBar } from "@/components/ChapterProgressBar";
+import { MemoryStatusBar } from "@/components/MemoryStatusBar";
 import {
   analyzeChapterCloudAudio,
   exportChapterAudioFromCloud,
@@ -76,6 +77,7 @@ import {
 import { extractCharacterMemoryUpdates } from "@/lib/memory/characterMemory";
 import { extractPlotState } from "@/lib/memory/plotState";
 import type { StoryPlotState } from "@/lib/memory/plotState";
+import { extractTimeline, type StoryTimeline } from "@/lib/memory/storyTimeline";
 import type {
   ChatTurn,
   LoreEntry,
@@ -201,6 +203,11 @@ export function ChatView({
   const [plotState, setPlotState] = useState<StoryPlotState | null>(
     storySettings.plotState ?? null,
   );
+  // Phase 3: timeline event log. Same storage as plotState, lives in
+  // storySettings.timeline (typed via StorySettings in @/lib/types).
+  const [timeline, setTimeline] = useState<StoryTimeline | null>(
+    (storySettings.timeline as StoryTimeline | null | undefined) ?? null,
+  );
 
   /** Live plot + Qwen profiles for TTS (scene instruct updates during play). */
   const ttsStorySettings = useMemo<StorySettings>(
@@ -260,6 +267,10 @@ export function ChatView({
     }
   }, [chapterId]);
   const memorySyncRef = useRef(false);
+  const castSyncRef = useRef(false);
+  // Mirrors the refs for render-time use (refs alone don't trigger re-renders).
+  const [memorySyncActive, setMemorySyncActive] = useState(false);
+  const [castSyncActive, setCastSyncActive] = useState(false);
   const initialPlotSyncDone = useRef(false);
   const knownTurnIdsRef = useRef<Set<string>>(new Set());
   const ttsBaselineReadyRef = useRef(false);
@@ -284,8 +295,12 @@ export function ChatView({
   const loadSeqRef = useRef(0);
   const prevTurnCountRef = useRef(0);
   const chatBusyRef = useRef(false);
-  const ROLLING_EVERY_N_TURNS = 4;
+  const ROLLING_EVERY_N_TURNS = 6;
   const PLOT_EVERY_N_TURNS = 2;
+  // Phase 1: lightweight cast updates run on the same cadence as plot state.
+  // The full sync (rolling summary + cast + plot) keeps a slightly longer interval
+  // so the LLM isn't re-asked to do everything at every turn.
+  const CAST_EVERY_N_TURNS = 2;
 
   useEffect(() => {
     const refreshTts = () => setHasTts(isTtsReady(loadTtsSettings()));
@@ -545,7 +560,10 @@ export function ChatView({
 
   useEffect(() => {
     setPlotState(storySettings.plotState ?? null);
-  }, [storyId, storySettings.plotState]);
+    setTimeline(
+      (storySettings.timeline as StoryTimeline | null | undefined) ?? null,
+    );
+  }, [storyId, storySettings.plotState, storySettings.timeline]);
 
   useEffect(() => {
     setAllCast(cast.filter((c) => c.role === "cast"));
@@ -565,6 +583,7 @@ export function ChatView({
       if (!s) return null;
 
       memorySyncRef.current = true;
+      setMemorySyncActive(true);
       try {
         if (!rows.length) {
           setRollingSummary(null);
@@ -579,12 +598,16 @@ export function ChatView({
         const phase = phaseHint ?? chapter.phase_hint;
         const priorPlot = existingPlot !== undefined ? existingPlot : plotState;
 
-        const [updatedRolling, updatedPlot] = await Promise.all([
+        const [updatedRolling, updatedPlot, updatedTimeline] = await Promise.all([
           regenerateRollingSummary(s, chat, {
             chapterTitle: title,
             phaseHint: phase,
           }),
           extractPlotState(s, chat, priorPlot, {
+            chapterTitle: title,
+            phaseHint: phase,
+          }),
+          extractTimeline(s, chat, timeline, {
             chapterTitle: title,
             phaseHint: phase,
           }),
@@ -614,10 +637,14 @@ export function ChatView({
 
         setRollingSummary(updatedRolling);
         setPlotState(updatedPlot);
+        if (updatedTimeline) setTimeline(updatedTimeline);
         await updateChapterSummaries(chapterId, {
           rolling_summary: updatedRolling,
         });
-        await updateStorySettings(storyId, { plotState: updatedPlot });
+        await updateStorySettings(storyId, {
+          plotState: updatedPlot,
+          timeline: updatedTimeline ?? undefined,
+        });
         return {
           rolling: updatedRolling,
           plot: updatedPlot,
@@ -628,6 +655,7 @@ export function ChatView({
         return null;
       } finally {
         memorySyncRef.current = false;
+        setMemorySyncActive(false);
       }
     },
     [
@@ -639,10 +667,64 @@ export function ChatView({
       chapterTitle,
       phaseHint,
       plotState,
+      timeline,
       allCast,
     ],
   );
 
+  const syncCastOnly = useCallback(
+    async (rows: TurnRow[]): Promise<CharacterRow[] | null> => {
+      // Independent lock from the full story memory sync so the two can run
+      // back-to-back without dropping work (Phase 1 race-condition fix).
+      if (readOnly || castSyncRef.current) return null;
+      const s = loadOpenRouterSettings();
+      if (!s || !rows.length) return null;
+      const userId = await resolveStoryActorId();
+      if (!userId) return null;
+
+      castSyncRef.current = true;
+      setCastSyncActive(true);
+      try {
+        // Lightweight pass: only the last few turns, but always pass the full
+        // existing cast roster so the LLM can refresh names / locations.
+        const recent = rows.slice(-6);
+        const chat = turnsToChat(recent);
+        const charUpdates = await extractCharacterMemoryUpdates(
+          s,
+          chat,
+          allCast,
+          { chapterTitle: chapterTitle ?? chapter.title },
+        );
+        if (!charUpdates.length) {
+          return allCast;
+        }
+        const next = (
+          await applyCharacterMemoryUpdates(
+            storyId,
+            userId,
+            charUpdates,
+            chapterId,
+          )
+        ).filter((c) => c.role === "cast");
+        setAllCast(next);
+        return next;
+      } catch (e) {
+        console.warn("Cast sync failed:", e);
+        return null;
+      } finally {
+        castSyncRef.current = false;
+        setCastSyncActive(false);
+      }
+    },
+    [
+      readOnly,
+      storyId,
+      chapterId,
+      chapter.title,
+      chapterTitle,
+      allCast,
+    ],
+  );
   const syncPlotStateOnly = useCallback(
     async (
       rows: TurnRow[],
@@ -653,25 +735,47 @@ export function ChatView({
       if (!s || !rows.length) return null;
 
       memorySyncRef.current = true;
+      setMemorySyncActive(true);
       try {
         const chat = turnsToChat(rows);
         const title = chapterTitle ?? chapter.title;
         const phase = phaseHint ?? chapter.phase_hint;
         const priorPlot = existingPlot !== undefined ? existingPlot : plotState;
 
-        const updatedPlot = await extractPlotState(s, chat, priorPlot, {
-          chapterTitle: title,
-          phaseHint: phase,
-        });
+        // Phase 3: run plot + timeline together so they stay in sync.
+        // They share a single lock (memorySyncRef) but each has its own DB
+        // write so a partial failure doesn't drop the other.
+        const [updatedPlot, updatedTimeline] = await Promise.allSettled([
+          extractPlotState(s, chat, priorPlot, {
+            chapterTitle: title,
+            phaseHint: phase,
+          }),
+          extractTimeline(s, chat, timeline, {
+            chapterTitle: title,
+            phaseHint: phase,
+          }),
+        ]);
 
-        setPlotState(updatedPlot);
-        await updateStorySettings(storyId, { plotState: updatedPlot });
-        return updatedPlot;
+        const nextPlot =
+          updatedPlot.status === "fulfilled" ? updatedPlot.value : priorPlot;
+        setPlotState(nextPlot);
+        if (updatedTimeline.status === "fulfilled") {
+          setTimeline(updatedTimeline.value);
+        }
+        await updateStorySettings(storyId, {
+          plotState: nextPlot,
+          timeline:
+            updatedTimeline.status === "fulfilled"
+              ? updatedTimeline.value
+              : undefined,
+        });
+        return nextPlot;
       } catch (e) {
         console.warn("Plot state sync failed:", e);
         return null;
       } finally {
         memorySyncRef.current = false;
+        setMemorySyncActive(false);
       }
     },
     [
@@ -682,6 +786,7 @@ export function ChatView({
       chapterTitle,
       phaseHint,
       plotState,
+      timeline,
     ],
   );
 
@@ -701,11 +806,18 @@ export function ChatView({
   const maybeSummarize = async (rows: TurnRow[]) => {
     if (rows.length <= 0) return;
     if (rows.length % ROLLING_EVERY_N_TURNS === 0) {
+      // Full sync (rolling summary + cast + plot). The full sync also refreshes
+      // cast, so we skip the lightweight pass to avoid double work.
       await syncStoryMemory(rows);
       return;
     }
     if (rows.length % PLOT_EVERY_N_TURNS === 0) {
-      await syncPlotStateOnly(rows);
+      // Phase 1: cast and plot get separate, independent lightweight passes on
+      // the same cadence. They can interleave because they use distinct locks.
+      await Promise.allSettled([
+        syncPlotStateOnly(rows),
+        syncCastOnly(rows),
+      ]);
     }
   };
 
@@ -1781,6 +1893,14 @@ export function ChatView({
     >
       {!readOnly && turns.length > 0 ? (
         <ChapterProgressBar rows={turns} />
+      ) : null}
+      {!readOnly ? (
+        <MemoryStatusBar
+          plot={plotState}
+          castCount={allCast.length}
+          pinsCount={storySettings.pinnedNotes?.length ?? 0}
+          syncing={memorySyncActive || castSyncActive}
+        />
       ) : null}
 
       <div className="relative min-h-0 flex-1">
