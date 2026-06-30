@@ -3,6 +3,10 @@ import {
   type StoryPlotState,
 } from "@/lib/memory/plotState";
 import {
+  formatTimelineForPrompt,
+  type StoryTimeline,
+} from "@/lib/memory/storyTimeline";
+import {
   formatPinsForPrompt,
   type StoryPin,
 } from "@/lib/memory/storyPins";
@@ -14,6 +18,7 @@ import {
 
 export type StoryMemoryInput = {
   plotState?: StoryPlotState | null;
+  timeline?: StoryTimeline | null;
   pinnedNotes?: StoryPin[];
   bandSummary?: string | null;
   priorChapterSummaries?: string | null;
@@ -56,6 +61,11 @@ export function buildStoryMemorySections(input: StoryMemoryInput): string[] {
 
   const plotBlock = formatPlotStateForPrompt(input.plotState);
   if (plotBlock) sections.push(plotBlock);
+
+  // Phase 7: timeline goes AFTER plot state (plot is authoritative for
+  // presence/threats, timeline is authoritative for chronological beats).
+  const timelineBlock = formatTimelineForPrompt(input.timeline);
+  if (timelineBlock) sections.push(timelineBlock);
 
   const pinBlock = formatPinsForPrompt(input.pinnedNotes);
   if (pinBlock) sections.push(pinBlock);

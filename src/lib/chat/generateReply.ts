@@ -8,6 +8,7 @@ import type { OpenRouterSettings } from "@/lib/types";
 import type { ChatTurn, LoreEntry, StorySettings, StoryCharacterCard } from "@/lib/types";
 import type { CharacterRow } from "@/lib/db/stories";
 import type { StoryPlotState } from "@/lib/memory/plotState";
+import type { StoryTimeline } from "@/lib/memory/storyTimeline";
 import { classifySteeringDisplay } from "@/lib/chat/playerSteering";
 import {
   buildContinuationTurns,
@@ -30,6 +31,7 @@ export type GenerateReplyParams = {
   chapterIndex?: number;
   closedChapterCount?: number;
   plotState?: StoryPlotState | null;
+  timeline?: StoryTimeline | null;
   allCast?: CharacterRow[];
   continuation?: boolean;
   /** Overrides default “continue” prompt (e.g. chosen story beat). */
@@ -68,6 +70,7 @@ export async function streamAssistantReply(
     chapterIndex: params.chapterIndex,
     closedChapterCount: params.closedChapterCount,
     plotState: params.plotState,
+    timeline: params.timeline,
     allCast: params.allCast ?? params.cast,
     settings: params.storySettings,
     storyLocale: params.storyLocale,

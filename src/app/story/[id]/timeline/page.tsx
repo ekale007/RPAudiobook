@@ -50,6 +50,10 @@ const T = {
     allTypes: "Alle Typen",
     allActors: "Alle Figuren",
     showResolved: "Erledigte anzeigen",
+    importanceFilter: "Wichtigkeit",
+    importanceAll: "Alle",
+    importanceHigh: "Nur wichtig (≥ 70%)",
+    importanceMid: "Mittel + wichtig (≥ 40%)",
     turn: (n: number) => `Turn ${n}`,
     location: "Ort",
     actors: "Beteiligt",
@@ -73,6 +77,10 @@ const T = {
     allTypes: "All types",
     allActors: "All characters",
     showResolved: "Show resolved",
+    importanceFilter: "Importance",
+    importanceAll: "All",
+    importanceHigh: "Important only (≥ 70%)",
+    importanceMid: "Medium + important (≥ 40%)",
     turn: (n: number) => `Turn ${n}`,
     location: "Location",
     actors: "Involved",
@@ -126,6 +134,7 @@ export default function StoryTimelinePage() {
   const [typeFilter, setTypeFilter] = useState<StoryEventType | "all">("all");
   const [actorFilter, setActorFilter] = useState<string>("");
   const [showResolved, setShowResolved] = useState(true);
+  const [importanceFilter, setImportanceFilter] = useState<"all" | "mid" | "high">("all");
 
   const load = useCallback(async () => {
     const overview = await getStoryOverview(storyId);
@@ -199,9 +208,16 @@ export default function StoryTimelinePage() {
       if (typeFilter !== "all" && e.type !== typeFilter) return false;
       if (actorFilter && !e.actors.includes(actorFilter)) return false;
       if (!showResolved && (e.type === "resolved" || e.type === "death")) return false;
+      // Importance filter — events without `importance` are treated as 0.5
+      // (matches `eventImportance()` in storyTimeline.ts).
+      if (importanceFilter !== "all") {
+        const imp = typeof e.importance === "number" ? e.importance : 0.5;
+        if (importanceFilter === "high" && imp < 0.7) return false;
+        if (importanceFilter === "mid" && imp < 0.4) return false;
+      }
       return true;
     });
-  }, [events, typeFilter, actorFilter, showResolved]);
+  }, [events, typeFilter, actorFilter, showResolved, importanceFilter]);
 
   if (loading) {
     return (
@@ -295,6 +311,18 @@ export default function StoryTimelinePage() {
             />
             {t.showResolved}
           </label>
+          <label className="flex items-center gap-1 text-zinc-400">
+            {t.importanceFilter}:
+            <select
+              value={importanceFilter}
+              onChange={(e) => setImportanceFilter(e.target.value as "all" | "mid" | "high")}
+              className="rounded border border-surface-border bg-surface px-2 py-1 text-xs text-zinc-100"
+            >
+              <option value="all">{t.importanceAll}</option>
+              <option value="mid">{t.importanceMid}</option>
+              <option value="high">{t.importanceHigh}</option>
+            </select>
+          </label>
         </div>
 
         {/* Events list */}
@@ -369,6 +397,26 @@ function TimelineEventRow({
             <span className="text-zinc-500">{meta[lang === "en" ? "labelEn" : "label"]}</span>
             {event.confidence != null ? (
               <span className="text-zinc-500">· {(event.confidence * 100).toFixed(0)}%</span>
+            ) : null}
+            {event.importance != null ? (
+              <span
+                className={
+                  "rounded px-1 text-[10px] " +
+                  (event.importance >= 0.7
+                    ? "bg-amber-500/15 text-amber-300"
+                    : event.importance <= 0.3
+                      ? "bg-zinc-500/10 text-zinc-500"
+                      : "bg-surface-border/40 text-zinc-400")
+                }
+                title={
+                  lang === "de"
+                    ? `Plot-Wichtigkeit: ${(event.importance * 100).toFixed(0)}%`
+                    : `Plot importance: ${(event.importance * 100).toFixed(0)}%`
+                }
+              >
+                {event.importance >= 0.7 ? "★" : event.importance <= 0.3 ? "·" : "•"}{" "}
+                {(event.importance * 100).toFixed(0)}%
+              </span>
             ) : null}
           </div>
           <p className="mt-1 text-sm text-zinc-100">{event.summary}</p>

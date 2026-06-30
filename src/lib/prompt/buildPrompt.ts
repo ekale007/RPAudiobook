@@ -15,6 +15,7 @@ import { buildStoryMemorySections } from "@/lib/memory/storyMemory";
 import type { CharacterRow } from "@/lib/db/stories";
 import type { StoryPlotState } from "@/lib/memory/plotState";
 import type { StoryPin } from "@/lib/memory/storyPins";
+import type { StoryTimeline } from "@/lib/memory/storyTimeline";
 import {
   isSteeringUserTurn,
   stripSteeringTurnPrefix,
@@ -39,6 +40,7 @@ export interface PromptContext {
   chapterIndex?: number;
   closedChapterCount?: number;
   plotState?: StoryPlotState | null;
+  timeline?: StoryTimeline | null;
   pinnedNotes?: StoryPin[];
   allCast?: CharacterRow[];
   settings?: Partial<StorySettings>;
@@ -86,6 +88,7 @@ export function buildChatMessages(ctx: PromptContext): {
   systemParts.push(
     ...buildStoryMemorySections({
       plotState: ctx.plotState,
+      timeline: ctx.timeline,
       pinnedNotes: ctx.pinnedNotes ?? ctx.settings?.pinnedNotes,
       bandSummary: ctx.bandSummary,
       priorChapterSummaries: ctx.chapterSummary,
