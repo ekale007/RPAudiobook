@@ -1048,8 +1048,10 @@ export function ChatView({
       continuation?: boolean;
       continuationPrompt?: string;
       plotState?: StoryPlotState | null;
+      timeline?: StoryTimeline | null;
       rollingSummary?: string | null;
       allCast?: CharacterRow[];
+      /** Erzähler macht weiter / N× — TTS-Warteschlange sofort anwerfen. */
       forceTts?: boolean;
       /** Prefetch during drive/autoplay — no full-screen generating indicator. */
       background?: boolean;
@@ -1091,6 +1093,7 @@ export function ChatView({
         chapterIndex: chapterIndex ?? chapter.index_in_band,
         closedChapterCount,
         plotState: opts.plotState !== undefined ? opts.plotState : plotState,
+        timeline: opts.timeline !== undefined ? opts.timeline : timeline,
         allCast: opts.allCast ?? allCast,
         continuation: opts.continuation,
         continuationPrompt: opts.continuationPrompt,
