@@ -65,6 +65,7 @@ import { summarizeChapter } from "@/lib/chapter/summarize";
 import { resolveChapterIntro } from "@/lib/chapter/chapterIntro";
 import { shouldAutoCreateNextChapter } from "@/lib/chapter/autoChapter";
 import { ChapterProgressBar } from "@/components/ChapterProgressBar";
+import { MemoryConflictsToast } from "@/components/MemoryConflictsToast";
 import {
   analyzeChapterCloudAudio,
   exportChapterAudioFromCloud,
@@ -77,6 +78,14 @@ import { extractCharacterMemoryUpdates } from "@/lib/memory/characterMemory";
 import { extractPlotState } from "@/lib/memory/plotState";
 import type { StoryPlotState } from "@/lib/memory/plotState";
 import { extractTimeline, type StoryTimeline } from "@/lib/memory/storyTimeline";
+import { validateAndCorrect, type MemoryConflict } from "@/lib/memory/memoryValidation";
+import {
+  parseChapterChunks,
+  appendChapterChunk,
+  nextChunkRange,
+  type ChapterChunk,
+} from "@/lib/memory/chapterChunks";
+import { summarizeChunk } from "@/lib/memory/chunkSummarizer";
 import type {
   ChatTurn,
   LoreEntry,
@@ -91,6 +100,7 @@ import {
   getStoryBundle,
   getTurns,
   rebuildBandSummary,
+  rebuildBandSummaryIncremental,
   seedChapterIntro,
   touchStoryUpdated,
   updateChapterSummaries,
@@ -199,6 +209,11 @@ export function ChatView({
   const [rollingSummary, setRollingSummary] = useState(
     chapter.rolling_summary,
   );
+  // Phase 7.2: hierarchical chapter chunks. Live copy of the JSONB column;
+  // persisted via updateChapterSummaries on every sync.
+  const [chapterChunks, setChapterChunks] = useState<ChapterChunk[]>(() =>
+    parseChapterChunks(chapter.chapter_chunks),
+  );
   const [plotState, setPlotState] = useState<StoryPlotState | null>(
     storySettings.plotState ?? null,
   );
@@ -270,6 +285,21 @@ export function ChatView({
   // Mirrors the refs for render-time use (refs alone don't trigger re-renders).
   const [memorySyncActive, setMemorySyncActive] = useState(false);
   const [castSyncActive, setCastSyncActive] = useState(false);
+  // Phase 7.2: surface memory-consistency conflicts to the user. The validation
+  // pass auto-corrects the timeline in place (silent), but the most recent
+  // conflict batch is shown as a toast so the user can spot continuity bugs
+  // before they read more.
+  const [memoryConflicts, setMemoryConflicts] = useState<MemoryConflict[]>([]);
+  const memoryConflictDismissedAtRef = useRef<number>(0);
+  const pushMemoryConflicts = useCallback((conflicts: MemoryConflict[]) => {
+    if (!conflicts.length) return;
+    setMemoryConflicts(conflicts);
+    memoryConflictDismissedAtRef.current = 0;
+  }, []);
+  const dismissMemoryConflicts = useCallback(() => {
+    setMemoryConflicts([]);
+    memoryConflictDismissedAtRef.current = Date.now();
+  }, []);
   const initialPlotSyncDone = useRef(false);
   const knownTurnIdsRef = useRef<Set<string>>(new Set());
   const ttsBaselineReadyRef = useRef(false);
@@ -597,10 +627,46 @@ export function ChatView({
         const phase = phaseHint ?? chapter.phase_hint;
         const priorPlot = existingPlot !== undefined ? existingPlot : plotState;
 
-        const [updatedRolling, updatedPlot, updatedTimeline] = await Promise.all([
+        // Phase 7.2: figure out whether a new chapter chunk needs summarizing
+        // before the rolling summary / plot state / timeline get regenerated.
+        // Chunks are append-only; we only add a new one when the gap since
+        // the last chunk is >= CHUNK_SIZE turns (see chapterChunks.ts).
+        const lastTurnIndex = Math.max(
+          0,
+          rows.length > 0 ? rows[rows.length - 1].index_in_chapter : 0,
+        );
+        const pendingRange = nextChunkRange(chapterChunks, lastTurnIndex);
+        let nextChapterChunks = chapterChunks;
+        if (pendingRange && pendingRange.end > pendingRange.start) {
+          // Take the turns that fall inside [pendingRange.start, pendingRange.end]
+          // and pass them to the chunk summarizer.
+          const inRange = rows.filter(
+            (r) =>
+              r.index_in_chapter >= pendingRange.start &&
+              r.index_in_chapter <= pendingRange.end,
+          );
+          if (inRange.length > 0) {
+            const result = await summarizeChunk(
+              s,
+              turnsToChat(inRange),
+              pendingRange.start,
+            );
+            const newChunk: ChapterChunk = {
+              startTurnIndex: result.startTurnIndex,
+              endTurnIndex: result.endTurnIndex,
+              summary: result.summary,
+              generatedAt: new Date().toISOString(),
+            };
+            nextChapterChunks = appendChapterChunk(chapterChunks, newChunk);
+            setChapterChunks(nextChapterChunks);
+          }
+        }
+
+        const [updatedRolling, rawUpdatedPlot, rawUpdatedTimeline] = await Promise.all([
           regenerateRollingSummary(s, chat, {
             chapterTitle: title,
             phaseHint: phase,
+            existingChunks: nextChapterChunks,
           }),
           extractPlotState(s, chat, priorPlot, {
             chapterTitle: title,
@@ -611,6 +677,22 @@ export function ChatView({
             phaseHint: phase,
           }),
         ]);
+
+        // Phase 7.2: validate timeline against plot state (which is
+        // authoritative). Auto-corrects the timeline in place and collects
+        // conflicts for optional UI surfacing.
+        const validation = validateAndCorrect(rawUpdatedPlot, rawUpdatedTimeline);
+        const updatedPlot = rawUpdatedPlot;
+        const updatedTimeline = validation.correctedTimeline;
+        if (validation.conflicts.length > 0) {
+          console.info(
+            `[memory-validation] ${validation.conflicts.length} Konflikt(e) gefunden:`,
+            validation.conflicts.map((c: MemoryConflict) => `${c.severity}:${c.kind}`).join(", "),
+          );
+          if (validation.changed) {
+            pushMemoryConflicts(validation.conflicts);
+          }
+        }
 
         let latestCast = allCast;
         const userId = await resolveStoryActorId();
@@ -639,6 +721,7 @@ export function ChatView({
         if (updatedTimeline) setTimeline(updatedTimeline);
         await updateChapterSummaries(chapterId, {
           rolling_summary: updatedRolling,
+          chapter_chunks: nextChapterChunks,
         });
         await updateStorySettings(storyId, {
           plotState: updatedPlot,
@@ -668,6 +751,7 @@ export function ChatView({
       plotState,
       timeline,
       allCast,
+      pushMemoryConflicts,
     ],
   );
 
@@ -755,17 +839,45 @@ export function ChatView({
           }),
         ]);
 
-        const nextPlot =
+        const rawNextPlot =
           updatedPlot.status === "fulfilled" ? updatedPlot.value : priorPlot;
+        // Phase 7.2: validate the (possibly partial) results. If the timeline
+        // extraction failed we skip validation entirely (no point correcting
+        // a missing timeline).
+        let finalTimeline =
+          updatedTimeline.status === "fulfilled"
+            ? updatedTimeline.value
+            : timeline;
+        let finalPlot = rawNextPlot;
+        if (
+          updatedTimeline.status === "fulfilled" &&
+          updatedPlot.status === "fulfilled" &&
+          rawNextPlot
+        ) {
+          const validation = validateAndCorrect(rawNextPlot, updatedTimeline.value);
+          finalTimeline = validation.correctedTimeline;
+          finalPlot = rawNextPlot;
+          if (validation.conflicts.length > 0) {
+            console.info(
+              `[memory-validation] ${validation.conflicts.length} Konflikt(e) gefunden:`,
+              validation.conflicts.map((c: MemoryConflict) => `${c.severity}:${c.kind}`).join(", "),
+            );
+            if (validation.changed) {
+              pushMemoryConflicts(validation.conflicts);
+            }
+          }
+        }
+
+        const nextPlot = finalPlot;
         setPlotState(nextPlot);
         if (updatedTimeline.status === "fulfilled") {
-          setTimeline(updatedTimeline.value);
+          setTimeline(finalTimeline);
         }
         await updateStorySettings(storyId, {
           plotState: nextPlot,
           timeline:
             updatedTimeline.status === "fulfilled"
-              ? updatedTimeline.value
+              ? finalTimeline
               : undefined,
         });
         return nextPlot;
@@ -786,6 +898,7 @@ export function ChatView({
       phaseHint,
       plotState,
       timeline,
+      pushMemoryConflicts,
     ],
   );
 
@@ -898,7 +1011,28 @@ export function ChatView({
         }
 
         const fresh = await getStoryBundle(storyId);
-        await rebuildBandSummary(bundle.band.id as string, fresh.chapters, settings);
+        // Phase 7.2: incremental cross-chapter consolidation. We try the
+        // incremental path first; falls back to the full re-aggregation
+        // when the previous band is missing/too long.
+        const previousBandSummary =
+          (fresh.band.band_summary as string | null) ?? null;
+        const closedChapterIndex = Math.max(1, nextIndex - 1);
+        try {
+          await rebuildBandSummaryIncremental({
+            bandId: bundle.band.id as string,
+            bandSummary: previousBandSummary,
+            newChapterTitle: chapter.title || `Chapter ${closedChapterIndex}`,
+            newChapterIndex: closedChapterIndex,
+            // Use the rolling_summary of the just-closed chapter as the
+            // "new chapter summary" — it's the freshest in-chapter memory.
+            newChapterSummary: chapter.rolling_summary ?? "",
+            fallbackChapters: fresh.chapters,
+            settings,
+          });
+        } catch (e) {
+          console.warn("Incremental band consolidation failed, using full rebuild:", e);
+          await rebuildBandSummary(bundle.band.id as string, fresh.chapters, settings);
+        }
         await touchStoryUpdated(storyId);
         window.location.href = `/story/${storyId}/chat?chapter=${newChapter.id}`;
         return true;
@@ -1913,6 +2047,17 @@ export function ChatView({
                 }
               : undefined
           }
+        />
+      ) : null}
+
+      {/* Phase 7.2: memory-consistency toast. The validation pass auto-corrects
+          the timeline silently; this banner surfaces what was corrected so the
+          user can spot continuity bugs before they read more. */}
+      {memoryConflicts.length > 0 ? (
+        <MemoryConflictsToast
+          conflicts={memoryConflicts}
+          onDismiss={dismissMemoryConflicts}
+          onOpenTimeline={() => router.push(`/story/${storyId}/timeline`)}
         />
       ) : null}
 
