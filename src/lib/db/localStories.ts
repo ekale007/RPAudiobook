@@ -45,6 +45,8 @@ type ChapterRow = {
   chapter_summary: string | null;
   rolling_summary: string | null;
   phase_hint?: string | null;
+  /** Phase 7.2: hierarchical chapter chunks. Optional (post-Migration 018). */
+  chapter_chunks?: unknown;
 };
 
 type TurnRow = {
@@ -460,6 +462,8 @@ export async function updateLocalChapterSummaries(
     chapter_summary?: string;
     status?: string;
     closed_at?: string;
+    /** Phase 7.2: hierarchical chapter chunks. */
+    chapter_chunks?: unknown;
   },
 ): Promise<void> {
   const ch = await localDbGet<LocalChapterRecord>("chapters", chapterId);

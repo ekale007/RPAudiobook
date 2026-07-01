@@ -27,6 +27,7 @@ import {
   updateChapterSummaries,
   updateChapterTitle,
   rebuildBandSummary,
+  rebuildBandSummaryIncremental,
 } from "@/lib/db/stories";
 import { loadOpenRouterSettings } from "@/lib/storage/openRouterSettings";
 import type { TurnRow } from "@/lib/db/stories";
@@ -194,8 +195,32 @@ export default function ChapterManagePage() {
         await seedChapterIntro(newChapter.id, intro.turns, storyId);
       }
 
+      // Phase 7.2: incremental cross-chapter consolidation. We try the
+      // incremental path first (LLM merges "previous band" + "new chapter"),
+      // and fall back to the full re-aggregation when the previous band is
+      // missing/too long. See lib/chapter/bandSummary.ts.
+      setStatus("Band-Übersicht wird konsolidiert …");
       const overview = await getStoryBundle(storyId);
-      await rebuildBandSummary(bandId, overview.chapters, settings);
+      const previousBandSummary =
+        (overview.band.band_summary as string | null) ?? null;
+      // The chapter we just closed is now in `overview.chapters` with
+      // status="closed" and chapter_summary set. Its index in the band
+      // is `nextIndex - 1` because the next chapter is at `nextIndex`.
+      const closedChapterIndex = Math.max(1, nextIndex - 1);
+      try {
+        await rebuildBandSummaryIncremental({
+          bandId,
+          bandSummary: previousBandSummary,
+          newChapterTitle: chapterTitle.trim() || `Chapter ${closedChapterIndex}`,
+          newChapterIndex: closedChapterIndex,
+          newChapterSummary: summary,
+          fallbackChapters: overview.chapters,
+          settings,
+        });
+      } catch (e) {
+        console.warn("Incremental band consolidation failed, using full rebuild:", e);
+        await rebuildBandSummary(bandId, overview.chapters, settings);
+      }
 
       await touchStoryUpdated(storyId);
       router.push(`/story/${storyId}/chat?chapter=${newChapter.id}`);

@@ -78,6 +78,12 @@ export interface ChapterRow {
   chapter_summary: string | null;
   rolling_summary: string | null;
   phase_hint?: string | null;
+  /**
+   * Phase 7.2: hierarchical summary chunks. Optional — only present
+   * after Migration 018 has been applied. Legacy rows return null/undefined
+   * and the chapterChunks lib falls back to empty array.
+   */
+  chapter_chunks?: unknown;
 }
 
 export interface TurnRow {
@@ -900,6 +906,12 @@ export async function updateChapterSummaries(
     chapter_summary?: string;
     status?: string;
     closed_at?: string;
+    /**
+     * Phase 7.2: hierarchical chapter chunks. Sent as-is to Supabase.
+     * If the chapter_chunks column doesn't exist (pre-Migration 018)
+     * Supabase will reject the write — we catch that case below.
+     */
+    chapter_chunks?: unknown;
   },
 ): Promise<void> {
   if (isLocalEntityId(chapterId)) {
@@ -907,10 +919,33 @@ export async function updateChapterSummaries(
     return;
   }
   const supabase = getCloudSupabase();
-  const { error } = await supabase
+  // Try the full patch first; if the column doesn't exist, retry without it.
+  let payload: Record<string, unknown> = { ...patch };
+  if (patch.chapter_chunks === undefined) delete payload.chapter_chunks;
+  let { error } = await supabase
     .from("chapters")
-    .update(patch)
+    .update(payload)
     .eq("id", chapterId);
+  if (
+    error &&
+    patch.chapter_chunks !== undefined &&
+    /chapter_chunks/i.test(error.message ?? "")
+  ) {
+    // Column doesn't exist (pre-Migration 018). Drop it and retry.
+    payload = { ...patch };
+    delete payload.chapter_chunks;
+    const retry = await supabase
+      .from("chapters")
+      .update(payload)
+      .eq("id", chapterId);
+    error = retry.error;
+    if (error) throw error;
+    // Silent fallback — chunks are accumulated in memory and will
+    // appear in the prompt via the existing `regenerateRollingSummary`
+    // path; they just won't survive a page reload until the migration
+    // is applied.
+    return;
+  }
   if (error) throw error;
 }
 
@@ -983,6 +1018,62 @@ export async function rebuildBandSummary(
   );
   const text = await buildBandSummaryForStorage(chapters, settings);
   await updateBandSummary(bandId, text);
+}
+
+/**
+ * Phase 7.2: incremental cross-chapter consolidation.
+ *
+ * Called from the chapter-close flow (src/app/story/[id]/chapter/page.tsx)
+ * AFTER a new chapter is closed. Uses the previous `bands.band_summary`
+ * (if it is short enough) + the new chapter_summary as inputs to
+ * `consolidateBandSummary`, which produces an updated band summary that
+ * integrates the new content without losing old facts.
+ *
+ * Falls back to `rebuildBandSummary` (full re-aggregation) if there is
+ * no previous band summary, the previous one is too long to incrementally
+ * merge, or no LLM settings are available.
+ *
+ * Compared to the old flow (rebuildBandSummary after every chapter close):
+ *  - Old: LLM sees ALL closed chapter summaries, can lose detail
+ *  - New: LLM sees previous (already-consolidated) + new chapter, keeps
+ *    detail through progressive integration
+ */
+export async function rebuildBandSummaryIncremental(args: {
+  bandId: string;
+  bandSummary: string | null;
+  newChapterTitle: string;
+  newChapterIndex: number;
+  newChapterSummary: string;
+  fallbackChapters: ChapterRow[];
+  settings?: import("@/lib/types").OpenRouterSettings | null;
+}): Promise<void> {
+  const { consolidateBandSummary } = await import(
+    "@/lib/chapter/bandSummary"
+  );
+  if (!args.settings) {
+    await rebuildBandSummary(args.bandId, args.fallbackChapters, args.settings);
+    return;
+  }
+  try {
+    const consolidated = await consolidateBandSummary({
+      previousBandSummary: args.bandSummary,
+      newChapterSummary: args.newChapterSummary,
+      newChapterTitle: args.newChapterTitle,
+      newChapterIndex: args.newChapterIndex,
+      settings: args.settings,
+    });
+    // consolidateBandSummary returns the previous band unchanged when it
+    // has too many words (>800) — in that case we should fall back to the
+    // full re-aggregation so the LLM gets a chance to compress.
+    if (consolidated === (args.bandSummary ?? "")) {
+      await rebuildBandSummary(args.bandId, args.fallbackChapters, args.settings);
+      return;
+    }
+    await updateBandSummary(args.bandId, consolidated);
+  } catch (e) {
+    console.warn("Incremental band rebuild failed, falling back to full rebuild:", e);
+    await rebuildBandSummary(args.bandId, args.fallbackChapters, args.settings);
+  }
 }
 
 export async function deleteChapter(
