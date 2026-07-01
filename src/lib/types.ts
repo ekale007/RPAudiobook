@@ -64,6 +64,7 @@ import type { TtsProvider } from "@/lib/storage/ttsSettings";
 import type { StoryPlotState } from "@/lib/memory/plotState";
 import type { StoryPin } from "@/lib/memory/storyPins";
 import type { StoryTimeline } from "@/lib/memory/storyTimeline";
+import type { ReflectionsContainer } from "@/lib/memory/reflections";
 
 /** Per-provider cast voice maps — `local-kokoro` / `local-qwen` when provider is `local`. */
 export type VoiceMapStorageKey =
@@ -113,6 +114,8 @@ export interface StorySettings {
   timeline?: StoryTimeline | null;
   /** Short pitch / logline — overrides template default in prompts */
   storyConcept?: string | null;
+  /** Phase 7.3: higher-level reflection layer (Diagnose Task 2B) */
+  storyReflections?: ReflectionsContainer | null;
 }
 
 export const DEFAULT_STORY_SETTINGS: StorySettings = {

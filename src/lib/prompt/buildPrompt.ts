@@ -97,6 +97,8 @@ export function buildChatMessages(ctx: PromptContext): {
       phaseHint: ctx.phaseHint,
       chapterIndex: ctx.chapterIndex,
       closedChapterCount: ctx.closedChapterCount,
+      // Phase 7.3: reflection layer
+      reflections: ctx.settings?.storyReflections ?? null,
     }),
   );
 
