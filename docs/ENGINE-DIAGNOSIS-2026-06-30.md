@@ -328,4 +328,48 @@ Implementation:
 
 ---
 
-**Stand:** 2026-06-30 17:30 · **Erstellt von:** Hermes Agent · **Nächste Aktion:** User-Review
+## 8. Status & Implementierung
+
+**Stand:** 2026-07-01 · **Branch:** `feat/engine-phase-7.2` · **PR:** siehe GitHub
+
+### ✅ Erledigt (4 Quick-Wins, ~80% Impact laut Diagnose)
+
+| # | Task | Commit | Datei(en) | LOC |
+|---|------|--------|-----------|-----|
+| 1D | Importance-Score Timeline | `a64d4d8` (Phase 7.1) | `src/lib/memory/storyTimeline.ts` | bereits im master |
+| 1C | Plot-State ↔ Timeline Validation-Pass | `31f8046` (Phase 7.2) | `src/lib/memory/memoryValidation.ts` | ~350 |
+| 1A | Hierarchische Verdichtung (Chunk→Chapter→Band) | `31f8046` (Phase 7.2) | `src/lib/memory/chapterChunks.ts` + `chunkSummarizer.ts` + `chapter/rollingSummary.ts` (rewrite) | ~600 |
+| 1B | Cross-Chapter-Konsolidierung (inkrementell) | `31f8046` (Phase 7.2) | `src/lib/chapter/bandSummary.ts` (new function) + `db/stories.ts` (new export) | ~150 |
+| 3A | Konflikt-Resolution-UI | `31f8046` (Phase 7.2) | `src/components/MemoryConflictsToast.tsx` | ~150 |
+
+### 🔧 Migration
+
+**Migration 018** (`docs/MIGRATION-018-chapter-chunks.sql`) muss in der Supabase-Instanz manuell ausgeführt werden, damit die neuen Chunks persistiert werden. **Optional bis dahin** — die App läuft mit dem Legacy-Pfad (40 KB single-pass Rolling-Summary), die Auto-Korrektur der Validation läuft auch ohne Migration.
+
+```sql
+ALTER TABLE public.chapters
+  ADD COLUMN IF NOT EXISTS chapter_chunks jsonb NOT NULL DEFAULT '[]'::jsonb;
+```
+
+### ⏭️ Verbleibend (Stufe 2 + 3)
+
+| # | Task | Aufwand | Impact |
+|---|------|---------|--------|
+| 6 | 2A: Memory-Stream + Embeddings + Retrieval | 2 Tage | Sehr hoch |
+| 7 | 2B: Reflection-Layer | 1 Tag | Hoch |
+| 8 | 2C: Knowledge-Graph (Beziehungen) | 2-3 Tage | Hoch |
+| 9 | 3B: Memory-Inspector Page | 1 Tag | Mittel (Debug) |
+| 10 | 3C: Smart-Prompt-Budget (largest-first truncation) | 0.5 Tage | Mittel |
+
+### 📊 Erwartete Verbesserungen (aus der Diagnose)
+
+1. **Keine "Kaelen ist verletzt geht vergessen"-Bugs mehr** — Chunks behalten ältere Fakten, Validation korrigiert Plot-State-Widersprüche in der Timeline sofort
+2. **Schnellere Band-Summary-Updates** — Inkrementell statt full re-aggregation
+3. **Sichtbare Konflikte** — User sieht direkt wenn Story-Memory repariert wurde (MemoryConflictsToast)
+4. **Kein "komplett neu"-Risiko** bei Chapter-Close — Inkrementelle Konsolidierung behält ältere Fakten
+
+---
+
+**Stand Phase 7.1:** 2026-06-30 17:30 · **Erstellt von:** Hermes Agent
+**Stand Phase 7.2:** 2026-07-01 · **Implementiert von:** Hermes Agent
+**Nächste Aktion:** User wendet Migration 018 in Supabase an, dann manueller Test der Live-Story (Kaelen-Beispiel aus Diagnose §6.4)
