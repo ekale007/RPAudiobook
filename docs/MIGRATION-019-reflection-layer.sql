@@ -1,0 +1,30 @@
+-- Migration 019: reflection layer
+--
+-- Phase 7.3 of the engine-diagnosis roadmap (docs/ENGINE-DIAGNOSIS-2026-06-30.md,
+-- Task 2B: Reflection-Layer).
+--
+-- Adds a JSONB column `stories.settings->story_reflections` for the
+-- higher-level reflection layer (key relationships, open questions, key
+-- facts, current goal). Generated every 30 turns by a small LLM call.
+--
+-- Backward-compat: column-optional, no crash if missing. App falls back
+-- to "no reflection" (plot-state + timeline still work).
+--
+-- Apply in the Supabase SQL editor (manual, no CLI on the operator box).
+
+-- Add the column directly on the stories.settings JSONB.
+-- We don't change the schema of `settings`; we add a top-level key to it.
+-- This is a no-op at the SQL level: stories.settings is already jsonb.
+-- The app-side parser will read .story_reflections and treat missing/null
+-- as "no reflections yet".
+
+-- Documentation only — there is no DDL change because settings is a free-form JSONB.
+-- If you want to enforce a type, add a CHECK constraint (commented out to avoid
+-- blocking existing rows):
+--
+-- ALTER TABLE public.stories
+--   ADD CONSTRAINT stories_settings_reflections_is_object
+--   CHECK (
+--     settings IS NULL
+--     OR jsonb_typeof(settings->'story_reflections') IN ('object', 'null')
+--   );

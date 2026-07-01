@@ -86,6 +86,13 @@ import {
   type ChapterChunk,
 } from "@/lib/memory/chapterChunks";
 import { summarizeChunk } from "@/lib/memory/chunkSummarizer";
+import {
+  parseReflections,
+  appendReflection,
+  shouldGenerateReflection,
+  generateReflection,
+  type ReflectionsContainer,
+} from "@/lib/memory/reflections";
 import type {
   ChatTurn,
   LoreEntry,
@@ -213,6 +220,10 @@ export function ChatView({
   // persisted via updateChapterSummaries on every sync.
   const [chapterChunks, setChapterChunks] = useState<ChapterChunk[]>(() =>
     parseChapterChunks(chapter.chapter_chunks),
+  );
+  // Phase 7.3: reflection layer. Live copy of the JSONB-in-settings column.
+  const [reflections, setReflections] = useState<ReflectionsContainer>(() =>
+    parseReflections(storySettings.storyReflections),
   );
   const [plotState, setPlotState] = useState<StoryPlotState | null>(
     storySettings.plotState ?? null,
@@ -719,6 +730,34 @@ export function ChatView({
         setRollingSummary(updatedRolling);
         setPlotState(updatedPlot);
         if (updatedTimeline) setTimeline(updatedTimeline);
+
+        // Phase 7.3: reflection layer. Generate a new reflection when at
+        // least 30 turns have passed since the last one (or no reflection
+        // exists yet). Runs in the background — failures are logged but
+        // don't block the rest of the sync.
+        let nextReflections = reflections;
+        if (shouldGenerateReflection(reflections, lastTurnIndex)) {
+          try {
+            const plotSummary = updatedPlot?.timeLabel
+              ? `Time: ${updatedPlot.timeLabel}\nLocation: ${updatedPlot.location}\nPresent: ${(updatedPlot.presentCharacters ?? []).join(", ")}`
+              : "";
+            const newReflection = await generateReflection({
+              settings: s,
+              turns: chat,
+              existing: reflections.reflections[reflections.reflections.length - 1] ?? null,
+              plotStateSummary: plotSummary,
+              currentTurnIndex: lastTurnIndex,
+            });
+            nextReflections = appendReflection(reflections, newReflection);
+            setReflections(nextReflections);
+            console.info(
+              `[reflection] Generated at turn ${lastTurnIndex} (${reflections.reflections.length + 1} total)`,
+            );
+          } catch (e) {
+            console.warn("Reflection generation failed:", e);
+          }
+        }
+
         await updateChapterSummaries(chapterId, {
           rolling_summary: updatedRolling,
           chapter_chunks: nextChapterChunks,
@@ -726,6 +765,7 @@ export function ChatView({
         await updateStorySettings(storyId, {
           plotState: updatedPlot,
           timeline: updatedTimeline ?? undefined,
+          storyReflections: nextReflections,
         });
         return {
           rolling: updatedRolling,

@@ -10,10 +10,27 @@ import {
   formatPinsForPrompt,
   type StoryPin,
 } from "@/lib/memory/storyPins";
+import {
+  buildMemoryLayers,
+  enforcePromptBudget,
+  DEFAULT_PROMPT_BUDGET_CHARS,
+  type BudgetPlan,
+} from "@/lib/memory/promptBudget";
+import {
+  formatReflectionsForPrompt,
+  type ReflectionsContainer,
+} from "@/lib/memory/reflections";
 
 /**
  * Assembles long-term story memory for the system prompt without duplication
  * and with clear rules so recent chat wins over stale summaries.
+ *
+ * Phase 7.3: smart-prompt-budget (Diagnose Task 3C). Each memory layer is
+ * classified mandatory (plot, timeline, rules) or soft (current chapter,
+ * band summary, prior chapter summaries, pins). The total is then enforced
+ * against `DEFAULT_PROMPT_BUDGET_CHARS` (18 KB ≈ 4.5K tokens) by
+ * largest-first truncation of soft layers. Plot-state and timeline are
+ * NEVER trimmed (authoritative per storyMemory.ts synapse).
  */
 
 export type StoryMemoryInput = {
@@ -27,6 +44,10 @@ export type StoryMemoryInput = {
   phaseHint?: string | null;
   chapterIndex?: number;
   closedChapterCount?: number;
+  /** Optional override for the total prompt budget. Defaults to ~18 KB. */
+  budgetChars?: number;
+  /** Phase 7.3: reflection layer (Diagnose Task 2B). Optional. */
+  reflections?: ReflectionsContainer | null;
 };
 
 const MEMORY_RULES = `## Memory rules (follow strictly)
@@ -53,32 +74,7 @@ You are continuing an **ongoing** interactive story — **Chapter ${idx}** (${cl
 Continue from the latest timeline and location. Never loop back to the story's opening unless the player explicitly rewinds.`;
 }
 
-export function buildStoryMemorySections(input: StoryMemoryInput): string[] {
-  const sections: string[] = [];
-
-  const progress = buildProgressSection(input);
-  if (progress) sections.push(progress);
-
-  const plotBlock = formatPlotStateForPrompt(input.plotState);
-  if (plotBlock) sections.push(plotBlock);
-
-  // Phase 7: timeline goes AFTER plot state (plot is authoritative for
-  // presence/threats, timeline is authoritative for chronological beats).
-  const timelineBlock = formatTimelineForPrompt(input.timeline);
-  if (timelineBlock) sections.push(timelineBlock);
-
-  const pinBlock = formatPinsForPrompt(input.pinnedNotes);
-  if (pinBlock) sections.push(pinBlock);
-
-  const band = input.bandSummary?.trim();
-  const prior = input.priorChapterSummaries?.trim();
-
-  if (band) {
-    sections.push(`## Earlier story (closed chapters)\n${band}`);
-  } else if (prior) {
-    sections.push(`## Earlier story (closed chapters)\n${prior}`);
-  }
-
+function buildCurrentChapterSection(input: StoryMemoryInput): string | null {
   const currentParts: string[] = [];
   if (input.chapterTitle?.trim()) {
     currentParts.push(`Active chapter: ${input.chapterTitle.trim()}`);
@@ -89,13 +85,91 @@ export function buildStoryMemorySections(input: StoryMemoryInput): string[] {
   if (input.rollingSummary?.trim()) {
     currentParts.push(input.rollingSummary.trim());
   }
+  if (!currentParts.length) return null;
+  return currentParts.join("\n\n");
+}
 
-  if (currentParts.length) {
-    sections.push(
-      `## Current chapter (compressed memory — check recent messages if unsure)\n${currentParts.join("\n\n")}`,
-    );
+function buildBandSummarySection(input: StoryMemoryInput): string | null {
+  const band = input.bandSummary?.trim();
+  const prior = input.priorChapterSummaries?.trim();
+  if (band) return band;
+  if (prior) return prior;
+  return null;
+}
+
+export interface StoryMemoryBuildResult {
+  /** Final sections, in prompt order. Includes rules at the end. */
+  sections: string[];
+  /** Budget report (for observability / Memory-Inspector Page). */
+  budget: BudgetPlan;
+}
+
+export function buildStoryMemorySections(
+  input: StoryMemoryInput,
+): string[] {
+  return buildStoryMemorySectionsDetailed(input).sections;
+}
+
+/**
+ * Same as `buildStoryMemorySections` but also returns the budget report —
+ * useful for the Memory-Inspector page and the validation toast.
+ */
+export function buildStoryMemorySectionsDetailed(
+  input: StoryMemoryInput,
+): StoryMemoryBuildResult {
+  const progressSection = buildProgressSection(input);
+  const currentChapterSection = buildCurrentChapterSection(input);
+  const bandSummary = buildBandSummarySection(input);
+  const priorChapterSummaries = input.priorChapterSummaries ?? null;
+  const pinnedNotes = input.pinnedNotes ?? [];
+
+  const layers = buildMemoryLayers({
+    rules: MEMORY_RULES,
+    plotState: input.plotState ?? null,
+    timeline: input.timeline ?? null,
+    formatPlotState: formatPlotStateForPrompt,
+    formatTimeline: formatTimelineForPrompt,
+    formatPins: formatPinsForPrompt,
+    progressSection,
+    bandSummary,
+    priorChapterSummaries,
+    currentChapterSection,
+    pinnedNotes,
+  });
+
+  // Phase 7.3: inject the reflection layer BEFORE plot state. The reflection
+  // is a high-level "what's true now" snapshot that helps the LLM hold the
+  // forest (relationships, open questions, key facts) in mind even when the
+  // recent turns are noisy. Treated as soft (can be dropped under tight
+  // budget), but in practice it's tiny (~1 KB) so usually kept.
+  const reflectionText = input.reflections
+    ? formatReflectionsForPrompt(input.reflections, { useLatest: true })
+    : null;
+  if (reflectionText) {
+    layers.unshift({
+      name: "reflection",
+      text: reflectionText,
+      mandatory: false,
+      chars: reflectionText.length,
+    });
   }
 
-  sections.push(MEMORY_RULES);
-  return sections;
+  // Add the rules layer (always last, mandatory).
+  layers.push({
+    name: "rules",
+    text: MEMORY_RULES,
+    mandatory: true,
+    chars: MEMORY_RULES.length,
+  });
+
+  const budget = enforcePromptBudget(
+    layers,
+    input.budgetChars ?? DEFAULT_PROMPT_BUDGET_CHARS,
+  );
+
+  const sections = budget.kept
+    .map((l) => l.text)
+    .filter((t): t is string => !!t);
+
+  return { sections, budget };
 }
