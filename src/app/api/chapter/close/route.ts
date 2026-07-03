@@ -225,11 +225,27 @@ export async function POST(req: Request) {
   // exist OR because the user lacks read access. We can't tell the two
   // apart from the error alone, so we surface a dedicated
   // `chapter_not_accessible` code that the client can disambiguate.
+  // Phase 8.4: log the inputs so the user can paste the chapterId from
+  // Vercel Function Logs when reporting bugs.
+  console.log(
+    `[close-chapter] start chapterId=${chapterId} storyId=${storyId} bandId=${
+      bandId || "(omitted)"
+    } chErr.code=${""}`,
+  );
   const { data: chapter, error: chErr } = await supabase
     .from("chapters")
     .select("id, band_id, story_id, title, index_in_band, phase_hint, status")
     .eq("id", chapterId)
     .single();
+  if (chErr) {
+    console.log(
+      `[close-chapter] chapter-SELECT error: code=${chErr.code} message=${chErr.message} hint=${chErr.hint ?? ""} chapterId=${chapterId}`,
+    );
+  } else if (chapter) {
+    console.log(
+      `[close-chapter] chapter-SELECT ok: id=${chapter.id} status=${chapter.status} band_id=${chapter.band_id} story_id=${chapter.story_id}`,
+    );
+  }
   if (chErr?.code === "PGRST116" || (!chapter && chErr)) {
     return jsonError(
       404,
