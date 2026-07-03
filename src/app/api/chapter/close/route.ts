@@ -113,10 +113,16 @@ export async function POST(req: Request) {
   if (!isValidString(chapterId)) {
     return jsonError(400, "chapterId is required", "invalid_input");
   }
-  // bandId is optional — the server resolves it from the chapter row.
-  // We validate the prefix when present so local-mode IDs are caught
-  // before any DB work.
-  if (bandId !== undefined && !isValidString(bandId)) {
+  // bandId is optional. The client may send it (preferred — it lives in
+  // ChapterRow already) or omit it. The server falls back to the chapter
+  // row's band_id when missing. An explicit non-string value is a
+  // client bug — we ignore it instead of erroring.
+  if (
+    bandId !== undefined &&
+    bandId !== null &&
+    bandId !== "" &&
+    !isValidString(bandId)
+  ) {
     return jsonError(400, "bandId must be a non-empty string", "invalid_input");
   }
   const validIntroModes = [

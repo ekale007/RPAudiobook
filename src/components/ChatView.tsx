@@ -1225,14 +1225,14 @@ export function ChatView({
         );
         setAutoCloseStatus("Plot-Stand wird gesichert …");
         setAutoClosePhase("summarizing");
-        // The server resolves bandId from the chapter, so we don't need a
-        // getStoryBundle round-trip on the client. This was a previous
-        // bug: an extra Supabase SELECT just to read one field.
+        // We send bandId from the chapter row (already in component state)
+        // — no extra Supabase roundtrip. The server still validates against
+        // the chapter's actual band_id, so a wrong client value is caught.
         const result = await postCloseChapter(
           {
             storyId,
             chapterId,
-            bandId: "", // server resolves from chapter
+            bandId: chapter.band_id,
             introMode: "ai_bridge",
           },
           ctrl.signal,
@@ -1274,7 +1274,7 @@ export function ChatView({
         }
       }
     },
-    [storyId, chapterId, router, turns, executeAutoChapterClose],
+    [storyId, chapterId, router, turns, executeAutoChapterClose, chapter.band_id],
   );
 
   const promptAutoClose = useCallback(
