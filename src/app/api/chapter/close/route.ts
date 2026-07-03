@@ -19,6 +19,16 @@
  * Auth: requireUser (server-side cookie check). The OpenRouter key is the
  * server's account key (getOpenRouterApiKey), not a per-user key.
  *
+ * DB: we use the **admin (service-role) Supabase client** for all DB
+ * reads/writes after auth, not the user client. RLS is bypassed
+ * intentionally here — the user has already been authenticated, the
+ * story is explicitly checked for ownership, and we need to write to
+ * several tables (chapters, turns, bands, stories) that have their own
+ * RLS policies. Without admin, RLS would block legitimate writes
+ * because the chapter/turn rows aren't directly owned by the user — they
+ * belong to a band that belongs to a story the user owns. Same pattern
+ * as /api/admin/* routes.
+ *
  * Tier: we check `requireSpendableBalance` once before kicking the first
  * LLM call so a user with empty wallet doesn't burn through the whole
  * close workflow before failing.
@@ -29,6 +39,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/server/requireUser";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
+import { createAdminSupabase } from "@/lib/supabase/admin";
 import {
   getOpenRouterApiKey,
   getOpenRouterModel,
@@ -149,17 +160,39 @@ export async function POST(req: Request) {
     return jsonError(400, "nextTitle must be a non-empty string", "invalid_input");
   }
 
-  const supabase = await createServerSupabaseFromRequest(req);
+  const userSupabase = await createServerSupabaseFromRequest(req);
 
-  // Tier check before any LLM work — same pattern as /api/llm/chat.
+  // Tier check before any LLM work — same pattern as /api/llm/chat. We
+  // use the user-scoped client here because tier limits + wallet live in
+  // tables that have user_id RLS — the user client reads the right row.
   let tierLimits;
   try {
-    tierLimits = await fetchUserTierLimits(supabase, auth.user.id);
+    tierLimits = await fetchUserTierLimits(userSupabase, auth.user.id);
   } catch {
     tierLimits = null;
   }
-  const balanceErr = await requireSpendableBalance(supabase, auth.user.id, 1);
+  const balanceErr = await requireSpendableBalance(
+    userSupabase,
+    auth.user.id,
+    1,
+  );
   if (balanceErr) return balanceErr;
+
+  // Switch to the service-role (admin) client for all chapter/story/band
+  // operations. RLS is bypassed — we re-check ownership explicitly via
+  // `story.user_id === auth.user.id` below. The user client + RLS was
+  // returning PGRST116 for legitimate chapter reads/writes because the
+  // chapter rows are owned by the band (which is owned by the story the
+  // user owns), not directly by the user.
+  const admin = createAdminSupabase();
+  if (!admin) {
+    return jsonError(
+      503,
+      "SUPABASE_SERVICE_ROLE_KEY fehlt — Endpoint braucht Admin-Client.",
+      "admin_unconfigured",
+    );
+  }
+  const supabase = admin;
 
   // Build server-side OpenRouter settings.
   let settings: OpenRouterSettings;
