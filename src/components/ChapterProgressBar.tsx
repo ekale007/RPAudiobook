@@ -31,6 +31,19 @@ type CloseChapterAction = {
   hint?: string;
 };
 
+type ChapterSiblingRef = {
+  id: string;
+  title: string;
+};
+
+type ChapterNav = {
+  prev: ChapterSiblingRef | null;
+  next: ChapterSiblingRef | null;
+  total: number;
+  currentIndex: number;
+  onNavigate: (chapterId: string) => void;
+};
+
 const T = {
   de: {
     memory: "Story-Memory",
@@ -50,6 +63,11 @@ const T = {
     closeReady: "Kapitelabschluss möglich",
     remaining: (n: number) => `noch ca. ${n} % bis Übergang`,
     chapterPercent: (n: number) => `Kapitel: ${n}%`,
+    prevChapter: (title: string) => `← ${title}`,
+    nextChapter: (title: string) => `${title} →`,
+    chapterPosition: (i: number, total: number) => `${i} / ${total}`,
+    navPrev: "Vorheriges Kapitel",
+    navNext: "Nächstes Kapitel",
   },
   en: {
     memory: "Story memory",
@@ -69,6 +87,11 @@ const T = {
     closeReady: "Chapter close possible",
     remaining: (n: number) => `~${n}% to close`,
     chapterPercent: (n: number) => `Chapter: ${n}%`,
+    prevChapter: (title: string) => `← ${title}`,
+    nextChapter: (title: string) => `${title} →`,
+    chapterPosition: (i: number, total: number) => `${i} / ${total}`,
+    navPrev: "Previous chapter",
+    navNext: "Next chapter",
   },
 };
 
@@ -101,12 +124,14 @@ export function ChapterProgressBar({
   memory,
   storyId,
   closeChapter,
+  nav,
 }: {
   rows: TurnRow[];
   compact?: boolean;
   memory?: MemoryDetails;
   storyId?: string;
   closeChapter?: CloseChapterAction;
+  nav?: ChapterNav;
 }) {
   // Hooks first — never put an early return before useState/useEffect/useLocale.
   const { locale } = useUiLocale();
@@ -185,11 +210,34 @@ export function ChapterProgressBar({
       className="border-b border-surface-border bg-surface-raised/60 text-xs"
       data-testid="chapter-progress-bar"
     >
-      {/* Always-visible row: progress + memory toggle + (optional) close action + sync indicator */}
+      {/* Always-visible row: nav ◀ + progress + memory toggle + (optional) close action + nav ▶ + sync indicator */}
       <div className="flex items-center gap-2 px-3 py-1.5">
+        {nav ? (
+          <button
+            type="button"
+            onClick={() => nav.prev && nav.onNavigate(nav.prev.id)}
+            disabled={!nav.prev}
+            aria-label={t.navPrev}
+            title={nav.prev ? `${t.navPrev}: ${nav.prev.title}` : t.navPrev}
+            data-testid="chapter-nav-prev"
+            className="flex shrink-0 items-center gap-1 rounded-full border border-surface-border bg-surface px-2 py-1 text-[10px] text-zinc-300 hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-surface-border disabled:hover:text-zinc-300"
+          >
+            <span aria-hidden>◀</span>
+            <span className="hidden max-w-[8rem] truncate sm:inline">
+              {nav.prev?.title ?? "—"}
+            </span>
+          </button>
+        ) : null}
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center justify-between gap-2 text-[11px] text-zinc-500">
-            <span>{t.chapterProgress}</span>
+            <span className="flex items-center gap-1.5">
+              {t.chapterProgress}
+              {nav && nav.total > 1 ? (
+                <span className="rounded-full bg-surface px-1.5 text-[10px] text-zinc-500">
+                  {t.chapterPosition(nav.currentIndex, nav.total)}
+                </span>
+              ) : null}
+            </span>
             <span className={ready ? "text-accent" : "text-zinc-400"}>
               {percent}% · {statusLabel}
             </span>
@@ -242,6 +290,23 @@ export function ChapterProgressBar({
               <span aria-hidden>✓</span>
             )}
             <span>{closeChapter.busy ? closeChapter.busyLabel : closeChapter.label}</span>
+          </button>
+        ) : null}
+
+        {nav ? (
+          <button
+            type="button"
+            onClick={() => nav.next && nav.onNavigate(nav.next.id)}
+            disabled={!nav.next}
+            aria-label={t.navNext}
+            title={nav.next ? `${t.navNext}: ${nav.next.title}` : t.navNext}
+            data-testid="chapter-nav-next"
+            className="flex shrink-0 items-center gap-1 rounded-full border border-surface-border bg-surface px-2 py-1 text-[10px] text-zinc-300 hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-surface-border disabled:hover:text-zinc-300"
+          >
+            <span className="hidden max-w-[8rem] truncate sm:inline">
+              {nav.next?.title ?? "—"}
+            </span>
+            <span aria-hidden>▶</span>
           </button>
         ) : null}
       </div>

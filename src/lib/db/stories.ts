@@ -837,6 +837,84 @@ export async function getTurns(chapterId: string): Promise<TurnRow[]> {
   return (data ?? []) as TurnRow[];
 }
 
+export type ChapterSibling = {
+  id: string;
+  title: string;
+  index_in_band: number;
+  status: string;
+} | null;
+
+export type ChapterSiblings = {
+  prev: ChapterSibling;
+  next: ChapterSibling;
+  total: number;
+  currentIndex: number;
+};
+
+/**
+ * Resolve the previous and next chapter for a given chapter, ordered by
+ * `index_in_band`. Used by the chapter nav arrows in the header bar.
+ *
+ * Returns null for both siblings on the first/last chapter. Local-mode
+ * stories return null (Local-First-Standard-Praxis: nav not implemented
+ * for IndexedDB chapters — the chapter page is the canonical overview).
+ */
+export async function getChapterSiblings(
+  storyId: string,
+  chapterId: string,
+): Promise<ChapterSiblings | null> {
+  if (isLocalStoryId(storyId) || isLocalEntityId(chapterId)) {
+    return null;
+  }
+  const supabase = getCloudSupabase();
+  // 1. Find the current chapter's band_id + index_in_band.
+  const { data: current, error: cErr } = await supabase
+    .from("chapters")
+    .select("id, band_id, index_in_band, title, status")
+    .eq("id", chapterId)
+    .single();
+  if (cErr || !current) return null;
+  const bandId = current.band_id as string;
+  const myIndex = current.index_in_band as number;
+  // 2. Fetch the band-ordered chapter list (small — typically <20 rows).
+  const { data: siblings, error: sErr } = await supabase
+    .from("chapters")
+    .select("id, title, index_in_band, status")
+    .eq("band_id", bandId)
+    .order("index_in_band");
+  if (sErr || !siblings) return null;
+  const list = siblings as Array<{
+    id: string;
+    title: string;
+    index_in_band: number;
+    status: string;
+  }>;
+  const idx = list.findIndex((c) => c.id === chapterId);
+  if (idx < 0) return null;
+  const prev = idx > 0 ? list[idx - 1] : null;
+  const next = idx < list.length - 1 ? list[idx + 1] : null;
+  return {
+    prev: prev
+      ? {
+          id: prev.id,
+          title: prev.title,
+          index_in_band: prev.index_in_band,
+          status: prev.status,
+        }
+      : null,
+    next: next
+      ? {
+          id: next.id,
+          title: next.title,
+          index_in_band: next.index_in_band,
+          status: next.status,
+        }
+      : null,
+    total: list.length,
+    currentIndex: myIndex,
+  };
+}
+
 export async function appendTurn(
   chapterId: string,
   index: number,

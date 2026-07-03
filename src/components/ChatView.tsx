@@ -6,6 +6,10 @@ import {
   AutoChapterOverlay,
   type AutoChapterOverlayPhase,
 } from "@/components/AutoChapterOverlay";
+import {
+  AutoCloseOverlay,
+  type AutoCloseOverlayPhase,
+} from "@/components/AutoCloseOverlay";
 import { GeneratingIndicator } from "@/components/GeneratingIndicator";
 import { BubbleNavArrows } from "@/components/BubbleNavArrows";
 import { ChatTurnBubble } from "@/components/ChatTurnBubble";
@@ -106,6 +110,7 @@ import {
   createNextChapter,
   getStoryBundle,
   getTurns,
+  getChapterSiblings,
   rebuildBandSummary,
   rebuildBandSummaryIncremental,
   seedChapterIntro,
@@ -114,6 +119,7 @@ import {
   updateChapterTitle,
   updateStorySettings,
   type ChapterRow,
+  type ChapterSiblings,
   type CharacterRow,
   type TurnRow,
 } from "@/lib/db/stories";
@@ -263,6 +269,14 @@ export function ChatView({
     null,
   );
   const [autoChapterRows, setAutoChapterRows] = useState<TurnRow[]>([]);
+  // Phase 8: auto-close-chapter background flow. The server endpoint
+  // (POST /api/chapter/close) drives the phase transitions; the client
+  // only reflects them. See lib/api/closeChapterClient.ts.
+  const [autoClosePhase, setAutoClosePhase] =
+    useState<AutoCloseOverlayPhase | null>(null);
+  const [autoCloseStatus, setAutoCloseStatus] = useState<string | null>(null);
+  const autoCloseBusyRef = useRef(false);
+  const autoCloseDeferredRef = useRef<string | null>(null);
   const autoSessionRef = useRef(false);
   const autoSessionStopRef = useRef(false);
   const drivePausedRef = useRef(false);
@@ -332,6 +346,9 @@ export function ChatView({
   const bubbleRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const [bubbleFocusIndex, setBubbleFocusIndex] = useState(0);
+  const [chapterSiblings, setChapterSiblings] = useState<ChapterSiblings | null>(
+    null,
+  );
   const loadSeqRef = useRef(0);
   const prevTurnCountRef = useRef(0);
   const chatBusyRef = useRef(false);
@@ -553,6 +570,28 @@ export function ChatView({
     ttsBaselineReadyRef.current = true;
     setTurns(rows);
   }, [chapterId, syncKnownTurns]);
+
+  // Phase 8: load the previous/next chapter for the header-bar nav arrows.
+  // The query is small (one band-scoped SELECT, typically <20 rows) and only
+  // re-runs when the chapter changes — not on every turn.
+  useEffect(() => {
+    let cancelled = false;
+    setChapterSiblings(null);
+    void getChapterSiblings(storyId, chapterId).then((s) => {
+      if (!cancelled) setChapterSiblings(s);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [storyId, chapterId]);
+
+  const navigateChapter = useCallback(
+    (targetChapterId: string) => {
+      if (!targetChapterId || targetChapterId === chapterId) return;
+      router.push(`/story/${storyId}/chat?chapter=${targetChapterId}`);
+    },
+    [router, storyId, chapterId],
+  );
 
   useEffect(() => {
     if (!turns.length) return;
@@ -1126,6 +1165,116 @@ export function ChatView({
     setAutoChapterRows([]);
     router.push(`/story/${storyId}/chapter`);
   }, [chapterId, router, storyId]);
+
+  // Phase 8: auto-close flow. The button in ChapterProgressBar
+  // (closeChapter.onClick) opens the overlay in "prompt" phase; the user
+  // confirms and we POST /api/chapter/close which runs the full close
+  // workflow server-side. On 2xx we redirect to the new chapter; on error
+  // the overlay shows the message with a retry button.
+  const autoCloseAbortRef = useRef<AbortController | null>(null);
+  const startAutoClose = useCallback(
+    async (hardLimit: boolean) => {
+      if (autoCloseBusyRef.current) return;
+      autoCloseBusyRef.current = true;
+      autoCloseAbortRef.current?.abort();
+      const ctrl = new AbortController();
+      autoCloseAbortRef.current = ctrl;
+      setAutoCloseStatus(null);
+      setAutoClosePhase("closing");
+      try {
+        const { postCloseChapter } = await import(
+          "@/lib/api/closeChapterClient"
+        );
+        // We need the bandId; fetch the bundle to read it. The endpoint
+        // also accepts storyId+chapterId and could resolve bandId server-side,
+        // but for now we resolve client-side once and pass it through.
+        const { getStoryBundle } = await import("@/lib/db/stories");
+        const bundle = await getStoryBundle(storyId, chapterId);
+        setAutoCloseStatus("Plot-Stand wird gesichert …");
+        setAutoClosePhase("summarizing");
+        const result = await postCloseChapter(
+          {
+            storyId,
+            chapterId,
+            bandId: bundle.band.id as string,
+            introMode: "ai_bridge",
+          },
+          ctrl.signal,
+        );
+        if (!result.ok) {
+          setAutoCloseStatus(result.error);
+          setAutoClosePhase("error");
+          autoCloseBusyRef.current = false;
+          return;
+        }
+        setAutoClosePhase("consolidating");
+        setAutoCloseStatus("Band-Übersicht wird konsolidiert …");
+        // Consolidation happens inside the server endpoint as part of the
+        // close flow; this client phase is mostly UI breathing room.
+        setAutoClosePhase("done");
+        setAutoCloseStatus("Fertig — springe ins neue Kapitel …");
+        await touchStoryUpdated(storyId);
+        router.push(`/story/${storyId}/chat?chapter=${result.newChapterId}`);
+      } catch (e) {
+        if (ctrl.signal.aborted) return;
+        setAutoCloseStatus(
+          e instanceof Error ? e.message : String(e),
+        );
+        setAutoClosePhase("error");
+      } finally {
+        if (!ctrl.signal.aborted) {
+          autoCloseBusyRef.current = false;
+        }
+      }
+    },
+    [storyId, chapterId, router],
+  );
+
+  const promptAutoClose = useCallback(
+    (hardLimit: boolean) => {
+      if (autoCloseBusyRef.current) return;
+      if (autoCloseDeferredRef.current === chapterId) return;
+      if (autoClosePhase && autoClosePhase !== "error") return;
+      setAutoClosePhase("prompt");
+    },
+    [autoClosePhase, chapterId],
+  );
+
+  const dismissAutoClosePrompt = useCallback(() => {
+    autoCloseDeferredRef.current = chapterId;
+    setAutoClosePhase(null);
+    setAutoCloseStatus(null);
+  }, [chapterId]);
+
+  const openManualClosePage = useCallback(() => {
+    autoCloseDeferredRef.current = chapterId;
+    setAutoClosePhase(null);
+    setAutoCloseStatus(null);
+    router.push(`/story/${storyId}/chapter`);
+  }, [chapterId, router, storyId]);
+
+  const retryAutoClose = useCallback(() => {
+    void startAutoClose(false);
+  }, [startAutoClose]);
+
+  const cancelAutoCloseError = useCallback(() => {
+    setAutoClosePhase(null);
+    setAutoCloseStatus(null);
+    autoCloseBusyRef.current = false;
+  }, []);
+
+  // Reset auto-close state when navigating between chapters so a stale
+  // overlay doesn't bleed across the chapterId boundary.
+  useEffect(() => {
+    if (
+      autoCloseDeferredRef.current &&
+      autoCloseDeferredRef.current !== chapterId
+    ) {
+      autoCloseDeferredRef.current = null;
+    }
+    setAutoClosePhase(null);
+    setAutoCloseStatus(null);
+  }, [chapterId]);
 
   const persistAssistantReply = async (
     full: string,
@@ -2077,13 +2226,38 @@ export function ChatView({
             pinsCount: storySettings.pinnedNotes?.length ?? 0,
             syncing: memorySyncActive || castSyncActive,
           }}
+          nav={
+            chapterSiblings
+              ? {
+                  prev: chapterSiblings.prev
+                    ? {
+                        id: chapterSiblings.prev.id,
+                        title: chapterSiblings.prev.title,
+                      }
+                    : null,
+                  next: chapterSiblings.next
+                    ? {
+                        id: chapterSiblings.next.id,
+                        title: chapterSiblings.next.title,
+                      }
+                    : null,
+                  total: chapterSiblings.total,
+                  currentIndex: chapterSiblings.currentIndex,
+                  onNavigate: navigateChapter,
+                }
+              : undefined
+          }
           closeChapter={
             turns.length > 0
               ? {
                   label: t("chat.closeChapter"),
                   busyLabel: t("common.saving") || t("chat.closingChapter") || "…",
-                  busy: false,
-                  onClick: () => router.push(`/story/${storyId}/chapter`),
+                  busy: !!autoClosePhase && autoClosePhase !== "error" && autoClosePhase !== "prompt",
+                  onClick: () => promptAutoClose(false),
+                  hint:
+                    autoClosePhase && autoClosePhase !== "error" && autoClosePhase !== "prompt"
+                      ? t("common.saving")
+                      : undefined,
                 }
               : undefined
           }
@@ -2370,6 +2544,19 @@ export function ChatView({
           onAutoContinue={() => void executeAutoChapterClose(autoChapterRows)}
           onManualTransition={openManualChapterTransition}
           onDismiss={dismissAutoChapterPrompt}
+        />
+      ) : null}
+
+      {autoClosePhase ? (
+        <AutoCloseOverlay
+          open
+          phase={autoClosePhase}
+          status={autoCloseStatus}
+          onAutoClose={() => void startAutoClose(false)}
+          onManualTransition={openManualClosePage}
+          onLater={dismissAutoClosePrompt}
+          onRetry={retryAutoClose}
+          onCancelError={cancelAutoCloseError}
         />
       ) : null}
     </div>
