@@ -113,8 +113,11 @@ export async function POST(req: Request) {
   if (!isValidString(chapterId)) {
     return jsonError(400, "chapterId is required", "invalid_input");
   }
-  if (!isValidString(bandId)) {
-    return jsonError(400, "bandId is required", "invalid_input");
+  // bandId is optional — the server resolves it from the chapter row.
+  // We validate the prefix when present so local-mode IDs are caught
+  // before any DB work.
+  if (bandId !== undefined && !isValidString(bandId)) {
+    return jsonError(400, "bandId must be a non-empty string", "invalid_input");
   }
   const validIntroModes = [
     "ai_bridge",
@@ -164,19 +167,52 @@ export async function POST(req: Request) {
     );
   }
 
+  // Preflight: reject local-mode IDs explicitly so the client can fall back
+  // to the client-side close flow without an extra round-trip.
+  if (
+    (typeof storyId === "string" && storyId.startsWith("local-")) ||
+    (typeof chapterId === "string" && chapterId.startsWith("local-")) ||
+    (typeof bandId === "string" && bandId.startsWith("local-"))
+  ) {
+    return jsonError(
+      400,
+      "Lokale Storys müssen den client-seitigen Abschluss-Flow nutzen.",
+      "local_mode_unsupported",
+    );
+  }
+
   // Fetch the chapter + verify ownership + load the turns in one shot.
+  // RLS may return PGRST116 (no rows) either because the chapter doesn't
+  // exist OR because the user lacks read access. We can't tell the two
+  // apart from the error alone, so we surface a dedicated
+  // `chapter_not_accessible` code that the client can disambiguate.
   const { data: chapter, error: chErr } = await supabase
     .from("chapters")
     .select("id, band_id, story_id, title, index_in_band, phase_hint, status")
     .eq("id", chapterId)
     .single();
+  if (chErr?.code === "PGRST116" || (!chapter && chErr)) {
+    return jsonError(
+      404,
+      "Chapter nicht zugänglich — entweder nicht vorhanden oder keine Lese-Berechtigung.",
+      "chapter_not_accessible",
+    );
+  }
   if (chErr || !chapter) {
     return jsonError(404, "Chapter not found", "chapter_not_found");
   }
-  if (chapter.band_id !== bandId || chapter.story_id !== storyId) {
+  // bandId is optional in the body (server resolves from chapter).
+  if (bandId && chapter.band_id !== bandId) {
     return jsonError(
       400,
-      "Chapter does not match provided storyId/bandId",
+      "Chapter does not match provided bandId",
+      "invalid_input",
+    );
+  }
+  if (chapter.story_id !== storyId) {
+    return jsonError(
+      400,
+      "Chapter does not match provided storyId",
       "invalid_input",
     );
   }
@@ -188,13 +224,20 @@ export async function POST(req: Request) {
     );
   }
 
-  // Verify story ownership (RLS would also enforce this; we check explicitly
-  // so we can return a clean 403 instead of a 500 from RLS).
+  // Verify story ownership. RLS may have already filtered the row, so a
+  // missing story here means RLS-blocked, not missing.
   const { data: story, error: stErr } = await supabase
     .from("stories")
     .select("id, user_id, settings")
     .eq("id", storyId)
     .single();
+  if (stErr?.code === "PGRST116" || (!story && stErr)) {
+    return jsonError(
+      403,
+      "Story nicht zugänglich — RLS blockt den Zugriff.",
+      "story_not_accessible",
+    );
+  }
   if (stErr || !story) {
     return jsonError(404, "Story not found", "story_not_found");
   }

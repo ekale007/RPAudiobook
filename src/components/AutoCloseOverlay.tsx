@@ -1,6 +1,5 @@
 "use client";
 
-import { GeneratingIndicator } from "@/components/GeneratingIndicator";
 import { OverlayPanel } from "@/components/ui/OverlayPanel";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 
@@ -13,6 +12,11 @@ import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
  *  - `consolidating`  server running incremental band consolidation
  *  - `done`           server finished — client redirects to new chapter
  *  - `error`          recoverable error with retry + cancel
+ *
+ * UX rule (Phase 8.1, user-reported): the running/error/done phases are
+ * surfaced as a non-blocking inline toast (AutoCloseToast) below the
+ * ChapterProgressBar, so the chat stays usable. Only the `prompt` phase
+ * is a blocking modal — the user must confirm before any LLM work starts.
  */
 export type AutoCloseOverlayPhase =
   | "prompt"
@@ -30,13 +34,6 @@ const T = {
     promptNow: "Jetzt abschließen",
     promptManual: "Manuell gestalten",
     promptLater: "Später",
-    closing: "Plot-Stand wird gesichert …",
-    summarizing: "Kapitel-Zusammenfassung wird geschrieben …",
-    consolidating: "Band-Übersicht wird konsolidiert …",
-    done: "Fertig — springe ins neue Kapitel …",
-    errorLead: "Beim Abschluss ist ein Fehler aufgetreten.",
-    errorRetry: "Erneut versuchen",
-    errorCancel: "Abbrechen",
   },
   en: {
     title: "Close chapter",
@@ -45,35 +42,20 @@ const T = {
     promptNow: "Close now",
     promptManual: "Customize first",
     promptLater: "Later",
-    closing: "Saving plot state …",
-    summarizing: "Writing chapter summary …",
-    consolidating: "Consolidating band summary …",
-    done: "Done — opening next chapter …",
-    errorLead: "Something went wrong while closing the chapter.",
-    errorRetry: "Retry",
-    errorCancel: "Cancel",
   },
 };
 
 export function AutoCloseOverlay({
-  open,
   phase,
-  status,
   onAutoClose,
   onManualTransition,
   onLater,
-  onRetry,
-  onCancelError,
   hardLimit = false,
 }: {
-  open: boolean;
   phase: AutoCloseOverlayPhase;
-  status: string | null;
   onAutoClose: () => void;
   onManualTransition: () => void;
   onLater: () => void;
-  onRetry: () => void;
-  onCancelError: () => void;
   /** True when the auto-close was triggered by a hard-limit (56+ turns) hint. */
   hardLimit?: boolean;
 }) {
@@ -82,74 +64,11 @@ export function AutoCloseOverlay({
   const lang: "de" | "en" = locale === "en" ? "en" : "de";
   const t = T[lang];
 
-  if (!open) return null;
+  // Only the prompt phase is rendered as a blocking modal. All other
+  // phases are surfaced inline via AutoCloseToast so the user can keep
+  // reading while the server works.
+  if (phase !== "prompt") return null;
 
-  // Running phases: blocking modal with the same GeneratingIndicator look.
-  if (phase === "closing" || phase === "summarizing" || phase === "consolidating" || phase === "done") {
-    const label =
-      status ??
-      (phase === "closing"
-        ? t.closing
-        : phase === "summarizing"
-          ? t.summarizing
-          : phase === "consolidating"
-            ? t.consolidating
-            : t.done);
-    return (
-      <OverlayPanel
-        open
-        onClose={() => {}}
-        title={t.title}
-        blocking
-        hideClose
-      >
-        <div className="flex flex-col gap-4 pb-2">
-          <p className="text-sm leading-relaxed text-zinc-300">
-            {phase === "done"
-              ? t.done
-              : lang === "de"
-                ? "Das passiert im Hintergrund auf dem Server. Du kannst den Tab geöffnet lassen — du wirst automatisch ins neue Kapitel weitergeleitet, sobald alles fertig ist."
-                : "This runs in the background on the server. You can keep the tab open — you'll be redirected to the next chapter as soon as it's ready."}
-          </p>
-          <GeneratingIndicator label={label} onCancel={undefined} />
-        </div>
-      </OverlayPanel>
-    );
-  }
-
-  // Error: blocking but with retry/cancel — recoverable.
-  if (phase === "error") {
-    return (
-      <OverlayPanel
-        open
-        onClose={onCancelError}
-        title={t.title}
-        blocking
-      >
-        <div className="flex flex-col gap-4 pb-2">
-          <p className="text-sm leading-relaxed text-rose-200">
-            {status ?? t.errorLead}
-          </p>
-          <button
-            type="button"
-            onClick={onRetry}
-            className="rounded-xl bg-accent py-3 text-sm font-medium text-black"
-          >
-            {t.errorRetry}
-          </button>
-          <button
-            type="button"
-            onClick={onCancelError}
-            className="rounded-xl border border-surface-border bg-surface-raised py-3 text-sm font-medium text-zinc-200"
-          >
-            {t.errorCancel}
-          </button>
-        </div>
-      </OverlayPanel>
-    );
-  }
-
-  // prompt: user decides.
   return (
     <OverlayPanel
       open

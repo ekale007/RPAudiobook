@@ -10,6 +10,7 @@ import {
   AutoCloseOverlay,
   type AutoCloseOverlayPhase,
 } from "@/components/AutoCloseOverlay";
+import { AutoCloseToast } from "@/components/AutoCloseToast";
 import { GeneratingIndicator } from "@/components/GeneratingIndicator";
 import { BubbleNavArrows } from "@/components/BubbleNavArrows";
 import { ChatTurnBubble } from "@/components/ChatTurnBubble";
@@ -123,6 +124,7 @@ import {
   type CharacterRow,
   type TurnRow,
 } from "@/lib/db/stories";
+import { isLocalEntityId, isLocalStoryId } from "@/lib/db/localStoryIds";
 import {
   patchTurnCosts,
   truncateTurnsFrom,
@@ -275,6 +277,9 @@ export function ChatView({
   const [autoClosePhase, setAutoClosePhase] =
     useState<AutoCloseOverlayPhase | null>(null);
   const [autoCloseStatus, setAutoCloseStatus] = useState<string | null>(null);
+  const [autoCloseNewChapterHref, setAutoCloseNewChapterHref] = useState<
+    string | null
+  >(null);
   const autoCloseBusyRef = useRef(false);
   const autoCloseDeferredRef = useRef<string | null>(null);
   const autoSessionRef = useRef(false);
@@ -1170,7 +1175,11 @@ export function ChatView({
   // (closeChapter.onClick) opens the overlay in "prompt" phase; the user
   // confirms and we POST /api/chapter/close which runs the full close
   // workflow server-side. On 2xx we redirect to the new chapter; on error
-  // the overlay shows the message with a retry button.
+  // the toast shows the message with a retry button.
+  //
+  // Phase 8.1: local-mode stories don't go through the server endpoint —
+  // they have no Supabase rows. We fall back to the existing client-side
+  // `executeAutoChapterClose` which already handles the Local-First path.
   const autoCloseAbortRef = useRef<AbortController | null>(null);
   const startAutoClose = useCallback(
     async (hardLimit: boolean) => {
@@ -1180,23 +1189,50 @@ export function ChatView({
       const ctrl = new AbortController();
       autoCloseAbortRef.current = ctrl;
       setAutoCloseStatus(null);
+      setAutoCloseNewChapterHref(null);
       setAutoClosePhase("closing");
+
+      // Local-mode preflight: skip the server endpoint, run the existing
+      // client-side close flow. The toast is fine here too because the
+      // client flow completes in ~3-6s and the user is in Local-First
+      // mode where they have less multi-tasking expectation.
+      if (isLocalStoryId(storyId) || isLocalEntityId(chapterId)) {
+        try {
+          setAutoClosePhase("summarizing");
+          setAutoCloseStatus("Lokal-Modus: schließe client-seitig …");
+          const ok = await executeAutoChapterClose(turns);
+          if (!ok) {
+            setAutoCloseStatus("Lokaler Abschluss fehlgeschlagen.");
+            setAutoClosePhase("error");
+          } else {
+            setAutoClosePhase("done");
+            setAutoCloseStatus("Fertig — neues Kapitel verfügbar.");
+          }
+        } catch (e) {
+          setAutoCloseStatus(
+            e instanceof Error ? e.message : String(e),
+          );
+          setAutoClosePhase("error");
+        } finally {
+          autoCloseBusyRef.current = false;
+        }
+        return;
+      }
+
       try {
         const { postCloseChapter } = await import(
           "@/lib/api/closeChapterClient"
         );
-        // We need the bandId; fetch the bundle to read it. The endpoint
-        // also accepts storyId+chapterId and could resolve bandId server-side,
-        // but for now we resolve client-side once and pass it through.
-        const { getStoryBundle } = await import("@/lib/db/stories");
-        const bundle = await getStoryBundle(storyId, chapterId);
         setAutoCloseStatus("Plot-Stand wird gesichert …");
         setAutoClosePhase("summarizing");
+        // The server resolves bandId from the chapter, so we don't need a
+        // getStoryBundle round-trip on the client. This was a previous
+        // bug: an extra Supabase SELECT just to read one field.
         const result = await postCloseChapter(
           {
             storyId,
             chapterId,
-            bandId: bundle.band.id as string,
+            bandId: "", // server resolves from chapter
             introMode: "ai_bridge",
           },
           ctrl.signal,
@@ -1209,12 +1245,21 @@ export function ChatView({
         }
         setAutoClosePhase("consolidating");
         setAutoCloseStatus("Band-Übersicht wird konsolidiert …");
-        // Consolidation happens inside the server endpoint as part of the
-        // close flow; this client phase is mostly UI breathing room.
         setAutoClosePhase("done");
-        setAutoCloseStatus("Fertig — springe ins neue Kapitel …");
+        setAutoCloseStatus("Fertig — neues Kapitel verfügbar.");
+        setAutoCloseNewChapterHref(
+          `/story/${storyId}/chat?chapter=${result.newChapterId}`,
+        );
         await touchStoryUpdated(storyId);
-        router.push(`/story/${storyId}/chat?chapter=${result.newChapterId}`);
+        // Auto-redirect after a short beat so the user sees the success
+        // toast. (Toast stays visible on the next chapter via chapterId
+        // reset effect, but the next page has no autoClose state.)
+        setTimeout(() => {
+          if (!ctrl.signal.aborted) {
+            autoCloseBusyRef.current = false;
+            router.push(`/story/${storyId}/chat?chapter=${result.newChapterId}`);
+          }
+        }, 1500);
       } catch (e) {
         if (ctrl.signal.aborted) return;
         setAutoCloseStatus(
@@ -1223,11 +1268,13 @@ export function ChatView({
         setAutoClosePhase("error");
       } finally {
         if (!ctrl.signal.aborted) {
+          // Error path releases here. Success path releases in the
+          // setTimeout closure above (after the auto-redirect).
           autoCloseBusyRef.current = false;
         }
       }
     },
-    [storyId, chapterId, router],
+    [storyId, chapterId, router, turns, executeAutoChapterClose],
   );
 
   const promptAutoClose = useCallback(
@@ -1244,12 +1291,14 @@ export function ChatView({
     autoCloseDeferredRef.current = chapterId;
     setAutoClosePhase(null);
     setAutoCloseStatus(null);
+    setAutoCloseNewChapterHref(null);
   }, [chapterId]);
 
   const openManualClosePage = useCallback(() => {
     autoCloseDeferredRef.current = chapterId;
     setAutoClosePhase(null);
     setAutoCloseStatus(null);
+    setAutoCloseNewChapterHref(null);
     router.push(`/story/${storyId}/chapter`);
   }, [chapterId, router, storyId]);
 
@@ -1260,11 +1309,12 @@ export function ChatView({
   const cancelAutoCloseError = useCallback(() => {
     setAutoClosePhase(null);
     setAutoCloseStatus(null);
+    setAutoCloseNewChapterHref(null);
     autoCloseBusyRef.current = false;
   }, []);
 
   // Reset auto-close state when navigating between chapters so a stale
-  // overlay doesn't bleed across the chapterId boundary.
+  // overlay/toast doesn't bleed across the chapterId boundary.
   useEffect(() => {
     if (
       autoCloseDeferredRef.current &&
@@ -1274,6 +1324,7 @@ export function ChatView({
     }
     setAutoClosePhase(null);
     setAutoCloseStatus(null);
+    setAutoCloseNewChapterHref(null);
   }, [chapterId]);
 
   const persistAssistantReply = async (
@@ -2547,16 +2598,48 @@ export function ChatView({
         />
       ) : null}
 
-      {autoClosePhase ? (
+      {autoClosePhase === "prompt" ? (
         <AutoCloseOverlay
-          open
           phase={autoClosePhase}
-          status={autoCloseStatus}
           onAutoClose={() => void startAutoClose(false)}
           onManualTransition={openManualClosePage}
           onLater={dismissAutoClosePrompt}
+        />
+      ) : null}
+
+      {autoClosePhase &&
+      autoClosePhase !== "prompt" &&
+      autoClosePhase !== "done" &&
+      autoClosePhase !== "error" ? (
+        <AutoCloseToast
+          phase={autoClosePhase}
+          status={autoCloseStatus}
+          newChapterHref={null}
           onRetry={retryAutoClose}
-          onCancelError={cancelAutoCloseError}
+          onCancel={cancelAutoCloseError}
+          onDismiss={cancelAutoCloseError}
+        />
+      ) : null}
+
+      {autoClosePhase === "done" ? (
+        <AutoCloseToast
+          phase={autoClosePhase}
+          status={autoCloseStatus}
+          newChapterHref={autoCloseNewChapterHref}
+          onRetry={retryAutoClose}
+          onCancel={cancelAutoCloseError}
+          onDismiss={cancelAutoCloseError}
+        />
+      ) : null}
+
+      {autoClosePhase === "error" ? (
+        <AutoCloseToast
+          phase={autoClosePhase}
+          status={autoCloseStatus}
+          newChapterHref={null}
+          onRetry={retryAutoClose}
+          onCancel={cancelAutoCloseError}
+          onDismiss={cancelAutoCloseError}
         />
       ) : null}
     </div>
