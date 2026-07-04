@@ -10,6 +10,7 @@ import {
   extractOpenRouterErrorMessage,
   formatOpenRouterErrorMessage,
 } from "@/lib/llm/openRouterErrors";
+import { getServerLlmContext } from "@/lib/llm/serverCompletion";
 
 
 
@@ -323,6 +324,30 @@ export async function completeOpenRouterWithUsage(
   opts?: CompleteOpts,
 ): Promise<OpenRouterCompleteResult> {
   if (isServerLlmAvailable() && !isLocalMode()) {
+    // When invoked from a Vercel serverless function (e.g. the chapter
+    // close workflow) we cannot call /api/llm/chat via authFetch — a
+    // relative URL throws ERR_INVALID_URL on the server because Node
+    // has no window.location. Route through serverCompletion which
+    // posts directly to OpenRouter with the server-side key and logs
+    // usage against the wallet.
+    const ctx = getServerLlmContext();
+    if (ctx) {
+      const { serverCompleteOpenRouter } = await import(
+        "@/lib/llm/serverCompletion"
+      );
+      const result = await serverCompleteOpenRouter(messages, {
+        maxTokens: opts?.maxTokens ?? 1024,
+        temperature: opts?.temperature ?? 0.5,
+        responseFormat: opts?.responseFormat,
+      });
+      return {
+        content: result.content,
+        llmCostCents: result.llmCostCents,
+      };
+    }
+
+    // Browser context: chat UI runs here, relative URL works because
+    // the browser resolves it against window.location.origin.
     const res = await authFetch("/api/llm/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

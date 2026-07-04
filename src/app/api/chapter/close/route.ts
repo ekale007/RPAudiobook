@@ -52,6 +52,7 @@ import { extractPlotState } from "@/lib/memory/plotState";
 import { summarizeChapter } from "@/lib/chapter/summarize";
 import { resolveChapterIntro } from "@/lib/chapter/chapterIntro";
 import { consolidateBandSummary } from "@/lib/chapter/bandSummary";
+import { setServerLlmContext, clearServerLlmContext } from "@/lib/llm/serverCompletion";
 import type { TurnRow } from "@/lib/db/stories";
 
 // Force dynamic — this endpoint runs LLM calls and writes to Supabase;
@@ -177,6 +178,24 @@ export async function POST(req: Request) {
     1,
   );
   if (balanceErr) return balanceErr;
+
+  // Hand the tier limits + a working supabase client to the universal
+  // `completeOpenRouter` module so the LLM calls below route through
+  // server-side OpenRouter directly (no relative-URL authFetch roundtrip
+  // — that throws ERR_INVALID_URL on Vercel serverless). See
+  // lib/llm/serverCompletion.ts. We clear the context in `finally` so
+  // a re-used module global can't leak into the next request.
+  const effectiveTierLimits = tierLimits ?? {
+    tier: "beta" as const,
+    tierLabel: "Beta",
+    llmBudgetCents: 0,
+    llmPerHour: 60,
+    ttsPerHour: 60,
+    ttsStorageMax: 100,
+    allowedModelIds: null,
+  };
+  setServerLlmContext({ supabase: userSupabase, tierLimits: effectiveTierLimits });
+  try {
 
   // Switch to the service-role (admin) client for all chapter/story/band
   // operations. RLS is bypassed — we re-check ownership explicitly via
@@ -595,4 +614,10 @@ export async function POST(req: Request) {
     closedChapterTitle: currentTitle,
     introTurnsCount: introTurns.length,
   });
+  } finally {
+    // Always clear the per-request LLM context so a re-used module
+    // global can't leak tierLimits from one user into the next request
+    // if Vercel ever warms this lambda.
+    clearServerLlmContext();
+  }
 }
