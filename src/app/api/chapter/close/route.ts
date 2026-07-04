@@ -220,30 +220,31 @@ export async function POST(req: Request) {
     );
   }
 
-  // Fetch the chapter + verify ownership + load the turns in one shot.
-  // RLS may return PGRST116 (no rows) either because the chapter doesn't
-  // exist OR because the user lacks read access. We can't tell the two
-  // apart from the error alone, so we surface a dedicated
-  // `chapter_not_accessible` code that the client can disambiguate.
-  // Phase 8.4: log the inputs so the user can paste the chapterId from
-  // Vercel Function Logs when reporting bugs.
+  // Phase 8.5: chapter-SELECT only reads chapter-owned columns. The
+  // chapters table has no `story_id` column — that's on bands. We do a
+  // 2-stage lookup: chapter → band → story. This matches the schema
+  // "Story → Band → Chapter" (AGENTS.md) and avoids the column-doesn't-
+  // exist error that broke 8.3. Logging the inputs and each lookup
+  // result so we can see exactly where things go wrong.
   console.log(
     `[close-chapter] start chapterId=${chapterId} storyId=${storyId} bandId=${
       bandId || "(omitted)"
-    } chErr.code=${""}`,
+    }`,
   );
   const { data: chapter, error: chErr } = await supabase
     .from("chapters")
-    .select("id, band_id, story_id, title, index_in_band, phase_hint, status")
+    .select("id, band_id, title, index_in_band, phase_hint, status")
     .eq("id", chapterId)
     .single();
   if (chErr) {
     console.log(
-      `[close-chapter] chapter-SELECT error: code=${chErr.code} message=${chErr.message} hint=${chErr.hint ?? ""} chapterId=${chapterId}`,
+      `[close-chapter] chapter-SELECT error: code=${chErr.code} message=${chErr.message} hint=${
+        chErr.hint ?? ""
+      } chapterId=${chapterId}`,
     );
   } else if (chapter) {
     console.log(
-      `[close-chapter] chapter-SELECT ok: id=${chapter.id} status=${chapter.status} band_id=${chapter.band_id} story_id=${chapter.story_id}`,
+      `[close-chapter] chapter-SELECT ok: id=${chapter.id} status=${chapter.status} band_id=${chapter.band_id}`,
     );
   }
   if (chErr?.code === "PGRST116" || (!chapter && chErr)) {
@@ -256,6 +257,7 @@ export async function POST(req: Request) {
   if (chErr || !chapter) {
     return jsonError(404, "Chapter not found", "chapter_not_found");
   }
+
   // bandId is optional in the body (server resolves from chapter).
   if (bandId && chapter.band_id !== bandId) {
     return jsonError(
@@ -264,10 +266,31 @@ export async function POST(req: Request) {
       "invalid_input",
     );
   }
-  if (chapter.story_id !== storyId) {
+
+  // Phase 8.5: fetch the parent band to get the story_id (chapters don't
+  // carry it directly). Two-stage join because there's no foreign-key
+  // embed in the table.
+  const { data: band, error: bandErr } = await supabase
+    .from("bands")
+    .select("id, story_id, band_summary")
+    .eq("id", chapter.band_id)
+    .single();
+  if (bandErr || !band) {
+    console.log(
+      `[close-chapter] band-SELECT error: code=${
+        bandErr?.code ?? "no-row"
+      } message=${bandErr?.message ?? ""} bandId=${chapter.band_id}`,
+    );
+    return jsonError(404, "Band not found for this chapter", "band_not_found");
+  }
+  console.log(
+    `[close-chapter] band-SELECT ok: id=${band.id} story_id=${band.story_id}`,
+  );
+
+  if (band.story_id !== storyId) {
     return jsonError(
       400,
-      "Chapter does not match provided storyId",
+      "Chapter belongs to a different story than provided",
       "invalid_input",
     );
   }
@@ -279,21 +302,19 @@ export async function POST(req: Request) {
     );
   }
 
-  // Verify story ownership. RLS may have already filtered the row, so a
-  // missing story here means RLS-blocked, not missing.
+  // Verify story ownership. With service-role this always returns the
+  // row, but we still check user_id to enforce the auth boundary.
   const { data: story, error: stErr } = await supabase
     .from("stories")
     .select("id, user_id, settings")
     .eq("id", storyId)
     .single();
-  if (stErr?.code === "PGRST116" || (!story && stErr)) {
-    return jsonError(
-      403,
-      "Story nicht zugänglich — RLS blockt den Zugriff.",
-      "story_not_accessible",
+  if (!story) {
+    console.log(
+      `[close-chapter] story-SELECT error: no-row storyId=${storyId} (stErr=${
+        stErr ? `${stErr.code} ${stErr.message}` : "none"
+      })`,
     );
-  }
-  if (stErr || !story) {
     return jsonError(404, "Story not found", "story_not_found");
   }
   if (story.user_id !== auth.user.id) {
