@@ -211,7 +211,7 @@ export function ChapterProgressBar({
       data-testid="chapter-progress-bar"
     >
       {/* Always-visible row: nav ◀ + progress + memory toggle + (optional) close action + nav ▶ + sync indicator */}
-      <div className="flex items-center gap-2 px-3 py-1.5">
+      <div className="flex items-center gap-1.5 px-3 py-1.5">
         {nav ? (
           <button
             type="button"
@@ -220,25 +220,25 @@ export function ChapterProgressBar({
             aria-label={t.navPrev}
             title={nav.prev ? `${t.navPrev}: ${nav.prev.title}` : t.navPrev}
             data-testid="chapter-nav-prev"
-            className="flex shrink-0 items-center gap-1 rounded-full border border-surface-border bg-surface px-2 py-1 text-[10px] text-zinc-300 hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-surface-border disabled:hover:text-zinc-300"
+            className="flex max-w-[6rem] shrink-0 items-center gap-1 truncate rounded-full border border-surface-border bg-surface px-2 py-1 text-[10px] text-zinc-300 hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-surface-border disabled:hover:text-zinc-300"
           >
-            <span aria-hidden>◀</span>
-            <span className="hidden max-w-[8rem] truncate sm:inline">
+            <span aria-hidden className="shrink-0">◀</span>
+            <span className="hidden truncate sm:inline">
               {nav.prev?.title ?? "—"}
             </span>
           </button>
         ) : null}
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center justify-between gap-2 text-[11px] text-zinc-500">
-            <span className="flex items-center gap-1.5">
-              {t.chapterProgress}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate">{t.chapterProgress}</span>
               {nav && nav.total > 1 ? (
-                <span className="rounded-full bg-surface px-1.5 text-[10px] text-zinc-500">
+                <span className="shrink-0 rounded-full bg-surface px-1.5 text-[10px] text-zinc-500">
                   {t.chapterPosition(nav.currentIndex, nav.total)}
                 </span>
               ) : null}
             </span>
-            <span className={ready ? "text-accent" : "text-zinc-400"}>
+            <span className={`shrink-0 ${ready ? "text-accent" : "text-zinc-400"}`}>
               {percent}% · {statusLabel}
             </span>
           </div>
@@ -262,16 +262,16 @@ export function ChapterProgressBar({
             title={t.memory}
           >
             <span
-              className={`inline-block transition-transform ${open ? "rotate-90" : ""}`}
+              className={`inline-block shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
               aria-hidden
             >
               ▶
             </span>
-            <span className="font-medium uppercase tracking-wide">
+            <span className="hidden font-medium uppercase tracking-wide md:inline">
               {t.memory}
             </span>
             {memory?.syncing ? (
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-300" />
+              <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-amber-300" />
             ) : null}
           </button>
         ) : null}
@@ -301,12 +301,12 @@ export function ChapterProgressBar({
             aria-label={t.navNext}
             title={nav.next ? `${t.navNext}: ${nav.next.title}` : t.navNext}
             data-testid="chapter-nav-next"
-            className="flex shrink-0 items-center gap-1 rounded-full border border-surface-border bg-surface px-2 py-1 text-[10px] text-zinc-300 hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-surface-border disabled:hover:text-zinc-300"
+            className="flex max-w-[6rem] shrink-0 items-center gap-1 truncate rounded-full border border-surface-border bg-surface px-2 py-1 text-[10px] text-zinc-300 hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-surface-border disabled:hover:text-zinc-300"
           >
-            <span className="hidden max-w-[8rem] truncate sm:inline">
+            <span className="hidden truncate sm:inline">
               {nav.next?.title ?? "—"}
             </span>
-            <span aria-hidden>▶</span>
+            <span aria-hidden className="shrink-0">▶</span>
           </button>
         ) : null}
       </div>
