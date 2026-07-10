@@ -21,6 +21,16 @@ const LOOSE_SPEAKER_TAG = new RegExp(
   "gi",
 );
 
+/**
+ * Quoted variant: <<"speaker:naya-vellen">> or << "speaker:slug" >>.
+ * Some models wrap the slug in straight quotes after << — common in JSON-flavored output.
+ * Must run BEFORE LOOSE_SPEAKER_TAG in the normalize pipeline; consumes the wrapper quotes.
+ */
+const QUOTED_SPEAKER_TAG = new RegExp(
+  `<<\\s*"?\\s*speaker\\s*:\\s*(${SPEAKER_SLUG})\\s*"?\\s*>>`,
+  "gi",
+);
+
 const SPEAKER_TAG_LINE = new RegExp(
   `^\\s*<<\\s*speaker\\s*:\\s*(${SPEAKER_SLUG})\\s*>>\\s*$`,
   "i",
@@ -52,6 +62,10 @@ function canonicalSpeakerTag(slug: string): string {
 /** Normalize any speaker tag variant to <<speaker:slug>>; strip empty <<>>. */
 export function normalizeMalformedSpeakerTags(text: string): string {
   let out = text.replace(
+    QUOTED_SPEAKER_TAG,
+    (_m, slug: string) => canonicalSpeakerTag(slug),
+  );
+  out = out.replace(
     LOOSE_SPEAKER_TAG,
     (_m, slug: string) => canonicalSpeakerTag(slug),
   );
