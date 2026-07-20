@@ -13,6 +13,7 @@ import { getTtsHourlyLimitForUser } from "@/lib/server/userTier";
 import { estimateTtsCostCents } from "@/lib/server/billingSettings";
 import { requireSpendableBalance } from "@/lib/server/wallet";
 import { readElevenLabsUsageHeaders, recordAndChargeTtsUsage } from "@/lib/server/ttsUsage";
+import { getCachedTtsAudio, putCachedTtsAudio, ttsCacheDebugKey } from "@/lib/server/ttsCache";
 import { isElevenV3Model } from "@/lib/tts/elevenLabsDelivery";
 import {
   coerceElevenLabsVoiceId,
@@ -166,6 +167,39 @@ export async function POST(req: Request) {
     tryModels.push("eleven_multilingual_v2", "eleven_turbo_v2_5");
   }
 
+  // Server-side cache: content-addressed in Supabase Storage.
+  // Saves API costs for repeated identical (voice, text) pairs.
+  if (saas && supabase) {
+    const cached = await getCachedTtsAudio(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      "elevenlabs",
+      voiceId,
+      text,
+    );
+    if (cached) {
+      console.log("tts-cache: hit", ttsCacheDebugKey("elevenlabs", voiceId, text));
+      // Still charge (cache storage costs are negligible, but the user
+      // consumed the TTS feature). Use a flat small charge for cache hits.
+      const hitCents = 1;
+      await recordAndChargeTtsUsage(supabase, {
+        label: "TTS ElevenLabs (cached)",
+        modelId,
+        characters: text.length,
+        costCents: hitCents,
+      });
+      return new NextResponse(cached, {
+        status: 200,
+        headers: {
+          "Content-Type": "audio/mpeg",
+          "Cache-Control": "private, max-age=86400",
+          "X-TTS-Cache": "hit",
+          "X-TTS-Cost-Cents": String(hitCents),
+        },
+      });
+    }
+  }
+
   let upstream: Response | null = null;
   let usedModel = modelId;
   let usedVoice = voiceId;
@@ -248,6 +282,19 @@ export async function POST(req: Request) {
   }
 
   const audio = await upstream.arrayBuffer();
+
+  // Save to server-side cache for future requests.
+  if (saas && supabase) {
+    putCachedTtsAudio(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      "elevenlabs",
+      usedVoice,
+      text,
+      audio,
+    ).catch(() => {}); // fire-and-forget is fine for cache writes
+  }
+
   return new NextResponse(audio, {
     status: 200,
     headers: {

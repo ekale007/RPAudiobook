@@ -14,6 +14,7 @@ import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 import { getTtsHourlyLimitForUser } from "@/lib/server/userTier";
 import { requireSpendableBalance } from "@/lib/server/wallet";
 import { recordAndChargeTtsUsage } from "@/lib/server/ttsUsage";
+import { getCachedTtsAudio, putCachedTtsAudio, ttsCacheDebugKey } from "@/lib/server/ttsCache";
 import {
   looksLikeFishReferenceId,
   normalizeFishAudioModel,
@@ -106,6 +107,34 @@ export async function POST(req: Request) {
     );
   }
 
+  // Server-side cache check.
+  if (saas && supabase) {
+    const cached = await getCachedTtsAudio(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      "fish",
+      referenceId,
+      text,
+    );
+    if (cached) {
+      console.log("tts-cache: hit", ttsCacheDebugKey("fish", referenceId, text));
+      await recordAndChargeTtsUsage(supabase, {
+        label: "TTS Fish Audio (cached)",
+        modelId: model,
+        characters: text.length,
+        costCents: 1,
+      });
+      return new NextResponse(cached, {
+        status: 200,
+        headers: {
+          "Content-Type": "audio/mpeg",
+          "Cache-Control": "private, max-age=86400",
+          "X-TTS-Cache": "hit",
+        },
+      });
+    }
+  }
+
   const upstream = await fetch(FISH_TTS_URL, {
     method: "POST",
     headers: {
@@ -162,6 +191,18 @@ export async function POST(req: Request) {
   }
 
   const audio = await upstream.arrayBuffer();
+
+  if (saas && supabase) {
+    putCachedTtsAudio(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      "fish",
+      referenceId,
+      text,
+      audio,
+    ).catch(() => {});
+  }
+
   return new NextResponse(audio, {
     status: 200,
     headers: {

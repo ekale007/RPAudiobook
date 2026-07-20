@@ -12,6 +12,7 @@ import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 import { getTtsHourlyLimitForUser } from "@/lib/server/userTier";
 import { requireSpendableBalance } from "@/lib/server/wallet";
 import { recordAndChargeTtsUsage } from "@/lib/server/ttsUsage";
+import { getCachedTtsAudio, putCachedTtsAudio, ttsCacheDebugKey } from "@/lib/server/ttsCache";
 import {
   falTtsMaxChars,
   formatFalTtsError,
@@ -83,6 +84,34 @@ export async function POST(req: Request) {
     );
   }
 
+  // Server-side cache check.
+  if (supabase) {
+    const cached = await getCachedTtsAudio(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      "fal",
+      voice,
+      text,
+    );
+    if (cached) {
+      console.log("tts-cache: hit", ttsCacheDebugKey("fal", voice, text));
+      await recordAndChargeTtsUsage(supabase, {
+        label: "TTS fal.ai (cached)",
+        modelId: model,
+        characters: text.length,
+        costCents: 1,
+      });
+      return new NextResponse(cached, {
+        status: 200,
+        headers: {
+          "Content-Type": "audio/mpeg",
+          "Cache-Control": "private, max-age=86400",
+          "X-TTS-Cache": "hit",
+        },
+      });
+    }
+  }
+
   try {
     const { audio, contentType } = await synthesizeFalTts(
       apiKey,
@@ -102,6 +131,16 @@ export async function POST(req: Request) {
       characters: text.length,
       costCents: ttsCostCents,
     });
+
+    // Save to cache for future requests.
+    putCachedTtsAudio(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      "fal",
+      voice,
+      text,
+      audio,
+    ).catch(() => {});
 
     return new NextResponse(audio, {
       status: 200,
