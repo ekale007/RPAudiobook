@@ -8,7 +8,7 @@ import {
   getRateLimitLlmPerHour,
   getRateLimitTtsPerHour,
 } from "@/lib/server/env";
-import { getBetaLlmBudgetCents } from "@/lib/server/llmUsage";
+import { getBetaLlmBudgetCents, requireLlmMonthlyBudget } from "@/lib/server/llmUsage";
 import {
   extractOpenRouterErrorMessage,
   formatOpenRouterErrorMessage,
@@ -49,6 +49,9 @@ export async function POST(req: Request) {
 
   const balanceErr = await requireSpendableBalance(supabase, auth.user.id, 1);
   if (balanceErr) return balanceErr;
+
+  const budgetErr = await requireLlmMonthlyBudget(supabase, auth.user.id, tierLimits);
+  if (budgetErr) return budgetErr;
 
   const llmPerHour = tierLimits?.llmPerHour ?? getRateLimitLlmPerHour();
   const limit = checkRateLimit(`llm:${auth.user.id}`, llmPerHour);

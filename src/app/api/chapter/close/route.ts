@@ -46,6 +46,7 @@ import {
 } from "@/lib/server/env";
 import { fetchUserTierLimits } from "@/lib/server/userTier";
 import { requireSpendableBalance } from "@/lib/server/wallet";
+import { requireLlmMonthlyBudget } from "@/lib/server/llmUsage";
 import { completeOpenRouter } from "@/lib/llm/openrouter";
 import type { OpenRouterSettings } from "@/lib/types";
 import { extractPlotState } from "@/lib/memory/plotState";
@@ -179,7 +180,15 @@ export async function POST(req: Request) {
   );
   if (balanceErr) return balanceErr;
 
-  // Hand the tier limits + a working supabase client to the universal
+  // Monthly LLM budget gate — same gate as /api/llm/chat.
+  const budgetErr = await requireLlmMonthlyBudget(
+    userSupabase,
+    auth.user.id,
+    tierLimits,
+  );
+  if (budgetErr) return budgetErr;
+
+  // Hand the tier limits + a working supabase client
   // `completeOpenRouter` module so the LLM calls below route through
   // server-side OpenRouter directly (no relative-URL authFetch roundtrip
   // — that throws ERR_INVALID_URL on Vercel serverless). See

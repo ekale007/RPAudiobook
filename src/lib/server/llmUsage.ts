@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
 import {
   getLlmModelById,
   resolveAllowedLlmModel,
@@ -163,6 +164,40 @@ export async function fetchMonthlyUsage(
     tier: tierLimits.tier,
     tierLabel: tierLimits.tierLabel,
   };
+}
+
+/**
+ * Gate: block LLM requests when the monthly budget is spent.
+ * Returns a 429 response or null (pass). Soft-fails if the query
+ * errors — in that case we let the request through to avoid a
+ * false-positive outage.
+ */
+export async function requireLlmMonthlyBudget(
+  supabase: SupabaseClient,
+  userId: string,
+  tierLimits: Awaited<ReturnType<typeof fetchUserTierLimits>> | null,
+): Promise<NextResponse | null> {
+  // Only enforce when tier data is available (graceful fallback).
+  if (!tierLimits) return null;
+  try {
+    const monthly = await fetchMonthlyUsage(supabase, userId);
+    if (monthly.budgetRemainingCents <= 0) {
+      return NextResponse.json(
+        {
+          error: `Dein monatliches LLM-Budget (${formatCentsDe(monthly.budgetCents)}) ist aufgebraucht. Nächste Freischaltung am Monatsersten.`,
+          code: "monthly_budget_exhausted",
+          budgetCents: monthly.budgetCents,
+          costCents: monthly.costCents,
+          budgetRemainingCents: 0,
+          periodMonth: monthly.periodMonth,
+        },
+        { status: 429 },
+      );
+    }
+  } catch {
+    // DB query failed — don't block legitimate usage
+  }
+  return null;
 }
 
 export type RecordLlmUsageOptions = {
