@@ -14,8 +14,8 @@ import { requireApiActor } from "@/lib/server/requireApiActor";
 import { readBearerClientKey } from "@/lib/server/ttsClientKeys";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 import { getTtsHourlyLimitForUser } from "@/lib/server/userTier";
-import { insertUsageEvent } from "@/lib/server/usageEvents";
-import { applyUsageCharge, requireSpendableBalance } from "@/lib/server/wallet";
+import { requireSpendableBalance } from "@/lib/server/wallet";
+import { recordAndChargeTtsUsage } from "@/lib/server/ttsUsage";
 import {
   normalizeOpenRouterTtsModel,
   normalizeOpenRouterTtsVoice,
@@ -134,15 +134,13 @@ export async function POST(req: Request) {
       supabase,
       text.length,
     );
-    void insertUsageEvent(supabase, {
-      kind: "tts",
+    await recordAndChargeTtsUsage(supabase, {
       label: "TTS OpenRouter",
       modelId: model,
       providerRef: generationId,
       characters: text.length,
       costCents: ttsCostCents,
     });
-    void applyUsageCharge(supabase, ttsCostCents);
   }
 
   const audio = await upstream.arrayBuffer();

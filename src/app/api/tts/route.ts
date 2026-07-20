@@ -10,10 +10,9 @@ import { isSaasMode } from "@/lib/server/deploymentMode";
 import { requireApiActor } from "@/lib/server/requireApiActor";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 import { getTtsHourlyLimitForUser } from "@/lib/server/userTier";
-import { insertUsageEvent } from "@/lib/server/usageEvents";
 import { estimateTtsCostCents } from "@/lib/server/billingSettings";
-import { applyUsageCharge, requireSpendableBalance } from "@/lib/server/wallet";
-import { readElevenLabsUsageHeaders } from "@/lib/server/ttsUsage";
+import { requireSpendableBalance } from "@/lib/server/wallet";
+import { readElevenLabsUsageHeaders, recordAndChargeTtsUsage } from "@/lib/server/ttsUsage";
 import { isElevenV3Model } from "@/lib/tts/elevenLabsDelivery";
 import {
   coerceElevenLabsVoiceId,
@@ -227,15 +226,13 @@ export async function POST(req: Request) {
       charCount,
       usedModel,
     );
-    void insertUsageEvent(supabase, {
-      kind: "tts",
+    await recordAndChargeTtsUsage(supabase, {
       label: "TTS ElevenLabs",
       modelId: usedModel,
       providerRef: elevenHeaders.requestId,
       characters: charCount,
       costCents: ttsCostCents,
     });
-    void applyUsageCharge(supabase, ttsCostCents);
   }
 
   const audio = await upstream.arrayBuffer();

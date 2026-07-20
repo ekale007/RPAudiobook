@@ -4,16 +4,16 @@ import { estimateFishTtsCostCents } from "@/lib/server/billingSettings";
 import {
   getFishAudioApiKey,
   isServerFishAudioTtsConfigured,
+  getRateLimitTtsPerHour,
 } from "@/lib/server/env";
 import { checkRateLimit } from "@/lib/server/rateLimit";
 import { isSaasMode } from "@/lib/server/deploymentMode";
 import { requireApiActor } from "@/lib/server/requireApiActor";
 import { readBearerClientKey } from "@/lib/server/ttsClientKeys";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
-import { getRateLimitTtsPerHour } from "@/lib/server/env";
 import { getTtsHourlyLimitForUser } from "@/lib/server/userTier";
-import { insertUsageEvent } from "@/lib/server/usageEvents";
-import { applyUsageCharge, requireSpendableBalance } from "@/lib/server/wallet";
+import { requireSpendableBalance } from "@/lib/server/wallet";
+import { recordAndChargeTtsUsage } from "@/lib/server/ttsUsage";
 import {
   looksLikeFishReferenceId,
   normalizeFishAudioModel,
@@ -151,14 +151,12 @@ export async function POST(req: Request) {
   let ttsCostCents = 0;
   if (saas && supabase) {
     ttsCostCents = await estimateFishTtsCostCents(supabase, utf8Bytes);
-    void insertUsageEvent(supabase, {
-      kind: "tts",
+    await recordAndChargeTtsUsage(supabase, {
       label: "TTS Fish Audio",
       modelId: model,
       characters: text.length,
       costCents: ttsCostCents,
     });
-    void applyUsageCharge(supabase, ttsCostCents);
   }
 
   const audio = await upstream.arrayBuffer();

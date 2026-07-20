@@ -10,8 +10,8 @@ import { checkRateLimit } from "@/lib/server/rateLimit";
 import { requireUser } from "@/lib/server/requireUser";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
 import { getTtsHourlyLimitForUser } from "@/lib/server/userTier";
-import { insertUsageEvent } from "@/lib/server/usageEvents";
-import { applyUsageCharge, requireSpendableBalance } from "@/lib/server/wallet";
+import { requireSpendableBalance } from "@/lib/server/wallet";
+import { recordAndChargeTtsUsage } from "@/lib/server/ttsUsage";
 import {
   falTtsMaxChars,
   formatFalTtsError,
@@ -93,14 +93,12 @@ export async function POST(req: Request) {
       text.length,
       model,
     );
-    void insertUsageEvent(supabase, {
-      kind: "tts",
+    await recordAndChargeTtsUsage(supabase, {
       label: "TTS fal.ai",
       modelId: model,
       characters: text.length,
       costCents: ttsCostCents,
     });
-    void applyUsageCharge(supabase, ttsCostCents);
 
     return new NextResponse(audio, {
       status: 200,
