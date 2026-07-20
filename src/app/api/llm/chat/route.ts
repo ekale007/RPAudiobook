@@ -47,33 +47,7 @@ export async function POST(req: Request) {
     tierLimits = null;
   }
 
-  const balanceErr = await requireSpendableBalance(supabase, auth.user.id, 1);
-  if (balanceErr) return balanceErr;
-
-  const budgetErr = await requireLlmMonthlyBudget(supabase, auth.user.id, tierLimits);
-  if (budgetErr) return budgetErr;
-
-  const llmPerHour = tierLimits?.llmPerHour ?? getRateLimitLlmPerHour();
-  const limit = checkRateLimit(`llm:${auth.user.id}`, llmPerHour);
-  if (!limit.ok) {
-    return NextResponse.json(
-      {
-        error: "LLM rate limit exceeded",
-        code: "hourly_limit",
-        retryAfterSec: limit.retryAfterSec,
-      },
-      { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } },
-    );
-  }
-
-  const apiKey = getOpenRouterApiKey();
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "OPENROUTER_API_KEY not configured on server" },
-      { status: 503 },
-    );
-  }
-
+  // Parse body early so we can estimate cost for the pre-flight wallet check.
   let body: {
     messages?: Array<{ role: string; content: string }>;
     stream?: boolean;
@@ -91,6 +65,37 @@ export async function POST(req: Request) {
   const messages = body.messages;
   if (!messages?.length) {
     return NextResponse.json({ error: "Missing messages" }, { status: 400 });
+  }
+
+  const apiKey = getOpenRouterApiKey();
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "OPENROUTER_API_KEY not configured on server" },
+      { status: 503 },
+    );
+  }
+
+  // Pre-flight wallet gate: estimate ~2 cents per 1K completion tokens
+  // (conservative heuristic covering even expensive beta-tier models).
+  // Actual cost is resolved post-request from OpenRouter usage / catalog.
+  const estimatedMinCents = Math.max(1, Math.ceil(((body.maxTokens ?? 2048) / 1000) * 2));
+  const balanceErr = await requireSpendableBalance(supabase, auth.user.id, estimatedMinCents);
+  if (balanceErr) return balanceErr;
+
+  const budgetErr = await requireLlmMonthlyBudget(supabase, auth.user.id, tierLimits);
+  if (budgetErr) return budgetErr;
+
+  const llmPerHour = tierLimits?.llmPerHour ?? getRateLimitLlmPerHour();
+  const limit = checkRateLimit(`llm:${auth.user.id}`, llmPerHour);
+  if (!limit.ok) {
+    return NextResponse.json(
+      {
+        error: "LLM rate limit exceeded",
+        code: "hourly_limit",
+        retryAfterSec: limit.retryAfterSec,
+      },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } },
+    );
   }
 
   const resolved = tierLimits

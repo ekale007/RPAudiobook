@@ -39,8 +39,37 @@ export async function POST(req: Request) {
   const saas = isSaasMode();
   const supabase = saas ? await createServerSupabaseFromRequest(req) : null;
 
+  let body: {
+    text?: string;
+    model?: string;
+    voice?: string;
+  };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const text = body.text?.trim();
+  const model = normalizeOpenRouterTtsModel(
+    body.model?.trim() || getOpenRouterTtsModel(),
+  );
+  const voice = normalizeOpenRouterTtsVoice(model, body.voice);
+
+  if (!text) {
+    return NextResponse.json({ error: "Missing text" }, { status: 400 });
+  }
+  if (text.length > 2400) {
+    return NextResponse.json(
+      { error: "Text too long for single chunk (max 2400)" },
+      { status: 400 },
+    );
+  }
+
   if (saas && supabase) {
-    const balanceErr = await requireSpendableBalance(supabase, auth.user.id, 1);
+    // Pre-flight: ~1 cent per 500 chars.
+    const estMin = Math.max(1, Math.ceil(text.length / 500));
+    const balanceErr = await requireSpendableBalance(supabase, auth.user.id, estMin);
     if (balanceErr) return balanceErr;
   }
 
@@ -67,33 +96,6 @@ export async function POST(req: Request) {
           : "OpenRouter API-Key oben unter OpenRouter eintragen (gleicher Key wie LLM).",
       },
       { status: 503 },
-    );
-  }
-
-  let body: {
-    text?: string;
-    model?: string;
-    voice?: string;
-  };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const text = body.text?.trim();
-  const model = normalizeOpenRouterTtsModel(
-    body.model?.trim() || getOpenRouterTtsModel(),
-  );
-  const voice = normalizeOpenRouterTtsVoice(model, body.voice);
-
-  if (!text) {
-    return NextResponse.json({ error: "Missing text" }, { status: 400 });
-  }
-  if (text.length > 2400) {
-    return NextResponse.json(
-      { error: "Text too long for single chunk (max 2400)" },
-      { status: 400 },
     );
   }
 

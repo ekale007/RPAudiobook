@@ -31,28 +31,6 @@ export async function POST(req: Request) {
   if ("error" in auth) return auth.error;
 
   const supabase = await createServerSupabaseFromRequest(req);
-  const balanceErr = await requireSpendableBalance(supabase, auth.user.id, 1);
-  if (balanceErr) return balanceErr;
-
-  const ttsPerHour = await getTtsHourlyLimitForUser(supabase, auth.user.id);
-  const limit = checkRateLimit(`tts-fal:${auth.user.id}`, ttsPerHour);
-  if (!limit.ok) {
-    return NextResponse.json(
-      { error: "TTS rate limit exceeded", retryAfterSec: limit.retryAfterSec },
-      { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } },
-    );
-  }
-
-  const apiKey = getFalApiKey();
-  if (!apiKey) {
-    return NextResponse.json(
-      {
-        error:
-          "fal.ai TTS not configured. Set FAL_API_KEY or FAL_KEY on the server.",
-      },
-      { status: 503 },
-    );
-  }
 
   let body: {
     text?: string;
@@ -77,6 +55,31 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: `Text too long for single chunk (max ${maxChars})` },
       { status: 400 },
+    );
+  }
+
+  // Pre-flight: ~1 cent per 500 chars.
+  const estMin = Math.max(1, Math.ceil(text.length / 500));
+  const balanceErr = await requireSpendableBalance(supabase, auth.user.id, estMin);
+  if (balanceErr) return balanceErr;
+
+  const ttsPerHour = await getTtsHourlyLimitForUser(supabase, auth.user.id);
+  const limit = checkRateLimit(`tts-fal:${auth.user.id}`, ttsPerHour);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "TTS rate limit exceeded", retryAfterSec: limit.retryAfterSec },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } },
+    );
+  }
+
+  const apiKey = getFalApiKey();
+  if (!apiKey) {
+    return NextResponse.json(
+      {
+        error:
+          "fal.ai TTS not configured. Set FAL_API_KEY or FAL_KEY on the server.",
+      },
+      { status: 503 },
     );
   }
 

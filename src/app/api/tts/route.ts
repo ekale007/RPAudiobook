@@ -38,8 +38,40 @@ export async function POST(req: Request) {
   const saas = isSaasMode();
   const supabase = saas ? await createServerSupabaseFromRequest(req) : null;
 
+  let body: {
+    text?: string;
+    voiceId?: string;
+    speakerSlug?: string;
+    modelId?: string;
+    locale?: string;
+    voiceSettings?: {
+      stability?: number;
+      similarity_boost?: number;
+      style?: number;
+      use_speaker_boost?: boolean;
+    };
+  };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const text = body.text?.trim();
+  if (!text) {
+    return NextResponse.json({ error: "Missing text" }, { status: 400 });
+  }
+  if (text.length > 2500) {
+    return NextResponse.json(
+      { error: "Text too long for single chunk (max 2500)" },
+      { status: 400 },
+    );
+  }
+
   if (saas && supabase) {
-    const balanceErr = await requireSpendableBalance(supabase, auth.user.id, 1);
+    // Pre-flight: ~1 cent per 500 chars covers ElevenLabs standard pricing.
+    const estMin = Math.max(1, Math.ceil(text.length / 500));
+    const balanceErr = await requireSpendableBalance(supabase, auth.user.id, estMin);
     if (balanceErr) return balanceErr;
   }
 
@@ -69,26 +101,6 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: {
-    text?: string;
-    voiceId?: string;
-    speakerSlug?: string;
-    modelId?: string;
-    locale?: string;
-    voiceSettings?: {
-      stability?: number;
-      similarity_boost?: number;
-      style?: number;
-      use_speaker_boost?: boolean;
-    };
-  };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const text = body.text?.trim();
   const locale = body.locale?.startsWith("de") ? "de" : "en";
   const speakerSlug = body.speakerSlug?.trim() || null;
 

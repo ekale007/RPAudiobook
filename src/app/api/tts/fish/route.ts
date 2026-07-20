@@ -37,37 +37,6 @@ export async function POST(req: Request) {
   const saas = isSaasMode();
   const supabase = saas ? await createServerSupabaseFromRequest(req) : null;
 
-  if (saas && supabase) {
-    const balanceErr = await requireSpendableBalance(supabase, auth.user.id, 1);
-    if (balanceErr) return balanceErr;
-  }
-
-  const ttsPerHour =
-    saas && supabase
-      ? await getTtsHourlyLimitForUser(supabase, auth.user.id)
-      : getRateLimitTtsPerHour();
-  const limit = checkRateLimit(`tts-fish:${auth.user.id}`, ttsPerHour);
-  if (!limit.ok) {
-    return NextResponse.json(
-      { error: "TTS rate limit exceeded", retryAfterSec: limit.retryAfterSec },
-      { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } },
-    );
-  }
-
-  const serverKey = getFishAudioApiKey();
-  const clientKey = readBearerClientKey(req);
-  const apiKey = saas ? (serverKey ?? clientKey) : clientKey;
-  if (!apiKey) {
-    return NextResponse.json(
-      {
-        error: saas
-          ? "Fish Audio TTS not configured. Set FISH_AUDIO_API_KEY on the server."
-          : "Fish Audio API-Key in Einstellungen eintragen (wird nur lokal im Browser gespeichert).",
-      },
-      { status: 503 },
-    );
-  }
-
   let body: {
     text?: string;
     referenceId?: string;
@@ -101,6 +70,39 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: "Text too long for single chunk (max 2400)" },
       { status: 400 },
+    );
+  }
+
+  if (saas && supabase) {
+    // Pre-flight: ~1 cent per 500 chars covers Fish Audio pricing.
+    const estMin = Math.max(1, Math.ceil(text.length / 500));
+    const balanceErr = await requireSpendableBalance(supabase, auth.user.id, estMin);
+    if (balanceErr) return balanceErr;
+  }
+
+  const ttsPerHour =
+    saas && supabase
+      ? await getTtsHourlyLimitForUser(supabase, auth.user.id)
+      : getRateLimitTtsPerHour();
+  const limit = checkRateLimit(`tts-fish:${auth.user.id}`, ttsPerHour);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "TTS rate limit exceeded", retryAfterSec: limit.retryAfterSec },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } },
+    );
+  }
+
+  const serverKey = getFishAudioApiKey();
+  const clientKey = readBearerClientKey(req);
+  const apiKey = saas ? (serverKey ?? clientKey) : clientKey;
+  if (!apiKey) {
+    return NextResponse.json(
+      {
+        error: saas
+          ? "Fish Audio TTS not configured. Set FISH_AUDIO_API_KEY on the server."
+          : "Fish Audio API-Key in Einstellungen eintragen (wird nur lokal im Browser gespeichert).",
+      },
+      { status: 503 },
     );
   }
 
