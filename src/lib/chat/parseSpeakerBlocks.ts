@@ -59,6 +59,15 @@ function canonicalSpeakerTag(slug: string): string {
   return `<<speaker:${normalizeTagSlug(slug)}>>`;
 }
 
+/** Catch unclosed speaker tags (missing >>). Model occasionally generates
+ *  <<speaker:guest:Maya Lin with spaces in the slug and no closing bracket.
+ *  Normalize: spaces → hyphens, append >>. Runs AFTER canonical tags are
+ *  resolved so it only catches genuinely broken tags. */
+const UNCLOSED_SPEAKER_TAG = new RegExp(
+  `<<\\s*speaker\\s*:\\s*([a-z0-9][a-z0-9_ :.-]*?)(?=(?:\\s*(?:$|\\n|<<|>>>)))`,
+  "gi",
+);
+
 /** Normalize any speaker tag variant to <<speaker:slug>>; strip empty <<>>. */
 export function normalizeMalformedSpeakerTags(text: string): string {
   let out = text.replace(
@@ -69,6 +78,12 @@ export function normalizeMalformedSpeakerTags(text: string): string {
     LOOSE_SPEAKER_TAG,
     (_m, slug: string) => canonicalSpeakerTag(slug),
   );
+  // Catch unclosed tags AFTER canonical ones (so we don't modify tags that
+  // were already resolved). Spaces → hyphens for slug compatibility.
+  out = out.replace(UNCLOSED_SPEAKER_TAG, (_m, slug: string) => {
+    const clean = slug.trim().toLowerCase().replace(/\s+/g, "-");
+    return `<<speaker:${clean}>>`;
+  });
   out = out.replace(EMPTY_ANGLE_TAG, "");
   return out;
 }
