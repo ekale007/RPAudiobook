@@ -448,6 +448,42 @@ export async function POST(req: Request) {
     return jsonError(500, "Failed to close chapter", "db_error");
   }
 
+  // 2.5. Reflection layer update (Diagnose Task 2B).
+  // Best-effort: generates a high-level story state snapshot for the
+  // LLM system prompt. Failure here does NOT roll back the chapter close.
+  try {
+    const storySettings = (story.settings as Record<string, unknown>) ?? {};
+    const existingContainer = parseReflections(storySettings.storyReflections);
+    const lastReflection =
+      existingContainer.reflections.length > 0
+        ? existingContainer.reflections[existingContainer.reflections.length - 1]
+        : null;
+    const plotSummary = plot.timeLabel
+      ? `${plot.timeLabel} — ${plot.location ?? "unknown location"}`
+      : (plot.location ?? "unknown location");
+
+    const newReflection = await generateReflectionCore(
+      (msgs, opts) =>
+        serverCompleteOpenRouter(msgs, {
+          maxTokens: opts.maxTokens,
+          temperature: opts.temperature,
+          responseFormat: opts.responseFormat,
+        }).then((r: { content: string }) => r.content),
+      {
+        turns: chatTurns,
+        existing: lastReflection,
+        plotStateSummary: plotSummary,
+        currentTurnIndex: rows[rows.length - 1].index_in_chapter,
+      },
+    );
+
+    const updated = appendReflection(existingContainer, newReflection);
+    storySettings.storyReflections = updated;
+    await admin.from("stories").update({ settings: storySettings }).eq("id", storyId);
+  } catch (e) {
+    console.warn("close-chapter: reflection update failed", e);
+  }
+
   // 3. Resolve next-phase hint from the freshly extracted plot state.
   // The phaseHintForNextChapter helper lives client-side; replicate the
   // logic here so we don't need to import a client-only file into a server
