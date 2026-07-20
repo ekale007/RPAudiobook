@@ -53,7 +53,8 @@ import { extractPlotState } from "@/lib/memory/plotState";
 import { summarizeChapter } from "@/lib/chapter/summarize";
 import { resolveChapterIntro } from "@/lib/chapter/chapterIntro";
 import { consolidateBandSummary } from "@/lib/chapter/bandSummary";
-import { setServerLlmContext, clearServerLlmContext } from "@/lib/llm/serverCompletion";
+import { setServerLlmContext, clearServerLlmContext, serverCompleteOpenRouter } from "@/lib/llm/serverCompletion";
+import { generateReflectionCore, parseReflections, appendReflection } from "@/lib/memory/reflections";
 import type { TurnRow } from "@/lib/db/stories";
 
 // Force dynamic — this endpoint runs LLM calls and writes to Supabase;

@@ -112,6 +112,31 @@ export async function generateReflection(args: {
   plotStateSummary: string;
   currentTurnIndex: number;
 }): Promise<StoryReflection> {
+  return generateReflectionCore(
+    (messages, opts) =>
+      completeOpenRouter(args.settings, messages, opts),
+    args,
+  );
+}
+
+/**
+ * Server-side variant: same logic but accepts an arbitrary completion
+ * function (e.g. `serverCompleteOpenRouter` from serverCompletion.ts).
+ * Used by the chapter-close route which runs on Vercel serverless where
+ * `authFetch`-based `completeOpenRouter` can't hit `/api/llm/chat`.
+ */
+export async function generateReflectionCore(
+  complete: (
+    messages: Array<{ role: "system" | "user"; content: string }>,
+    opts: { maxTokens: number; temperature: number; responseFormat: { type: "json_object" } },
+  ) => Promise<string>,
+  args: {
+    turns: ChatTurn[];
+    existing: StoryReflection | null;
+    plotStateSummary: string;
+    currentTurnIndex: number;
+  },
+): Promise<StoryReflection> {
   const transcript = buildReflectionTranscript(args.turns);
   const user = [
     args.existing
@@ -121,8 +146,7 @@ export async function generateReflection(args: {
     `Recent transcript (last ${args.turns.length} turns, ending at turn ${args.currentTurnIndex}):\n${transcript}`,
   ].join("\n\n");
 
-  const text = await completeOpenRouter(
-    args.settings,
+  const text = await complete(
     [
       { role: "system", content: REFLECTION_SYSTEM },
       { role: "user", content: user },
