@@ -383,9 +383,12 @@ export async function POST(req: Request) {
   const currentTitle = (chapter.title ?? "").trim() || `Chapter ${chapter.index_in_band}`;
   const phaseHint = chapter.phase_hint ?? null;
 
-  // 1. Plot-state finalize.
+  // 1+2. Plot-state extraction and chapter summary run in parallel —
+  // they share chatTurns + title but are otherwise independent.
+  // Saves ~5-8s on typical chapters (25-40 turns).
   let plot;
-  try {
+  let summary: string;
+  {
     const existingPlot = (() => {
       try {
         const settingsJson = story.settings as Record<string, unknown> | null;
@@ -394,58 +397,67 @@ export async function POST(req: Request) {
         return null;
       }
     })();
-    plot = await extractPlotState(settings, chatTurns, existingPlot, {
-      chapterTitle: currentTitle,
-      phaseHint,
-    });
-  } catch (e) {
-    console.warn("close-chapter: plot-state extraction failed", e);
-    return jsonError(
-      502,
-      "Plot-Stand konnte nicht gesichert werden. Bitte erneut versuchen.",
-      "plot_extraction_failed",
-    );
+
+    const [plotSettled, summarySettled] = await Promise.allSettled([
+      extractPlotState(settings, chatTurns, existingPlot, {
+        chapterTitle: currentTitle,
+        phaseHint,
+      }),
+      summarizeChapter(settings, chatTurns, currentTitle),
+    ]);
+
+    if (plotSettled.status === "rejected") {
+      console.warn("close-chapter: plot-state extraction failed", plotSettled.reason);
+      return jsonError(
+        502,
+        "Plot-Stand konnte nicht gesichert werden. Bitte erneut versuchen.",
+        "plot_extraction_failed",
+      );
+    }
+    if (summarySettled.status === "rejected") {
+      console.warn("close-chapter: summarize failed", summarySettled.reason);
+      return jsonError(
+        502,
+        "Zusammenfassung konnte nicht erstellt werden.",
+        "summarize_failed",
+      );
+    }
+    plot = plotSettled.value;
+    summary = summarySettled.value;
   }
 
-  // Persist plot state immediately so the rest of the flow can read the
-  // updated value. We do this before summarizeChapter so a partial failure
-  // here doesn't lose the chapter's plot state.
-  const { error: settingsErr } = await supabase
-    .from("stories")
-    .update({
-      settings: {
-        ...((story.settings as Record<string, unknown>) ?? {}),
-        plotState: plot,
-      },
-    })
-    .eq("id", storyId);
-  if (settingsErr) {
-    return jsonError(500, "Failed to persist plot state", "db_error");
-  }
-
-  // 2. Chapter summary.
-  let summary: string;
-  try {
-    summary = await summarizeChapter(settings, chatTurns, currentTitle);
-  } catch (e) {
-    console.warn("close-chapter: summarize failed", e);
-    return jsonError(
-      502,
-      "Zusammenfassung konnte nicht erstellt werden.",
-      "summarize_failed",
-    );
-  }
+  // Persist plot + summary.
   const closedAt = new Date().toISOString();
-  const { error: updChErr } = await supabase
-    .from("chapters")
-    .update({
-      chapter_summary: summary,
-      status: "closed",
-      closed_at: closedAt,
-    })
-    .eq("id", chapterId);
-  if (updChErr) {
-    return jsonError(500, "Failed to close chapter", "db_error");
+  {
+    const [settingsErr, updChErr] = await Promise.all([
+      supabase
+        .from("stories")
+        .update({
+          settings: {
+            ...((story.settings as Record<string, unknown>) ?? {}),
+            plotState: plot,
+          },
+        })
+        .eq("id", storyId)
+        .then(
+          () => null,
+          (e: unknown) => e,
+        ),
+      supabase
+        .from("chapters")
+        .update({
+          chapter_summary: summary,
+          status: "closed",
+          closed_at: closedAt,
+        })
+        .eq("id", chapterId)
+        .then(
+          () => null,
+          (e: unknown) => e,
+        ),
+    ]);
+    if (settingsErr) return jsonError(500, "Failed to persist plot state", "db_error");
+    if (updChErr) return jsonError(500, "Failed to close chapter", "db_error");
   }
 
   // 2.5. Reflection layer update (Diagnose Task 2B).
