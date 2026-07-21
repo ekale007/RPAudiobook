@@ -10,6 +10,8 @@ export type LlmModelCatalogEntry = {
   promptCentsPer1k: number;
   completionCentsPer1k: number;
   priceHint: string;
+  provider?: string | null;
+  providerModelId?: string | null;
 };
 
 export function useLlmModelCatalog() {
