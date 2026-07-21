@@ -34,6 +34,8 @@ export async function GET(req: Request) {
     promptCentsPer1k: m.promptCentsPer1k,
     completionCentsPer1k: m.completionCentsPer1k,
     priceHint: formatModelPriceHint(m),
+    provider: m.provider ?? null,
+    providerModelId: m.providerModelId ?? null,
   }));
 
   return NextResponse.json({

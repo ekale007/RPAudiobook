@@ -16,6 +16,10 @@ export type LlmPricingEntry = {
   promptCentsPer1k: number;
   completionCentsPer1k: number;
   markupPercent: number;
+  /** Non-OpenRouter provider (google-ai-studio, groq, etc.) */
+  provider?: "openrouter" | "google-ai-studio" | "groq" | null;
+  /** Model ID to send to the provider (defaults to id) */
+  providerModelId?: string | null;
 };
 
 export type TtsPricingUnit = "per_1k_chars" | "per_1m_bytes" | "per_1k_blocks";
@@ -112,6 +116,8 @@ export function defaultProviderPricing(): ProviderPricingPayload {
     promptCentsPer1k: m.promptCentsPer1k,
     completionCentsPer1k: m.completionCentsPer1k,
     markupPercent: 0,
+    provider: m.provider ?? null,
+    providerModelId: m.providerModelId ?? null,
   }));
   const tts = TTS_DEFINITIONS.map((def) => ({
     ...def,
@@ -129,7 +135,7 @@ function parseMarkup(raw: unknown): number {
 
 function parseLlmRow(
   raw: unknown,
-  fallback?: LlmModelOption,
+  fallback?: LlmPricingEntry,
 ): LlmPricingEntry | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
@@ -360,6 +366,8 @@ export async function fetchLlmModelCatalog(
     label: m.label,
     promptCentsPer1k: m.promptCentsPer1k,
     completionCentsPer1k: m.completionCentsPer1k,
+    provider: (m.provider as "openrouter" | "google-ai-studio" | "groq" | undefined) ?? undefined,
+    providerModelId: (m.providerModelId as string | undefined) ?? undefined,
   }));
 }
 
