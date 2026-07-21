@@ -21,9 +21,10 @@ export type TierLimitDefaults = {
 export type TierLimitsMap = Record<UserTier, TierLimitDefaults>;
 
 const FREE_MODEL_IDS = [
-  "google/gemini-2.5-flash-lite",
-  "deepseek/deepseek-v4-flash",
-  "qwen/qwen3.5-flash-02-23",
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "google/gemma-4-31b-it:free",
+  "google/gemma-4-26b-a4b-it:free",
+  "openrouter/free",
 ] as const;
 
 const CACHE_TTL_MS = 30_000;

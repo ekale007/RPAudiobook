@@ -39,6 +39,31 @@ const DEFAULT_CATALOG: LlmModelOption[] = [
     promptCentsPer1k: 0.08,
     completionCentsPer1k: 0.16,
   },
+  // Free models (0¢ via OpenRouter) — great for free tier
+  {
+    id: "nvidia/nemotron-3-ultra-550b-a55b:free",
+    label: "Nemotron 3 Ultra (gratis)",
+    promptCentsPer1k: 0,
+    completionCentsPer1k: 0,
+  },
+  {
+    id: "google/gemma-4-31b-it:free",
+    label: "Gemma 4 31B (gratis)",
+    promptCentsPer1k: 0,
+    completionCentsPer1k: 0,
+  },
+  {
+    id: "google/gemma-4-26b-a4b-it:free",
+    label: "Gemma 4 26B (gratis)", 
+    promptCentsPer1k: 0,
+    completionCentsPer1k: 0,
+  },
+  {
+    id: "openrouter/free",
+    label: "OpenRouter Free (Auto)",
+    promptCentsPer1k: 0,
+    completionCentsPer1k: 0,
+  },
 ];
 
 function parseCatalogEntry(raw: unknown): LlmModelOption | null {
