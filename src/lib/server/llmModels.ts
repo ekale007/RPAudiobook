@@ -1,14 +1,12 @@
 /** Admin-configured LLM catalog (OpenRouter model ids + estimated ¢/1k tokens).
  *  Rates: OpenRouter $/1M tokens ÷ 10 → promptCentsPer1k / completionCentsPer1k. */
 
-export type LlmModelOption = {
-  id: string;
-  label: string;
-  promptCentsPer1k: number;
-  completionCentsPer1k: number;
-};
+import { getProviderConfig, type LlmModelOptionWithProvider } from "@/lib/server/llmProviders";
 
-const DEFAULT_CATALOG: LlmModelOption[] = [
+// Re-export as the canonical type name used throughout the codebase.
+export type LlmModelOption = LlmModelOptionWithProvider;
+
+const DEFAULT_CATALOG: LlmModelOptionWithProvider[] = [
   {
     id: "deepseek/deepseek-v4-pro",
     label: "DeepSeek V4 Pro",
@@ -38,6 +36,40 @@ const DEFAULT_CATALOG: LlmModelOption[] = [
     label: "Aion 2.0",
     promptCentsPer1k: 0.08,
     completionCentsPer1k: 0.16,
+  },
+  // Google AI Studio — Gemini models (free: 1,500 req/day)
+  {
+    id: "google/gemini-2.5-flash",
+    label: "Gemini 2.5 Flash ✦",
+    promptCentsPer1k: 0,
+    completionCentsPer1k: 0,
+    provider: "google-ai-studio",
+    providerModelId: "gemini-2.5-flash",
+  },
+  {
+    id: "google/gemini-2.5-pro",
+    label: "Gemini 2.5 Pro ✦",
+    promptCentsPer1k: 0,
+    completionCentsPer1k: 0,
+    provider: "google-ai-studio",
+    providerModelId: "gemini-2.5-pro",
+  },
+  // Groq — fast open-source models (free: 30 req/min)
+  {
+    id: "groq/llama-4-maverick",
+    label: "Llama 4 Maverick ⚡",
+    promptCentsPer1k: 0,
+    completionCentsPer1k: 0,
+    provider: "groq",
+    providerModelId: "meta-llama/llama-4-maverick-17b-128e-instruct",
+  },
+  {
+    id: "groq/gemma-4-31b-it",
+    label: "Gemma 4 31B ⚡",
+    promptCentsPer1k: 0,
+    completionCentsPer1k: 0,
+    provider: "groq",
+    providerModelId: "google/gemma-4-31b-it",
   },
   // Free models (0¢ via OpenRouter) — great for free tier
   {

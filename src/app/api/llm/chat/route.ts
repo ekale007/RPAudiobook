@@ -1,19 +1,12 @@
-import { brand } from "@/lib/brand";
 import { NextResponse } from "next/server";
 import { resolveAllowedLlmModelForTier } from "@/lib/server/userTier";
 import { fetchUserTierLimits } from "@/lib/server/userTier";
 import {
   getOpenRouterApiKey,
-  getOpenRouterModel,
   getRateLimitLlmPerHour,
   getRateLimitTtsPerHour,
 } from "@/lib/server/env";
 import { getBetaLlmBudgetCents, requireLlmMonthlyBudget } from "@/lib/server/llmUsage";
-import {
-  extractOpenRouterErrorMessage,
-  formatOpenRouterErrorMessage,
-  isOpenRouterPrivacyError,
-} from "@/lib/llm/openRouterErrors";
 import { requireSpendableBalance } from "@/lib/server/wallet";
 import {
   createUsageTrackingStream,
@@ -22,17 +15,7 @@ import {
 import { checkRateLimit } from "@/lib/server/rateLimit";
 import { requireUser } from "@/lib/server/requireUser";
 import { createServerSupabaseFromRequest } from "@/lib/supabase/server";
-
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-
-function openRouterHeaders(apiKey: string): HeadersInit {
-  return {
-    Authorization: `Bearer ${apiKey}`,
-    "Content-Type": "application/json",
-    "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
-    "X-Title": brand.openRouterAppTitle,
-  };
-}
+import { getProviderConfig, postLlmCompletion } from "@/lib/server/llmProviders";
 
 export async function POST(req: Request) {
   const auth = await requireUser(req);
@@ -47,7 +30,6 @@ export async function POST(req: Request) {
     tierLimits = null;
   }
 
-  // Parse body early so we can estimate cost for the pre-flight wallet check.
   let body: {
     messages?: Array<{ role: string; content: string }>;
     stream?: boolean;
@@ -67,18 +49,36 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing messages" }, { status: 400 });
   }
 
-  const apiKey = getOpenRouterApiKey();
-  if (!apiKey) {
+  // Resolve model first to determine which provider API key we need.
+  const resolved = tierLimits
+    ? resolveAllowedLlmModelForTier(body.model, tierLimits)
+    : resolveAllowedLlmModelForTier(body.model, {
+        tier: "beta",
+        tierLabel: "Beta",
+        llmBudgetCents: getBetaLlmBudgetCents(),
+        llmPerHour: getRateLimitLlmPerHour(),
+        ttsPerHour: getRateLimitTtsPerHour(),
+        ttsStorageMax: 100,
+        allowedModelIds: null,
+      });
+
+  const providerConfig = getProviderConfig(resolved.provider ?? "openrouter");
+  if (!providerConfig || !providerConfig.isConfigured()) {
+    const prov = resolved.provider ?? "openrouter";
     return NextResponse.json(
-      { error: "OPENROUTER_API_KEY not configured on server" },
+      { error: `LLM-Provider "${prov}" nicht konfiguriert — API-Key fehlt.` },
       { status: 503 },
     );
   }
 
-  // Pre-flight wallet gate: estimate ~2 cents per 1K completion tokens
-  // (conservative heuristic covering even expensive beta-tier models).
-  // Actual cost is resolved post-request from OpenRouter usage / catalog.
-  const estimatedMinCents = Math.max(1, Math.ceil(((body.maxTokens ?? 2048) / 1000) * 2));
+  const providerModelId = resolved.providerModelId ?? resolved.id;
+  const provider = resolved.provider ?? "openrouter";
+
+  // Pre-flight wallet gate: free models (0¢) only need 1¢ minimum.
+  const modelRate = Math.max(resolved.promptCentsPer1k, resolved.completionCentsPer1k);
+  const estimatedMinCents = modelRate === 0
+    ? 1
+    : Math.max(1, Math.ceil(((body.maxTokens ?? 2048) / 1000) * (modelRate / 2)));
   const balanceErr = await requireSpendableBalance(supabase, auth.user.id, estimatedMinCents);
   if (balanceErr) return balanceErr;
 
@@ -98,107 +98,38 @@ export async function POST(req: Request) {
     );
   }
 
-  const resolved = tierLimits
-    ? resolveAllowedLlmModelForTier(body.model, tierLimits)
-    : resolveAllowedLlmModelForTier(body.model, {
-        tier: "beta",
-        tierLabel: "Beta",
-        llmBudgetCents: getBetaLlmBudgetCents(),
-        llmPerHour: getRateLimitLlmPerHour(),
-        ttsPerHour: getRateLimitTtsPerHour(),
-        ttsStorageMax: 100,
-        allowedModelIds: null,
-      });
-  const model = resolved.id;
-
   const payload: Record<string, unknown> = {
-    model,
+    model: providerModelId,
     messages,
     max_tokens: body.maxTokens ?? 2048,
     temperature: body.temperature ?? 0.85,
     stream: Boolean(body.stream),
   };
-  if (body.responseFormat) {
+  if (body.responseFormat && provider === "openrouter") {
+    // Only OpenRouter supports response_format natively;
+    // other providers handle it via system prompt instructions.
     payload.response_format = body.responseFormat;
   }
 
-  const upstream = await postOpenRouter(apiKey, payload);
+  const upstream = await postLlmCompletion(provider, payload);
 
   if (!upstream.ok) {
-    const errText = await upstream.text();
-    const message = extractOpenRouterErrorMessage(errText);
-    const formatted = formatOpenRouterErrorMessage(message, upstream.status);
-
-    const fallbackModel = tierLimits
-      ? resolveAllowedLlmModelForTier(getOpenRouterModel(), tierLimits).id
-      : resolveAllowedLlmModelForTier(getOpenRouterModel(), {
-          tier: "beta",
-          tierLabel: "Beta",
-          llmBudgetCents: getBetaLlmBudgetCents(),
-          llmPerHour: getRateLimitLlmPerHour(),
-          ttsPerHour: getRateLimitTtsPerHour(),
-          ttsStorageMax: 100,
-          allowedModelIds: null,
-        }).id;
-    if (
-      upstream.status === 404 &&
-      isOpenRouterPrivacyError(message) &&
-      fallbackModel !== model
-    ) {
-      const retry = await postOpenRouter(apiKey, {
-        ...payload,
-        model: fallbackModel,
-      });
-      if (retry.ok) {
-        return forwardOpenRouterResponse(
-          retry,
-          body.stream,
-          supabase,
-          fallbackModel,
-          apiKey,
-        );
-      }
-    }
-
+    const errText = await upstream.text().catch(() => "");
     return NextResponse.json(
-      { error: formatted, code: "openrouter_upstream" },
-      { status: upstream.status },
+      {
+        error: `${provider} error ${upstream.status}: ${errText.slice(0, 400)}`,
+        code: "llm_upstream",
+      },
+      { status: upstream.status >= 400 ? upstream.status : 502 },
     );
   }
 
-  return forwardOpenRouterResponse(
-    upstream,
-    body.stream,
-    supabase,
-    model,
-    apiKey,
-  );
-}
-
-async function postOpenRouter(
-  apiKey: string,
-  payload: Record<string, unknown>,
-): Promise<Response> {
-  return fetch(OPENROUTER_URL, {
-    method: "POST",
-    headers: openRouterHeaders(apiKey),
-    body: JSON.stringify(payload),
-  });
-}
-
-async function forwardOpenRouterResponse(
-  upstream: Response,
-  stream: boolean | undefined,
-  supabase: Awaited<ReturnType<typeof createServerSupabaseFromRequest>>,
-  modelId: string,
-  openRouterApiKey: string,
-): Promise<Response> {
-  if (stream && upstream.body) {
+  if (body.stream && upstream.body) {
     const tracked = createUsageTrackingStream(
       upstream.body,
       supabase,
-      modelId,
-      openRouterApiKey,
+      resolved.id,
+      undefined, // Only OpenRouter supports generation-ID lookup
     );
     return new Response(tracked, {
       status: 200,
@@ -213,7 +144,8 @@ async function forwardOpenRouterResponse(
   const json = await upstream.json();
   let llmCostCents = 0;
   try {
-    llmCostCents = await recordUsageFromJsonResponse(supabase, json, modelId);
+    // Non-OpenRouter providers: use catalog estimate (no usage.cost field).
+    llmCostCents = await recordUsageFromJsonResponse(supabase, json, resolved.id);
   } catch (e) {
     console.warn("LLM usage record failed:", e);
   }

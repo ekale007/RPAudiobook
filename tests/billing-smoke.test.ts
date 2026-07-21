@@ -14,6 +14,8 @@ import type { ReflectionsContainer } from "../src/lib/memory/reflections";
 
 describe("promptBudget", () => {
   const emptyPlot: StoryPlotState = {
+    version: 1,
+    updatedAt: new Date().toISOString(),
     timeLabel: "Day 1",
     location: "The Keep",
     presentCharacters: [],
@@ -24,7 +26,7 @@ describe("promptBudget", () => {
     openThreads: [],
     publicKnowledge: [],
   };
-  const emptyTimeline: StoryTimeline = { events: [] };
+  const emptyTimeline: StoryTimeline = { version: 1, updatedAt: new Date().toISOString(), currentTime: "Day 1", events: [] };
   const emptyReflections: ReflectionsContainer = { version: 1, reflections: [] };
 
   it("does not trim mandatory layers (plot + timeline + rules)", () => {

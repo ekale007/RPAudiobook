@@ -25,6 +25,10 @@ const FREE_MODEL_IDS = [
   "google/gemma-4-31b-it:free",
   "google/gemma-4-26b-a4b-it:free",
   "openrouter/free",
+  "google/gemini-2.5-flash",
+  "google/gemini-2.5-pro",
+  "groq/llama-4-maverick",
+  "groq/gemma-4-31b-it",
 ] as const;
 
 const CACHE_TTL_MS = 30_000;
