@@ -99,6 +99,10 @@ export function isServerElevenLabsConfigured(): boolean {
   return Boolean(getElevenLabsApiKey());
 }
 
+export function isServerGoogleTtsConfigured(): boolean {
+  return Boolean(process.env.GOOGLE_CLOUD_TTS_API_KEY?.trim());
+}
+
 export function isServerTtsConfigured(): boolean {
   return (
     isServerElevenLabsConfigured() ||
@@ -106,7 +110,8 @@ export function isServerTtsConfigured(): boolean {
     isServerFishAudioTtsConfigured() ||
     isServerFalTtsConfigured() ||
     isServerQwenTtsConfigured() ||
-    isServerQwenCloudTtsConfigured()
+    isServerQwenCloudTtsConfigured() ||
+    isServerGoogleTtsConfigured()
   );
 }
 

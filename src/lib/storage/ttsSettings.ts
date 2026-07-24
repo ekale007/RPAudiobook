@@ -45,7 +45,8 @@ export type TtsProvider =
   | "fish-audio"
   | "fal-ai"
   | "qwen"
-  | "qwen-cloud";
+  | "qwen-cloud"
+  | "google-cloud";
 
 export interface TtsSettings {
   provider: TtsProvider;
@@ -99,6 +100,7 @@ export const BETA_TTS_PROVIDERS: TtsProvider[] = [
   "elevenlabs",
   "openrouter-tts",
   "fal-ai",
+  "google-cloud",
 ];
 
 /** Default cloud TTS on RP Audiobook beta. */

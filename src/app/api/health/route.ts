@@ -7,6 +7,7 @@ import {
   isServerOpenRouterTtsConfigured,
   isServerQwenCloudTtsConfigured,
   isServerQwenTtsConfigured,
+  isServerGoogleTtsConfigured,
   isServerTtsConfigured,
 } from "@/lib/server/env";
 import { getDeploymentMode, isSaasMode } from "@/lib/server/deploymentMode";
@@ -23,6 +24,7 @@ export async function GET() {
     serverFalTts: saas && isServerFalTtsConfigured(),
     serverQwenTts: saas && isServerQwenTtsConfigured(),
     serverQwenCloudTts: saas && isServerQwenCloudTtsConfigured(),
+    serverGoogleTts: saas && isServerGoogleTtsConfigured(),
     serverLlm: saas && isServerLlmConfigured(),
   });
 }

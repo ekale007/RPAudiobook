@@ -8,6 +8,7 @@ export type ServerCapabilities = {
   serverFalTts: boolean;
   serverQwenTts: boolean;
   serverQwenCloudTts: boolean;
+  serverGoogleTts: boolean;
   serverLlm: boolean;
 };
 
@@ -29,6 +30,7 @@ export function getServerCapabilitiesSync(): ServerCapabilities {
       serverFalTts: false,
       serverQwenTts: false,
       serverQwenCloudTts: false,
+      serverGoogleTts: false,
       serverLlm: false,
     }
   );
@@ -54,6 +56,7 @@ export async function refreshServerCapabilities(): Promise<ServerCapabilities> {
         serverFalTts: Boolean(json.serverFalTts),
         serverQwenTts: Boolean(json.serverQwenTts),
         serverQwenCloudTts: Boolean(json.serverQwenCloudTts),
+        serverGoogleTts: Boolean(json.serverGoogleTts),
         serverLlm: Boolean(json.serverLlm),
       };
       notify();
@@ -68,6 +71,7 @@ export async function refreshServerCapabilities(): Promise<ServerCapabilities> {
         serverFalTts: false,
         serverQwenTts: false,
         serverQwenCloudTts: false,
+        serverGoogleTts: false,
         serverLlm: false,
       };
       notify();
