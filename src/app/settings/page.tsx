@@ -534,7 +534,7 @@ export default function SettingsPage() {
                     { id: "fish-audio" as const, label: "Fish Audio" },
                     { id: "elevenlabs" as const, label: "ElevenLabs" },
                     { id: "openrouter-tts" as const, label: "OpenRouter TTS" },
-                    { id: "fal-ai" as const, label: "fal.ai" },
+                    { id: "google-cloud" as const, label: "Google Cloud" },
                   ] as const
                 ).map(({ id, label }) => (
                   <button
