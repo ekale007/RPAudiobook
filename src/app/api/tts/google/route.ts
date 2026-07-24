@@ -25,7 +25,37 @@ function isConfigured(): boolean {
 }
 
 export async function GET() {
-  return NextResponse.json({ configured: isConfigured() });
+  const key = getGoogleCloudTtsKey();
+  if (!key) {
+    return NextResponse.json({ configured: false, voices: [] });
+  }
+  try {
+    const res = await fetch(
+      `https://texttospeech.googleapis.com/v1/voices?key=${encodeURIComponent(key)}`,
+    );
+    if (!res.ok) return NextResponse.json({ configured: true, voices: [] });
+    const json = (await res.json()) as { voices?: Array<{
+      name: string;
+      languageCodes: string[];
+      ssmlGender: string;
+      naturalSampleRateHertz: number;
+    }> };
+    const voices = (json.voices ?? []).map((v) => ({
+      name: v.name,
+      languageCodes: v.languageCodes,
+      gender: v.ssmlGender,
+    }));
+    // Sort: German first, then alphabetically
+    voices.sort((a, b) => {
+      const aDe = a.languageCodes.some((c) => c.startsWith("de"));
+      const bDe = b.languageCodes.some((c) => c.startsWith("de"));
+      if (aDe !== bDe) return aDe ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    return NextResponse.json({ configured: true, voices });
+  } catch {
+    return NextResponse.json({ configured: true, voices: [] });
+  }
 }
 
 export async function POST(req: Request) {
