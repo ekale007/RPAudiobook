@@ -144,6 +144,7 @@ export function isBetaTtsProviderAvailable(
   if (provider === "elevenlabs") return caps.serverElevenLabsTts;
   if (provider === "openrouter-tts") return caps.serverOpenRouterTts;
   if (provider === "fal-ai") return caps.serverFalTts;
+  if (provider === "google-cloud") return caps.serverGoogleTts;
   return false;
 }
 

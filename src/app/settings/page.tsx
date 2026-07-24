@@ -86,6 +86,7 @@ export default function SettingsPage() {
   const serverFalTts = serverCaps.serverFalTts;
   const serverQwenTts = serverCaps.serverQwenTts;
   const serverQwenCloudTts = serverCaps.serverQwenCloudTts;
+  const serverGoogleTts = serverCaps.serverGoogleTts;
   const capsReady = serverCaps.ready;
   const localMode = isLocalMode();
   const betaMode = capsReady && serverLlm && !localMode;
@@ -115,6 +116,7 @@ export default function SettingsPage() {
   );
   const [falTtsModel, setFalTtsModel] = useState(DEFAULT_TTS.falTtsModel);
   const [falTtsVoice, setFalTtsVoice] = useState(DEFAULT_TTS.falTtsVoice);
+  const [gVoice, setGVoice] = useState("de-DE-Wavenet-C");
   const [pronunciationText, setPronunciationText] = useState("");
   const [ttsSaved, setTtsSaved] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
@@ -288,6 +290,7 @@ export default function SettingsPage() {
       fishRefId?: string;
       falModel?: string;
       falVoice?: string;
+      gVoice?: string;
     }) => {
       const provider = overrides?.ttsProvider ?? ttsProvider;
       const voiceId = (overrides?.elVoiceId ?? elVoiceId).trim();
@@ -740,6 +743,48 @@ export default function SettingsPage() {
                     }}
                     label={t("settings.narratorVoice")}
                   />
+                </>
+              ) : ttsProvider === "google-cloud" ? (
+                <>
+                  {!serverGoogleTts ? (
+                    <p className="mb-2 text-xs text-amber-200">
+                      Google Cloud TTS nicht aktiv —{" "}
+                      <code className="text-amber-100">GOOGLE_CLOUD_TTS_API_KEY</code>{" "}
+                      in Vercel setzen.
+                    </p>
+                  ) : (
+                    <p className="mb-2 text-xs text-zinc-500">
+                      Google Cloud TTS — 1 Mio Zeichen/Monat gratis. Stimme via
+                      Voice-Name (z. B. de-DE-Wavenet-C).
+                    </p>
+                  )}
+                  <label className="mb-1 block text-xs text-zinc-400">
+                    Voice-Name
+                  </label>
+                  <input
+                    type="text"
+                    value={gVoice}
+                    onChange={(e) => {
+                      setGVoice(e.target.value);
+                      persistTtsFromState({
+                        ttsProvider: "google-cloud",
+                        gVoice: e.target.value,
+                      });
+                    }}
+                    className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
+                    placeholder="de-DE-Wavenet-C"
+                  />
+                  <p className="text-[10px] text-zinc-600">
+                    Google Cloud Voice-Name. Übersicht:{" "}
+                    <a
+                      href="https://cloud.google.com/text-to-speech/docs/voices"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-accent underline"
+                    >
+                      voices
+                    </a>
+                  </p>
                 </>
               ) : (
                 <>
