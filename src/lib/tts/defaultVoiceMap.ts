@@ -121,6 +121,8 @@ export function mergeVoiceMapForProvider(
   } else if (provider === "fal-ai") {
     const narrator = normalizeFalTtsVoice(falModel, custom?.narrator);
     map = sanitizeFalVoiceMap({ narrator, ...custom }, falModel);
+  } else if (provider === "google-cloud") {
+    map = { narrator: "de-DE-Wavenet-C", ...custom };
   } else {
     map = mergeVoiceMap(custom);
   }
@@ -189,6 +191,9 @@ export function defaultNarratorVoiceForProvider(
   }
   if (provider === "fal-ai") {
     return falTtsModelMeta(DEFAULT_FAL_TTS_MODEL).defaultVoice;
+  }
+  if (provider === "google-cloud") {
+    return "de-DE-Wavenet-C";
   }
   return DEFAULT_WRYTOUR_VOICE_MAP.narrator ?? "af_heart";
 }

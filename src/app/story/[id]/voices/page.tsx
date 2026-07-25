@@ -76,6 +76,7 @@ function defaultMapForEngine(engine: LocalTtsEngine): VoiceMap {
 function fallbackVoice(provider: TtsProvider, engine: LocalTtsEngine): string {
   if (provider === "elevenlabs") return ELEVEN_DEFAULT_NARRATOR;
   if (provider === "qwen" || provider === "qwen-cloud") return QWEN_DEFAULT_NARRATOR;
+  if (provider === "google-cloud") return "de-DE-Wavenet-C";
   return engine === "qwen" ? QWEN_DEFAULT_NARRATOR : "af_bella";
 }
 
@@ -116,6 +117,8 @@ export default function StoryVoicesPage() {
   const [falTtsModel, setFalTtsModel] = useState(DEFAULT_TTS.falTtsModel);
   const [fishPinnedIds, setFishPinnedIds] = useState<string[]>([]);
   const [expandedSlug, setExpandedSlug] = useState<string | null>("narrator");
+  const [gVoices, setGVoices] = useState<Array<{ name: string; languageCodes: string[]; gender: string }>>([]);
+  const [gVoicesLoaded, setGVoicesLoaded] = useState(false);
 
   const { t } = useUiLocale();
   const { authReady } = useStorySession(router);
@@ -129,6 +132,16 @@ export default function StoryVoicesPage() {
     setFalTtsModel(normalizeFalTtsModel(tts.falTtsModel));
     setFishPinnedIds(tts.fishAudioPinnedIds ?? []);
     setLocalEngine(tts.localEngine ?? "edge");
+
+    // Fetch Google Cloud voices if provider is google-cloud
+    if (tts.provider === "google-cloud") {
+      fetch("/api/tts/google")
+        .then((r) => r.json() as Promise<{ voices: typeof gVoices }>)
+        .then((d) => { setGVoices(d.voices ?? []); setGVoicesLoaded(true); })
+        .catch(() => setGVoicesLoaded(true));
+    } else {
+      setGVoicesLoaded(true);
+    }
 
     Promise.all([listCharacters(storyId), getStoryOverview(storyId)])
       .then(([chars, overview]) => {
@@ -258,6 +271,8 @@ export default function StoryVoicesPage() {
           ? "Fish Audio"
           : ttsProvider === "fal-ai"
             ? "fal.ai"
+            : ttsProvider === "google-cloud"
+            ? "Google Cloud"
             : engine === "kokoro"
             ? "Kokoro"
             : "Local";
@@ -442,6 +457,29 @@ export default function StoryVoicesPage() {
                       }
                       allowCustom
                     />
+                  ) : ttsProvider === "google-cloud" ? (
+                    gVoices.length > 0 ? (
+                      <select
+                        value={currentVoice}
+                        onChange={(e) =>
+                          setVoiceMap((prev) => ({
+                            ...prev,
+                            [s.slug]: e.target.value,
+                          }))
+                        }
+                        className="w-full rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-xs"
+                      >
+                        {gVoices.map((v) => (
+                          <option key={v.name} value={v.name}>
+                            {v.name} ({v.languageCodes.join(", ")})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <p className="text-[10px] text-zinc-600">
+                        {gVoicesLoaded ? "Keine Stimmen geladen" : "Lade Stimmen…"}
+                      </p>
+                    )
                   ) : (
                     <select
                       value={currentVoice}

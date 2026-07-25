@@ -376,6 +376,20 @@ export function CastCharacterOverlay({
               disabled={voiceDisabled}
               allowCustom
             />
+          ) : ttsProvider === "google-cloud" ? (
+            <input
+              type="text"
+              value={currentVoice}
+              disabled={voiceDisabled}
+              onChange={(e) =>
+                onVoiceMapChange({
+                  ...voiceMap,
+                  [character.slug]: e.target.value,
+                })
+              }
+              className="w-full rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-xs"
+              placeholder="de-DE-Wavenet-C"
+            />
           ) : (
             <select
               value={currentVoice}

@@ -58,6 +58,7 @@ function defaultMapForEngine(engine: LocalTtsEngine): VoiceMap {
 function fallbackVoice(provider: TtsProvider, engine: LocalTtsEngine): string {
   if (provider === "elevenlabs") return ELEVEN_DEFAULT_NARRATOR;
   if (provider === "qwen" || provider === "qwen-cloud") return QWEN_DEFAULT_NARRATOR;
+  if (provider === "google-cloud") return "de-DE-Wavenet-C";
   return engine === "qwen" ? QWEN_DEFAULT_NARRATOR : "af_bella";
 }
 
