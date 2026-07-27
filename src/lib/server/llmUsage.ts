@@ -168,17 +168,16 @@ export async function fetchMonthlyUsage(
 
 /**
  * Gate: block LLM requests when the monthly budget is spent.
- * Returns a 429 response or null (pass). Soft-fails if the query
- * errors — in that case we let the request through to avoid a
- * false-positive outage.
+ * Only enforced for FREE tier — paying users rely on their wallet.
+ * Returns a 429 response or null (pass).
  */
 export async function requireLlmMonthlyBudget(
   supabase: SupabaseClient,
   userId: string,
   tierLimits: Awaited<ReturnType<typeof fetchUserTierLimits>> | null,
 ): Promise<NextResponse | null> {
-  // Only enforce when tier data is available (graceful fallback).
-  if (!tierLimits) return null;
+  // Only enforce for free tier — beta/pro use wallet balance.
+  if (!tierLimits || tierLimits.tier !== "free") return null;
   try {
     const monthly = await fetchMonthlyUsage(supabase, userId);
     if (monthly.budgetRemainingCents <= 0) {
