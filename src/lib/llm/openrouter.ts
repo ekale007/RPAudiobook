@@ -32,20 +32,35 @@ async function parseErrorResponse(res: Response): Promise<string> {
       error?: string | { message?: string };
       retryAfterSec?: number | null;
       code?: string;
+      budgetCents?: number;
+      costCents?: number;
     };
     if (res.status === 429) {
       const errText =
         typeof j.error === "string" ? j.error : (j.error?.message ?? "");
+      // Wallet / prepaid balance
       if (j.code === "insufficient_balance" || /guthaben/i.test(errText)) {
         return "Guthaben aufgebraucht — Konto → Guthaben aufladen (min. 5 €).";
       }
-      if (j.code === "budget_exceeded" || /budget/i.test(errText)) {
-        return "Budget erreicht — Konto → Guthaben aufladen.";
+      // Monthly budget (free tier)
+      if (
+        j.code === "monthly_budget_exhausted" ||
+        j.code === "budget_exceeded" ||
+        /budget|monatlich/i.test(errText)
+      ) {
+        return "Monatliches LLM-Budget aufgebraucht — nächste Freischaltung am Monatsersten.";
       }
+      // Hourly rate limit
       if (j.retryAfterSec) {
         const min = Math.max(1, Math.ceil(j.retryAfterSec / 60));
         return `Stündliches LLM-Limit — in ca. ${min} Min. wieder (Konto → Verbrauch).`;
       }
+      // Unknown 429 — log for debugging
+      console.warn("parseErrorResponse: unknown 429", {
+        code: j.code,
+        error: errText,
+        retryAfterSec: j.retryAfterSec,
+      });
       return "LLM-Limit erreicht — Konto → Verbrauch.";
     }
     const raw =
