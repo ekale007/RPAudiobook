@@ -6,6 +6,7 @@ import { CharacterAvatarUpload } from "@/components/CharacterAvatarUpload";
 import { ElevenLabsVoiceSelect } from "@/components/ElevenLabsVoiceSelect";
 import { FishAudioVoiceSelect } from "@/components/FishAudioVoiceSelect";
 import { FalTtsVoiceSelect } from "@/components/FalTtsVoiceSelect";
+import { GoogleCloudVoiceSelect } from "@/components/GoogleCloudVoiceSelect";
 import { OpenRouterTtsVoiceSelect } from "@/components/OpenRouterTtsVoiceSelect";
 import { QwenVoiceEditor } from "@/components/QwenVoiceEditor";
 import { OverlayPanel } from "@/components/ui/OverlayPanel";
@@ -377,18 +378,12 @@ export function CastCharacterOverlay({
               allowCustom
             />
           ) : ttsProvider === "google-cloud" ? (
-            <input
-              type="text"
+            <GoogleCloudVoiceSelect
               value={currentVoice}
               disabled={voiceDisabled}
-              onChange={(e) =>
-                onVoiceMapChange({
-                  ...voiceMap,
-                  [character.slug]: e.target.value,
-                })
+              onChange={(name) =>
+                onVoiceMapChange({ ...voiceMap, [character.slug]: name })
               }
-              className="w-full rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-xs"
-              placeholder="de-DE-Wavenet-C"
             />
           ) : (
             <select
