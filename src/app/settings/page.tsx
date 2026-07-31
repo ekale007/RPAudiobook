@@ -35,10 +35,10 @@ import {
   serializePronunciationMap,
 } from "@/lib/tts/pronunciation";
 import { useServerCapabilities } from "@/lib/server/useServerCapabilities";
-import { authFetch } from "@/lib/supabase/authFetch";
 import { ElevenLabsVoiceSelect } from "@/components/ElevenLabsVoiceSelect";
 import { FishAudioVoiceSelect } from "@/components/FishAudioVoiceSelect";
 import { FalTtsVoiceSelect } from "@/components/FalTtsVoiceSelect";
+import { GoogleCloudVoiceSelect } from "@/components/GoogleCloudVoiceSelect";
 import { ELEVEN_DEFAULT_MODEL } from "@/lib/tts/elevenLabsVoices";
 import {
   ELEVEN_TTS_MODEL_OPTIONS,
@@ -118,7 +118,6 @@ export default function SettingsPage() {
   const [falTtsModel, setFalTtsModel] = useState(DEFAULT_TTS.falTtsModel);
   const [falTtsVoice, setFalTtsVoice] = useState(DEFAULT_TTS.falTtsVoice);
   const [gVoice, setGVoice] = useState("de-DE-Wavenet-C");
-  const [gVoices, setGVoices] = useState<Array<{ name: string; languageCodes: string[]; gender: string }>>([]);
   const [pronunciationText, setPronunciationText] = useState("");
   const [ttsSaved, setTtsSaved] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
@@ -135,17 +134,6 @@ export default function SettingsPage() {
         : null,
     [llmModels, narratorModel],
   );
-
-  // Fetch Google Cloud TTS voices when provider is selected
-  useEffect(() => {
-    if (ttsProvider !== "google-cloud" || !serverGoogleTts) return;
-    let cancelled = false;
-    authFetch("/api/tts/google")
-      .then((r) => r.json() as Promise<{ voices: typeof gVoices }>)
-      .then((d) => { if (!cancelled) setGVoices(d.voices ?? []); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [ttsProvider, serverGoogleTts]);
 
   const reloadFromStorage = useCallback(() => {
     const s = loadOpenRouterSettings();
@@ -768,47 +756,21 @@ export default function SettingsPage() {
                   ) : (
                     <p className="mb-2 text-xs text-zinc-500">
                       Google Cloud TTS — 1 Mio Zeichen/Monat gratis.
-                      {gVoices.length > 0
-                        ? ` ${gVoices.length} Stimmen geladen.`
-                        : " Lade Stimmen…"}
                     </p>
                   )}
                   <label className="mb-1 block text-xs text-zinc-400">
                     Stimme
                   </label>
-                  {gVoices.length > 0 ? (
-                    <select
-                      value={gVoice}
-                      onChange={(e) => {
-                        setGVoice(e.target.value);
-                        persistTtsFromState({
-                          ttsProvider: "google-cloud",
-                          gVoice: e.target.value,
-                        });
-                      }}
-                      className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-2 py-2 text-sm"
-                    >
-                      {gVoices.map((v) => (
-                        <option key={v.name} value={v.name}>
-                          {v.name} — {v.languageCodes.join(", ")} ({v.gender})
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      value={gVoice}
-                      onChange={(e) => {
-                        setGVoice(e.target.value);
-                        persistTtsFromState({
-                          ttsProvider: "google-cloud",
-                          gVoice: e.target.value,
-                        });
-                      }}
-                      className="mb-2 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm"
-                      placeholder="de-DE-Wavenet-C"
-                    />
-                  )}
+                  <GoogleCloudVoiceSelect
+                    value={gVoice}
+                    onChange={(name) => {
+                      setGVoice(name);
+                      persistTtsFromState({
+                        ttsProvider: "google-cloud",
+                        gVoice: name,
+                      });
+                    }}
+                  />
                   <p className="text-[10px] text-zinc-600">
                     Google Cloud Voice-Name. Übersicht:{" "}
                     <a
