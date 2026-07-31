@@ -172,11 +172,19 @@ export default function StoryVoicesPage() {
   const qwen = isQwenMode(ttsProvider, localEngine);
   const sceneDelivery = supportsSceneDelivery(ttsProvider);
   const voiceOptions = voiceOptionsForEngine(engine);
-  const defaults =
-    ttsProvider === "elevenlabs"
-      ? mergeVoiceMapForProvider("elevenlabs", storyLocale, null)
-      : defaultMapForEngine(engine);
+  // Per-provider defaults via the canonical merge — covers all providers
+  // (elevenlabs, fish, openrouter-tts, fal, google-cloud, local engines).
+  const defaults = mergeVoiceMapForProvider(
+    ttsProvider,
+    storyLocale,
+    null,
+    voiceMapOpts,
+  );
   const fallback = fallbackVoice(ttsProvider, engine);
+
+  const resetAllToDefaults = () => {
+    setVoiceMap(defaults);
+  };
 
   const speakers = useMemo(() => {
     const narrator = cast.find((c) => c.role === "narrator");
@@ -480,6 +488,15 @@ export default function StoryVoicesPage() {
             );
           })}
         </ul>
+
+        <button
+          type="button"
+          onClick={resetAllToDefaults}
+          className="rounded-xl border border-surface-border py-2 text-xs text-zinc-400 hover:text-zinc-200"
+          title="Setzt alle Figuren auf die Standard-Stimmen des aktiven Providers"
+        >
+          Alle auf Standard zurücksetzen
+        </button>
 
         <button
           type="button"

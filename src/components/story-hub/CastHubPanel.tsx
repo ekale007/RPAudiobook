@@ -74,6 +74,11 @@ function shortVoiceLabel(
   if (ttsProvider === "elevenlabs") {
     return id.length > 10 ? `${id.slice(0, 8)}…` : id;
   }
+  // Google Cloud: voice names like "de-DE-Wavenet-C" — short enough to
+  // show directly; no static option list exists for lookup.
+  if (ttsProvider === "google-cloud") {
+    return id;
+  }
   const engineForOptions =
     ttsProvider === "qwen" || ttsProvider === "qwen-cloud"
       ? "qwen"
