@@ -11,7 +11,10 @@ import type {
 } from "@/lib/types";
 import { DEFAULT_STORY_SETTINGS } from "@/lib/types";
 import { formatCastMemoryForPrompt } from "@/lib/memory/characterMemory";
-import { buildStoryMemorySections } from "@/lib/memory/storyMemory";
+import {
+  buildStoryMemorySections,
+  type MemoryStreamTurn,
+} from "@/lib/memory/storyMemory";
 import type { CharacterRow } from "@/lib/db/stories";
 import type { StoryPlotState } from "@/lib/memory/plotState";
 import type { StoryPin } from "@/lib/memory/storyPins";
@@ -45,6 +48,12 @@ export interface PromptContext {
   allCast?: CharacterRow[];
   settings?: Partial<StorySettings>;
   storyLocale?: StoryContentLocale | string | null;
+  /**
+   * Engine 2A: retrieved memory-stream turns (client fetches them from
+   * /api/memory/retrieve before building the prompt). Optional — when
+   * absent the memory-stream layer is skipped entirely.
+   */
+  memoryStreamTurns?: MemoryStreamTurn[] | null;
 }
 
 export function buildChatMessages(ctx: PromptContext): {
@@ -99,6 +108,8 @@ export function buildChatMessages(ctx: PromptContext): {
       closedChapterCount: ctx.closedChapterCount,
       // Phase 7.3: reflection layer
       reflections: ctx.settings?.storyReflections ?? null,
+      // Engine 2A: retrieved memory-stream turns
+      memoryStreamTurns: ctx.memoryStreamTurns ?? null,
     }),
   );
 
@@ -135,8 +146,7 @@ export function buildChatMessages(ctx: PromptContext): {
     let content = stripSpeakerTags(turn.content);
     if (turn.role === "user" && isSteeringUserTurn(content)) {
       const display = stripSteeringTurnPrefix(content);
-      const resolved =
-        recent.slice(i + 1).some((t) => t.role === "assistant");
+      const resolved = recent.slice(i + 1).some((t) => t.role === "assistant");
       if (resolved) {
         content =
           locale === "de"

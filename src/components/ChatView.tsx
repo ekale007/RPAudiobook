@@ -125,6 +125,8 @@ import {
   type TurnRow,
 } from "@/lib/db/stories";
 import { isLocalEntityId, isLocalStoryId } from "@/lib/db/localStoryIds";
+import { authFetch } from "@/lib/supabase/authFetch";
+import type { MemoryStreamTurn } from "@/lib/memory/storyMemory";
 import {
   patchTurnCosts,
   truncateTurnsFrom,
@@ -1452,6 +1454,28 @@ export function ChatView({
     let full = "";
     let llmCostCents: number | undefined;
     try {
+      // Engine 2A: retrieve relevant memory-stream turns before building
+      // the prompt (DB stories only; local stories have no server stream).
+      let memoryStreamTurns: MemoryStreamTurn[] | null = null;
+      if (!isLocalStoryId(storyId)) {
+        try {
+          const queryText = history
+            .slice(-4)
+            .map((h) => h.content)
+            .join(" ")
+            .slice(0, 1500);
+          const res = await authFetch(
+            `/api/memory/retrieve?storyId=${encodeURIComponent(storyId)}&query=${encodeURIComponent(queryText)}`,
+          );
+          if (res.ok) {
+            const json = (await res.json()) as { turns?: MemoryStreamTurn[] };
+            memoryStreamTurns = json.turns ?? null;
+          }
+        } catch {
+          // Retrieval is best-effort — never block the reply on it.
+        }
+      }
+
       const reply = await streamAssistantReply({
         settings: chatSettings,
         character,
@@ -1472,6 +1496,7 @@ export function ChatView({
         continuation: opts.continuation,
         continuationPrompt: opts.continuationPrompt,
         storyLocale,
+        memoryStreamTurns,
         onLoreCount: setLoreCount,
         signal: abortRef.current.signal,
       });

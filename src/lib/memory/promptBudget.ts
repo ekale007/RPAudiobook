@@ -35,6 +35,7 @@ const MAX_SOFT_LAYER_CHARS = 10_000;
 export const LAYER_PRIORITY = [
   "rules", // 0 — can't be trimmed (synapse)
   "reflection", // 1 — high-priority soft layer (Diagnose Task 2B)
+  "memory-stream", // 1.5 — retrieved turns (Engine 2A), trimmed first under tight budget
   "plot", // 2 — can't be trimmed (authoritative per storyMemory.ts)
   "timeline", // 3 — can't be trimmed (chronological beats)
   "progress", // 4 — small, very rarely trimmed

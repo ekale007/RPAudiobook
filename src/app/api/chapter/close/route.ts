@@ -46,6 +46,7 @@ import {
 } from "@/lib/server/env";
 import { fetchUserTierLimits } from "@/lib/server/userTier";
 import { requireSpendableBalance } from "@/lib/server/wallet";
+import { appendTurnsToMemoryStream } from "@/lib/server/memoryStream";
 import { requireLlmMonthlyBudget } from "@/lib/server/llmUsage";
 import { completeOpenRouter } from "@/lib/llm/openrouter";
 import type { OpenRouterSettings } from "@/lib/types";
@@ -458,6 +459,30 @@ export async function POST(req: Request) {
     ]);
     if (settingsErr) return jsonError(500, "Failed to persist plot state", "db_error");
     if (updChErr) return jsonError(500, "Failed to close chapter", "db_error");
+  }
+
+  // 2.4. Memory-Stream-Update (Engine 2A).
+  // Best-effort: append all turns of the closed chapter to the memory
+  // stream for later retrieval. Idempotent (skips existing turn_id).
+  {
+    try {
+      const streamTurns = rows.map((r) => ({
+        turnId: r.id,
+        content: r.content ?? "",
+        chapterIndex: chapter.index_in_band,
+        importance: 0.5,
+      }));
+      const { inserted } = await appendTurnsToMemoryStream(
+        supabase,
+        storyId,
+        streamTurns,
+      );
+      if (inserted > 0) {
+        console.info(`close-chapter: memory stream +${inserted} turns`);
+      }
+    } catch (e) {
+      console.warn("close-chapter: memory stream update failed", e);
+    }
   }
 
   // 2.5. Reflection layer update (Diagnose Task 2B).

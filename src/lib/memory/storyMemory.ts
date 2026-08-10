@@ -33,6 +33,12 @@ import {
  * NEVER trimmed (authoritative per storyMemory.ts synapse).
  */
 
+export type MemoryStreamTurn = {
+  content: string;
+  timestamp: string;
+  importance: number;
+};
+
 export type StoryMemoryInput = {
   plotState?: StoryPlotState | null;
   timeline?: StoryTimeline | null;
@@ -48,6 +54,11 @@ export type StoryMemoryInput = {
   budgetChars?: number;
   /** Phase 7.3: reflection layer (Diagnose Task 2B). Optional. */
   reflections?: ReflectionsContainer | null;
+  /**
+   * Engine 2A: retrieved memory-stream turns (server-side retrieval).
+   * Optional — when absent the layer is skipped entirely.
+   */
+  memoryStreamTurns?: MemoryStreamTurn[] | null;
 };
 
 const MEMORY_RULES = `## Memory rules (follow strictly)
@@ -97,6 +108,25 @@ function buildBandSummarySection(input: StoryMemoryInput): string | null {
   return null;
 }
 
+function buildMemoryStreamSection(
+  turns: MemoryStreamTurn[] | null | undefined,
+): string | null {
+  if (!turns || turns.length === 0) return null;
+  const lines = turns.map((t) => {
+    const age = Date.now() - new Date(t.timestamp).getTime();
+    const ago =
+      age <= 0
+        ? "just now"
+        : age < 60_000
+          ? `${Math.max(1, Math.round(age / 1000))}s ago`
+          : age < 3_600_000
+            ? `${Math.round(age / 60_000)}m ago`
+            : `${Math.round(age / 3_600_000)}h ago`;
+    return `- [${ago}] ${t.content.trim()}`;
+  });
+  return `## Recovered memory (retrieved, most relevant first)\n${lines.join("\n")}`;
+}
+
 export interface StoryMemoryBuildResult {
   /** Final sections, in prompt order. Includes rules at the end. */
   sections: string[];
@@ -143,16 +173,29 @@ export function buildStoryMemorySectionsDetailed(
   // recent turns are noisy. Treated as soft (can be dropped under tight
   // budget), but in practice it's tiny (~1 KB) so usually kept.
   const reflectionText = input.reflections
-    ? formatReflectionsForPrompt(input.reflections, { useLatest: true })
-    : null;
-  if (reflectionText) {
-    layers.unshift({
-      name: "reflection",
-      text: reflectionText,
-      mandatory: false,
-      chars: reflectionText.length,
-    });
-  }
+      ? formatReflectionsForPrompt(input.reflections, { useLatest: true })
+      : null;
+    if (reflectionText) {
+      layers.unshift({
+        name: "reflection",
+        text: reflectionText,
+        mandatory: false,
+        chars: reflectionText.length,
+      });
+    }
+
+    // Engine 2A: retrieved memory-stream turns (soft layer). Injected AFTER
+    // the reflection so the high-level snapshot stays on top; trimmed
+    // first under tight budget because it is the most verbose layer.
+    const memoryStreamText = buildMemoryStreamSection(input.memoryStreamTurns);
+    if (memoryStreamText) {
+      layers.unshift({
+        name: "memory-stream",
+        text: memoryStreamText,
+        mandatory: false,
+        chars: memoryStreamText.length,
+      });
+    }
 
   // Add the rules layer (always last, mandatory).
   layers.push({

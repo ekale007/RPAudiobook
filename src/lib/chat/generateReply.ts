@@ -15,6 +15,7 @@ import {
   repairAssistantReplyForSteering,
 } from "@/lib/chat/playerSteering";
 import { defaultContinuePrompt } from "@/lib/chat/storyBeatSuggestions";
+import type { MemoryStreamTurn } from "@/lib/memory/storyMemory";
 
 export type GenerateReplyParams = {
   settings: OpenRouterSettings;
@@ -39,6 +40,11 @@ export type GenerateReplyParams = {
   onLoreCount?: (n: number) => void;
   storyLocale?: string | null;
   signal?: AbortSignal;
+  /**
+   * Engine 2A: retrieved memory-stream turns. Passed straight into the
+   * prompt context. Optional.
+   */
+  memoryStreamTurns?: MemoryStreamTurn[] | null;
 };
 
 export type AssistantReplyResult = {
@@ -72,9 +78,10 @@ export async function streamAssistantReply(
     plotState: params.plotState,
     timeline: params.timeline,
     allCast: params.allCast ?? params.cast,
-    settings: params.storySettings,
-    storyLocale: params.storyLocale,
-  };
+        settings: params.storySettings,
+        storyLocale: params.storyLocale,
+        memoryStreamTurns: params.memoryStreamTurns ?? null,
+      };
 
   const { messages, activeLoreCount } = buildChatMessages(promptCtx);
   params.onLoreCount?.(activeLoreCount);
