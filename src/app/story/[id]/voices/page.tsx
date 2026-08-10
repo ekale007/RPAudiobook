@@ -9,6 +9,7 @@ import { FishAudioVoiceSelect } from "@/components/FishAudioVoiceSelect";
 import { FalTtsVoiceSelect } from "@/components/FalTtsVoiceSelect";
 import { OpenRouterTtsVoiceSelect } from "@/components/OpenRouterTtsVoiceSelect";
 import { GoogleCloudVoiceSelect } from "@/components/GoogleCloudVoiceSelect";
+import { KokoroFilteredVoiceSelect } from "@/components/KokoroFilteredVoiceSelect";
 import { QwenVoiceEditor } from "@/components/QwenVoiceEditor";
 import { useStorySession } from "@/lib/story/useStorySession";
 import {
@@ -24,10 +25,8 @@ import {
   resolveStoryVoiceMap,
 } from "@/lib/tts/defaultVoiceMap";
 import { ELEVEN_DEFAULT_NARRATOR } from "@/lib/tts/elevenLabsVoices";
-import { KOKORO_VOICES } from "@/lib/tts/kokoroVoices";
 import {
   QWEN_DEFAULT_NARRATOR,
-  QWEN_VOICES,
 } from "@/lib/tts/qwenVoices";
 import {
   buildQwenProfilesFromSettings,
@@ -54,21 +53,6 @@ import { normalizeStoryLocale } from "@/lib/tts/ttsLocaleRouting";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
 import type { LocalTtsEngine } from "@/lib/storage/ttsPresets";
 import type { QwenVoiceProfile, StorySettings, VoiceMap } from "@/lib/types";
-
-type VoiceOption = { id: string; label: string };
-
-function voiceOptionsForEngine(engine: LocalTtsEngine): VoiceOption[] {
-  if (engine === "qwen") {
-    return QWEN_VOICES.map((v) => ({
-      id: v.id,
-      label: `${v.label} (${v.hint})`,
-    }));
-  }
-  return KOKORO_VOICES.map((v) => ({
-    id: v.id,
-    label: `${v.label} (${v.id})`,
-  }));
-}
 
 function defaultMapForEngine(engine: LocalTtsEngine): VoiceMap {
   return engine === "qwen" ? DEFAULT_QWEN_VOICE_MAP : DEFAULT_WRYTOUR_VOICE_MAP;
@@ -171,7 +155,6 @@ export default function StoryVoicesPage() {
   };
   const qwen = isQwenMode(ttsProvider, localEngine);
   const sceneDelivery = supportsSceneDelivery(ttsProvider);
-  const voiceOptions = voiceOptionsForEngine(engine);
   // Per-provider defaults via the canonical merge — covers all providers
   // (elevenlabs, fish, openrouter-tts, fal, google-cloud, local engines).
   const defaults = mergeVoiceMapForProvider(
@@ -462,22 +445,14 @@ export default function StoryVoicesPage() {
                       }
                     />
                   ) : (
-                    <select
+                    <KokoroFilteredVoiceSelect
                       value={currentVoice}
-                      onChange={(e) =>
-                        setVoiceMap((prev) => ({
-                          ...prev,
-                          [s.slug]: e.target.value,
-                        }))
+                      storyLocale={storyLocale}
+                      onChange={(id) =>
+                        setVoiceMap((prev) => ({ ...prev, [s.slug]: id }))
                       }
                       className="w-full rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-xs"
-                    >
-                      {voiceOptions.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {v.label}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   )
                 ) : !voiceDisabled && qwen ? (
                   <p className="text-[10px] text-zinc-600">

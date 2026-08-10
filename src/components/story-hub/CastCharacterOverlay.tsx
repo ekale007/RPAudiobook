@@ -8,6 +8,7 @@ import { FishAudioVoiceSelect } from "@/components/FishAudioVoiceSelect";
 import { FalTtsVoiceSelect } from "@/components/FalTtsVoiceSelect";
 import { GoogleCloudVoiceSelect } from "@/components/GoogleCloudVoiceSelect";
 import { OpenRouterTtsVoiceSelect } from "@/components/OpenRouterTtsVoiceSelect";
+import { KokoroFilteredVoiceSelect } from "@/components/KokoroFilteredVoiceSelect";
 import { QwenVoiceEditor } from "@/components/QwenVoiceEditor";
 import { OverlayPanel } from "@/components/ui/OverlayPanel";
 import {
@@ -386,23 +387,15 @@ export function CastCharacterOverlay({
               }
             />
           ) : (
-            <select
+            <KokoroFilteredVoiceSelect
               value={currentVoice}
+              storyLocale={storyLocale}
               disabled={voiceDisabled}
-              onChange={(e) =>
-                onVoiceMapChange({
-                  ...voiceMap,
-                  [character.slug]: e.target.value,
-                })
+              onChange={(id) =>
+                onVoiceMapChange({ ...voiceMap, [character.slug]: id })
               }
               className="w-full rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-xs disabled:opacity-50"
-            >
-              {voiceOptions.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.label}
-                </option>
-              ))}
-            </select>
+            />
           )}
           {qwenMode && !voiceDisabled ? (
             <p className="text-[10px] text-zinc-600">
