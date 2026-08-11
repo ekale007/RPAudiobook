@@ -65,7 +65,10 @@ export const dynamic = "force-dynamic";
 // close workflow with 3-4 LLM calls + DB writes fits in that budget for
 // typical chapter sizes (≤ 50 turns). Longer chapters may need a more
 // aggressive fallback (compressBandSummary) or a job-queue pattern.
-export const maxDuration = 60;
+// LLM-heavy endpoint: plot+summary+reflection run parallel, then intro +
+// band consolidation run parallel (second batch). Vercel Hobby caps at 60s;
+// Pro allows up to 300s — set high so slow models don't 504.
+export const maxDuration = 300;
 
 type Payload = {
   storyId?: unknown;
@@ -555,33 +558,106 @@ export async function POST(req: Request) {
         ? phaseHint
         : null;
 
-  // 3. AI intro for the next chapter.
-  let introTurns: Array<{ content: string; speakerSlug?: string | null }> = [];
-  try {
-    const intro = await resolveChapterIntro(resolvedIntroMode, {
-      settings,
-      priorTurns: rows as unknown as TurnRow[],
-      chapterSummary: summary,
-      previousChapterTitle: currentTitle,
-      nextChapterTitle:
-        (typeof nextTitle === "string" && nextTitle.trim()) ||
-        `Chapter ${chapter.index_in_band + 1}`,
-      phaseHint: nextPhaseHint,
-      customText: typeof customIntro === "string" ? customIntro : "",
+  // 3+7. AI intro AND band consolidation run in PARALLEL (second batch).
+  // Both only need `summary` — they are independent of each other. This
+  // cuts ~3-8s of serial LLM time off every chapter close and is the
+  // difference between a 504 and a successful response on slow models.
+  const nextChapterTitleLocal =
+    (typeof nextTitle === "string" && nextTitle.trim()) ||
+    `Chapter ${chapter.index_in_band + 1}`;
+
+  const introPromise = resolveChapterIntro(resolvedIntroMode, {
+    settings,
+    priorTurns: rows as unknown as TurnRow[],
+    chapterSummary: summary,
+    previousChapterTitle: currentTitle,
+    nextChapterTitle: nextChapterTitleLocal,
+    phaseHint: nextPhaseHint,
+    customText: typeof customIntro === "string" ? customIntro : "",
+  })
+    .then((intro) => intro.turns)
+    .catch((e) => {
+      // Non-fatal: continue without an intro. The new chapter just starts
+      // empty. We log and let the close succeed.
+      console.warn("close-chapter: intro resolve failed, continuing empty", e);
+      return [] as Array<{ content: string; speakerSlug?: string | null }>;
     });
-    introTurns = intro.turns;
-  } catch (e) {
-    // Non-fatal: continue without an intro. The new chapter just starts
-    // empty. We log and let the close succeed.
-    console.warn("close-chapter: intro resolve failed, continuing empty", e);
-    introTurns = [];
-  }
+
+  // Band consolidation as a Promise — includes the full re-aggregation
+  // fallback path. Non-fatal: the close succeeded, band just didn't update.
+  const bandPromise = (async () => {
+    try {
+      const { data: band, error: bandErr } = await supabase
+        .from("bands")
+        .select("band_summary")
+        .eq("id", bandId)
+        .single();
+      if (bandErr) throw bandErr;
+      const previousBandSummary =
+        (band?.band_summary as string | null | undefined) ?? null;
+
+      const consolidated = await consolidateBandSummary({
+        previousBandSummary,
+        newChapterSummary: summary,
+        newChapterTitle: currentTitle,
+        newChapterIndex: chapter.index_in_band,
+        settings,
+      });
+      // The helper returns the previous band unchanged when it has too many
+      // words (>800). In that case we fall through to a full re-aggregation
+      // so the LLM gets a chance to compress.
+      if (consolidated === (previousBandSummary ?? "")) {
+        const { data: allChapters, error: acErr } = await supabase
+          .from("chapters")
+          .select("id, title, index_in_band, status, chapter_summary")
+          .eq("band_id", bandId)
+          .order("index_in_band");
+        if (acErr) throw acErr;
+        const closed = (allChapters ?? [])
+          .filter(
+            (c) =>
+              c.status === "closed" &&
+              typeof c.chapter_summary === "string" &&
+              c.chapter_summary.trim().length > 0,
+          )
+          .sort((a, b) => a.index_in_band - b.index_in_band)
+          .map(
+            (c) =>
+              `### Chapter ${c.index_in_band}: ${c.title}\n${(c.chapter_summary as string).trim()}`,
+          )
+          .join("\n\n");
+        let rebuilt = closed;
+        if (rebuilt.length > 10_000) {
+          const { compressBandSummary } = await import(
+            "@/lib/chapter/bandSummary"
+          );
+          const closedCount = closed
+            .split("### Chapter")
+            .filter((s) => s.trim().length > 0).length;
+          rebuilt = await compressBandSummary(settings, rebuilt, closedCount);
+        }
+        const { error: updBandErr } = await supabase
+          .from("bands")
+          .update({ band_summary: rebuilt })
+          .eq("id", bandId);
+        if (updBandErr) throw updBandErr;
+      } else {
+        const { error: updBandErr } = await supabase
+          .from("bands")
+          .update({ band_summary: consolidated })
+          .eq("id", bandId);
+        if (updBandErr) throw updBandErr;
+      }
+    } catch (e) {
+      // Non-fatal: the close succeeded, band summary just didn't update.
+      // The next close will catch up.
+      console.warn("close-chapter: band consolidation failed", e);
+    }
+  })();
 
   // 5. Create the next chapter.
   const nextIndex = chapter.index_in_band + 1;
-  const nextChapterTitle =
-    (typeof nextTitle === "string" && nextTitle.trim()) ||
-    `Chapter ${nextIndex}`;
+  const nextChapterTitle = nextChapterTitleLocal;
   const { data: newChapter, error: createErr } = await supabase
     .from("chapters")
     .insert({
@@ -612,8 +688,10 @@ export async function POST(req: Request) {
   }
   const newChapterId = newChapter.id as string;
 
-  // 6. Seed the intro turns if any. The intro resolver returns
-  // speakerSlug as `string | null | undefined`; map to non-null for the DB.
+  // 6. Collect the (parallel) intro result and seed the turns if any.
+  // The intro resolver returns speakerSlug as `string | null | undefined`;
+  // map to non-null for the DB.
+  const introTurns = await introPromise;
   if (introTurns.length) {
     const introInsertRows = introTurns.map((it, i) => ({
       chapter_id: newChapterId,
@@ -631,80 +709,11 @@ export async function POST(req: Request) {
     }
   }
 
-  // 7. Incremental band consolidation. Same fallback hierarchy as the
-  // client-side rebuildBandSummaryIncremental: incremental if previous
-  // band is ≤ 800 words, else full re-aggregation.
-  try {
-    const { data: band, error: bandErr } = await supabase
-      .from("bands")
-      .select("band_summary")
-      .eq("id", bandId)
-      .single();
-    if (bandErr) throw bandErr;
-    const previousBandSummary =
-      (band?.band_summary as string | null | undefined) ?? null;
+  // 7. Wait for the (parallel) band consolidation — it already persisted
+  // itself; we just join it so the response is complete.
+  await bandPromise;
 
-    const consolidated = await consolidateBandSummary({
-      previousBandSummary,
-      newChapterSummary: summary,
-      newChapterTitle: currentTitle,
-      newChapterIndex: chapter.index_in_band,
-      settings,
-    });
-    // The helper returns the previous band unchanged when it has too many
-    // words (>800). In that case we fall through to a full re-aggregation
-    // so the LLM gets a chance to compress.
-    if (consolidated === (previousBandSummary ?? "")) {
-      // Full re-aggregation path: read all closed chapters and rebuild.
-      const { data: allChapters, error: acErr } = await supabase
-        .from("chapters")
-        .select("id, title, index_in_band, status, chapter_summary")
-        .eq("band_id", bandId)
-        .order("index_in_band");
-      if (acErr) throw acErr;
-      const closed = (allChapters ?? [])
-        .filter(
-          (c) =>
-            c.status === "closed" &&
-            typeof c.chapter_summary === "string" &&
-            c.chapter_summary.trim().length > 0,
-        )
-        .sort((a, b) => a.index_in_band - b.index_in_band)
-        .map(
-          (c) =>
-            `### Chapter ${c.index_in_band}: ${c.title}\n${(c.chapter_summary as string).trim()}`,
-        )
-        .join("\n\n");
-      let rebuilt = closed;
-      if (rebuilt.length > 10_000) {
-        // compressBandSummary is exported from bandSummary.ts and follows
-        // the same prompt as the client-side helper. We import it lazily
-        // to keep this module's cold-start cost down.
-        const { compressBandSummary } = await import(
-          "@/lib/chapter/bandSummary"
-        );
-        const closedCount = closed
-          .split("### Chapter")
-          .filter((s) => s.trim().length > 0).length;
-        rebuilt = await compressBandSummary(settings, rebuilt, closedCount);
-      }
-      const { error: updBandErr } = await supabase
-        .from("bands")
-        .update({ band_summary: rebuilt })
-        .eq("id", bandId);
-      if (updBandErr) throw updBandErr;
-    } else {
-      const { error: updBandErr } = await supabase
-        .from("bands")
-        .update({ band_summary: consolidated })
-        .eq("id", bandId);
-      if (updBandErr) throw updBandErr;
-    }
-  } catch (e) {
-    // Non-fatal: the close succeeded, band summary just didn't update.
-    // The next close will catch up.
-    console.warn("close-chapter: band consolidation failed", e);
-  }
+
 
   // 8. Touch story.updated_at so the library re-orders.
   try {
