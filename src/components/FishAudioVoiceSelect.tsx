@@ -9,6 +9,7 @@ import {
   type FishVoiceCatalogEntry,
 } from "@/lib/tts/fishAudioCatalogClient";
 import { looksLikeFishReferenceId } from "@/lib/tts/fishAudioVoices";
+import { FishPublicVoiceSelect } from "@/components/FishPublicVoiceSelect";
 
 export function FishAudioVoiceSelect({
   value,
@@ -37,6 +38,7 @@ export function FishAudioVoiceSelect({
   const [bulkDraft, setBulkDraft] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [showBulkInput, setShowBulkInput] = useState(false);
+  const [communityMode, setCommunityMode] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const autoPickedRef = useRef(false);
@@ -192,6 +194,44 @@ export function FishAudioVoiceSelect({
       {label ? (
         <label className="mb-1 block text-[10px] text-zinc-500">{label}</label>
       ) : null}
+      <div className="mb-1.5 flex gap-1.5">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setCommunityMode(false)}
+          className={`rounded-md px-2 py-1 text-[10px] ${
+            communityMode
+              ? "border border-surface-border text-zinc-500"
+              : "bg-accent/20 text-accent"
+          }`}
+        >
+          Meine Stimmen
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setCommunityMode(true)}
+          className={`rounded-md px-2 py-1 text-[10px] ${
+            communityMode
+              ? "bg-accent/20 text-accent"
+              : "border border-surface-border text-zinc-500"
+          }`}
+        >
+          Community-Bibliothek
+        </button>
+      </div>
+      {communityMode ? (
+        <FishPublicVoiceSelect
+          value={value}
+          onChange={(id) => {
+            onChange(id);
+            if (onPinnedIdsChange && !pinned.includes(id)) {
+              onPinnedIdsChange([...pinned, id]);
+            }
+          }}
+        />
+      ) : (
+        <>
       {catalogHint && !loading ? (
         <p className="mb-1 text-[10px] leading-snug text-zinc-500">
           {catalogHint}
@@ -333,7 +373,11 @@ export function FishAudioVoiceSelect({
         </button>
       ) : null}
 
-      {error ? <p className="mt-1 text-[10px] text-red-400">{error}</p> : null}
+          {error ? (
+            <p className="mt-1 text-[10px] text-red-400">{error}</p>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
