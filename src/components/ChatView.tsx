@@ -1458,6 +1458,8 @@ export function ChatView({
     try {
       // Engine 2A: retrieve relevant memory-stream turns before building
       // the prompt (DB stories only; local stories have no server stream).
+      // Hard 700ms timeout — a slow embedding must never delay the reply;
+      // without the turns the prompt simply omits the memory-stream layer.
       let memoryStreamTurns: MemoryStreamTurn[] | null = null;
       if (!isLocalStoryId(storyId)) {
         try {
@@ -1466,13 +1468,23 @@ export function ChatView({
             .map((h) => h.content)
             .join(" ")
             .slice(0, 1500);
-          const res = await authFetch(
+          const retrieval = authFetch(
             `/api/memory/retrieve?storyId=${encodeURIComponent(storyId)}&query=${encodeURIComponent(queryText)}`,
-          );
-          if (res.ok) {
-            const json = (await res.json()) as { turns?: MemoryStreamTurn[] };
-            memoryStreamTurns = json.turns ?? null;
-          }
+          )
+            .then(async (res) => {
+              if (!res.ok) return null;
+              const json = (await res.json()) as {
+                turns?: MemoryStreamTurn[];
+              };
+              return json.turns ?? null;
+            })
+            .catch(() => null);
+          memoryStreamTurns = await Promise.race([
+            retrieval,
+            new Promise<null>((resolve) =>
+              setTimeout(() => resolve(null), 700),
+            ),
+          ]);
         } catch {
           // Retrieval is best-effort — never block the reply on it.
         }

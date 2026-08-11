@@ -52,7 +52,9 @@ export interface OpenRouterSettings {
 export const DEFAULT_OPENROUTER: Omit<OpenRouterSettings, "apiKey"> = {
   model: "google/gemini-2.5-flash-lite",
   narratorModel: "aion-labs/aion-2.0",
-  maxTokens: 2048,
+  // 1600 covers ~95% of story scenes; higher caps let generalist models
+  // ramble (cost + long tails) without adding quality.
+  maxTokens: 1600,
   temperature: 0.85,
 };
 
