@@ -1,15 +1,29 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
+import { CastCharacterCard } from "@/components/story-editor/CastCharacterCard";
 import { useStorySession } from "@/lib/story/useStorySession";
 import {
   getStoryOverview,
+  updateCharacterCard,
   updateCharacterManual,
   type CharacterRow,
 } from "@/lib/db/stories";
+import { loadOpenRouterSettings } from "@/lib/storage/openRouterSettings";
+import { suggestCastField, type CastField } from "@/lib/cast/castFieldAi";
+import { getStoryConcept } from "@/lib/story/storyOrigin";
+import type { StoryCharacterCard } from "@/lib/types";
+
+type Draft = {
+  description: string;
+  personality: string;
+  memory: string;
+  archived: boolean;
+  reason: string;
+};
 
 export default function StoryCastPage() {
   const params = useParams();
@@ -19,24 +33,34 @@ export default function StoryCastPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [busyField, setBusyField] = useState<CastField | null>(null);
   const [storyTitle, setStoryTitle] = useState("");
+  const [storyConcept, setStoryConcept] = useState<string | null>(null);
+  const [storyLocale, setStoryLocale] = useState<"de" | "en">("de");
   const [cast, setCast] = useState<CharacterRow[]>([]);
-  const [charDrafts, setCharDrafts] = useState<
-    Record<string, { memory: string; archived: boolean; reason: string }>
-  >({});
+  const [charDrafts, setCharDrafts] = useState<Record<string, Draft>>({});
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const overview = await getStoryOverview(storyId);
     setStoryTitle(overview.story.title as string);
+    setStoryLocale(
+      (overview.story.locale as string) === "en" ? "en" : "de",
+    );
+    setStoryConcept(
+      getStoryConcept(
+        (overview.story.settings ?? {}) as Record<string, unknown>,
+        overview.narrator as StoryCharacterCard,
+      ),
+    );
     const members = overview.cast.filter((c) => c.role === "cast");
     setCast(members);
 
-    const drafts: Record<
-      string,
-      { memory: string; archived: boolean; reason: string }
-    > = {};
+    const drafts: Record<string, Draft> = {};
     for (const c of members) {
       drafts[c.id] = {
+        description: c.card_json.description ?? "",
+        personality: c.card_json.personality ?? "",
         memory: c.character_memory ?? "",
         archived: c.status === "archived",
         reason: c.archived_reason ?? "",
@@ -54,12 +78,33 @@ export default function StoryCastPage() {
       .finally(() => setLoading(false));
   }, [authReady, load]);
 
+  const patchDraft = (id: string, patch: Partial<Draft>) => {
+    setCharDrafts((prev) => ({
+      ...prev,
+      [id]: { ...(prev[id] ?? emptyDraft()), ...patch },
+    }));
+  };
+
   const saveCharacter = async (c: CharacterRow) => {
     const draft = charDrafts[c.id];
     if (!draft) return;
     setBusy(true);
     setError(null);
     try {
+      // Card fields
+      const card = { ...c.card_json, ...{} } as StoryCharacterCard;
+      if (
+        draft.description !== (c.card_json.description ?? "") ||
+        draft.personality !== (c.card_json.personality ?? "")
+      ) {
+        const nextCard: StoryCharacterCard = {
+          ...card,
+          description: draft.description,
+          personality: draft.personality,
+        };
+        await updateCharacterCard(c.id, storyId, nextCard);
+      }
+      // Manual fields
       await updateCharacterManual(c.id, storyId, {
         character_memory: draft.memory,
         status: draft.archived ? "archived" : "active",
@@ -72,6 +117,45 @@ export default function StoryCastPage() {
       setBusy(false);
     }
   };
+
+  const aiSuggest = async (c: CharacterRow, field: CastField) => {
+    const settings = loadOpenRouterSettings();
+    if (!settings || !charDrafts[c.id]) return;
+    setBusyField(field);
+    setError(null);
+    try {
+      const draft = charDrafts[c.id];
+      const value = await suggestCastField(settings, {
+        field,
+        characterName: c.name,
+        characterRole: c.role ?? "cast",
+        currentValue:
+          field === "description"
+            ? draft.description
+            : field === "personality"
+              ? draft.personality
+              : draft.memory,
+        storyTitle,
+        storyConcept,
+        locale: storyLocale,
+      });
+      if (field === "description") patchDraft(c.id, { description: value });
+      else if (field === "personality") patchDraft(c.id, { personality: value });
+      else patchDraft(c.id, { memory: value });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusyField(null);
+    }
+  };
+
+  const sortedCast = useMemo(
+    () =>
+      [...cast].sort((a, b) =>
+        (a.created_at ?? "").localeCompare(b.created_at ?? ""),
+      ),
+    [cast],
+  );
 
   if (loading) {
     return (
@@ -90,83 +174,33 @@ export default function StoryCastPage() {
             Figuren &amp; Erinnerungen
           </h1>
           <p className="mt-1 text-xs text-zinc-500">
-            Was die Story über jede Figur weiß — Reihenfolge wie bei der
-            Erstellung (Hauptcharaktere oben).
+            Karte antippen zum Bearbeiten — 🎲 KI nutzt das Story-Konzept für
+            Beschreibung, Persönlichkeit und Erinnerungen.
           </p>
         </div>
 
+        {error ? <p className="text-sm text-red-400">{error}</p> : null}
+
         <ul className="flex flex-col gap-3">
-          {cast.map((c) => {
+          {sortedCast.map((c) => {
             const draft = charDrafts[c.id];
             if (!draft) return null;
             return (
-              <li
+              <CastCharacterCard
                 key={c.id}
-                className="rounded-xl border border-surface-border bg-surface-raised p-3"
-              >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-zinc-100">
-                    {c.name}
-                  </span>
-                  <label className="flex items-center gap-1.5 text-xs text-zinc-500">
-                    <input
-                      type="checkbox"
-                      checked={draft.archived}
-                      onChange={(e) =>
-                        setCharDrafts((prev) => ({
-                          ...prev,
-                          [c.id]: {
-                            ...prev[c.id]!,
-                            archived: e.target.checked,
-                          },
-                        }))
-                      }
-                    />
-                    Archiviert
-                  </label>
-                </div>
-                {c.card_json.personality ? (
-                  <p className="mb-2 text-[11px] text-zinc-500">
-                    {c.card_json.personality}
-                  </p>
-                ) : null}
-                <textarea
-                  value={draft.memory}
-                  onChange={(e) =>
-                    setCharDrafts((prev) => ({
-                      ...prev,
-                      [c.id]: { ...prev[c.id]!, memory: e.target.value },
-                    }))
-                  }
-                  rows={4}
-                  placeholder="Was die Story über diese Figur weiß …"
-                  className="w-full rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-xs text-zinc-200"
-                />
-                {draft.archived ? (
-                  <input
-                    value={draft.reason}
-                    onChange={(e) =>
-                      setCharDrafts((prev) => ({
-                        ...prev,
-                        [c.id]: {
-                          ...prev[c.id]!,
-                          reason: e.target.value,
-                        },
-                      }))
-                    }
-                    placeholder="Grund (z. B. tot, weggegangen)"
-                    className="mt-2 w-full rounded-lg border border-surface-border bg-surface px-2 py-1 text-xs"
-                  />
-                ) : null}
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => saveCharacter(c)}
-                  className="mt-2 rounded-lg bg-accent/20 px-3 py-1.5 text-xs text-accent disabled:opacity-40"
-                >
-                  Figur speichern
-                </button>
-              </li>
+                character={c}
+                isNarrator={c.role === "narrator"}
+                expanded={expandedId === c.id}
+                onToggle={() =>
+                  setExpandedId(expandedId === c.id ? null : c.id)
+                }
+                draft={draft}
+                onDraftChange={(patch) => patchDraft(c.id, patch)}
+                busyField={busyField}
+                onAiSuggest={(field) => void aiSuggest(c, field)}
+                busySaving={busy}
+                onSave={() => void saveCharacter(c)}
+              />
             );
           })}
         </ul>
@@ -174,8 +208,6 @@ export default function StoryCastPage() {
         {cast.length === 0 ? (
           <p className="text-xs text-zinc-500">Noch kein Cast in dieser Story.</p>
         ) : null}
-
-        {error ? <p className="text-sm text-red-400">{error}</p> : null}
 
         <Link
           href={`/story/${storyId}/voices`}
@@ -186,4 +218,14 @@ export default function StoryCastPage() {
       </div>
     </main>
   );
+}
+
+function emptyDraft(): Draft {
+  return {
+    description: "",
+    personality: "",
+    memory: "",
+    archived: false,
+    reason: "",
+  };
 }
