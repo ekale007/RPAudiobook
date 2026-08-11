@@ -2,7 +2,10 @@ import { buildChatMessages } from "@/lib/prompt/buildPrompt";
 import { ensureSpeakerScript } from "@/lib/chat/dialogueScript";
 import { preprocessAssistantMarkup } from "@/lib/chat/parseSpeakerBlocks";
 import { stripGameMetaLeaks } from "@/lib/chat/sanitizeAssistantOutput";
-import { completeOpenRouterWithUsage } from "@/lib/llm/openrouter";
+import {
+  completeOpenRouterWithUsage,
+  streamOpenRouterChat,
+} from "@/lib/llm/openrouter";
 import { resolveChatModelSettings } from "@/lib/storage/openRouterSettings";
 import type { OpenRouterSettings } from "@/lib/types";
 import type { ChatTurn, LoreEntry, StorySettings, StoryCharacterCard } from "@/lib/types";
@@ -92,6 +95,72 @@ export async function streamAssistantReply(
     temperature: chatSettings.temperature,
     signal: params.signal,
   });
+}
+
+/**
+ * Streaming variant of streamAssistantReply — tokens arrive via onToken
+ * as the upstream generates them (SSE), so the UI can render live text
+ * instead of a spinner. Returns the final content + estimated cost.
+ */
+export async function streamAssistantReplyStreaming(
+  params: GenerateReplyParams,
+  onToken: (delta: string) => void,
+): Promise<AssistantReplyResult> {
+  const history = params.continuation
+    ? buildContinuationTurns(
+        params.turns,
+        params.continuationPrompt ?? defaultContinuePrompt(),
+        params.storyLocale,
+      )
+    : params.turns;
+
+  const promptCtx = {
+    character: params.character,
+    loreEntries: params.loreEntries,
+    turns: history,
+    bandSummary: params.bandSummary,
+    chapterSummary: params.chapterSummary,
+    rollingSummary: params.rollingSummary,
+    chapterTitle: params.chapterTitle,
+    phaseHint: params.phaseHint,
+    chapterIndex: params.chapterIndex,
+    closedChapterCount: params.closedChapterCount,
+    plotState: params.plotState,
+    timeline: params.timeline,
+    allCast: params.allCast ?? params.cast,
+    settings: params.storySettings,
+    storyLocale: params.storyLocale,
+    memoryStreamTurns: params.memoryStreamTurns ?? null,
+  };
+
+  const { messages, activeLoreCount } = buildChatMessages(promptCtx);
+  params.onLoreCount?.(activeLoreCount);
+
+  const chatSettings = resolveChatModelSettings(params.settings);
+  let full = "";
+  let streamError: Error | null = null;
+
+  await new Promise<void>((resolve) => {
+    void streamOpenRouterChat(
+      chatSettings,
+      messages,
+      {
+        onToken: (delta) => {
+          full += delta;
+          onToken(delta);
+        },
+        onDone: () => resolve(),
+        onError: (e) => {
+          streamError = e;
+          resolve();
+        },
+      },
+      params.signal,
+    );
+  });
+
+  if (streamError) throw streamError;
+  return { content: full, llmCostCents: undefined };
 }
 
 export type ParseAssistantBlocksOpts = {

@@ -53,6 +53,7 @@ import { formatScriptAttributionDebug } from "@/lib/chat/dialogueScript";
 import {
   parseAssistantBlocks,
   streamAssistantReply,
+  streamAssistantReplyStreaming,
 } from "@/lib/chat/generateReply";
 import {
   buildPlayBeatPrompt,
@@ -221,6 +222,7 @@ export function ChatView({
   const [steeringInputMode, setSteeringInputMode] =
     useState<SteeringInputMode>("auto");
   const [generating, setGenerating] = useState(false);
+  const [liveStreamText, setLiveStreamText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loreCount, setLoreCount] = useState(0);
   const [rollingSummary, setRollingSummary] = useState(
@@ -1476,30 +1478,38 @@ export function ChatView({
         }
       }
 
-      const reply = await streamAssistantReply({
-        settings: chatSettings,
-        character,
-        cast: opts.allCast ?? allCast,
-        loreEntries,
-        turns: turnsToChat(history),
-        storySettings,
-        bandSummary,
-        chapterSummary: priorChapterSummaries,
-        rollingSummary: opts.rollingSummary ?? rollingSummary,
-        chapterTitle: chapterTitle ?? chapter.title,
-        phaseHint: phaseHint ?? chapter.phase_hint,
-        chapterIndex: chapterIndex ?? chapter.index_in_band,
-        closedChapterCount,
-        plotState: opts.plotState !== undefined ? opts.plotState : plotState,
-        timeline: opts.timeline !== undefined ? opts.timeline : timeline,
-        allCast: opts.allCast ?? allCast,
-        continuation: opts.continuation,
-        continuationPrompt: opts.continuationPrompt,
-        storyLocale,
-        memoryStreamTurns,
-        onLoreCount: setLoreCount,
-        signal: abortRef.current.signal,
-      });
+      const reply = await streamAssistantReplyStreaming(
+        {
+          settings: chatSettings,
+          character,
+          cast: opts.allCast ?? allCast,
+          loreEntries,
+          turns: turnsToChat(history),
+          storySettings,
+          bandSummary,
+          chapterSummary: priorChapterSummaries,
+          rollingSummary: opts.rollingSummary ?? rollingSummary,
+          chapterTitle: chapterTitle ?? chapter.title,
+          phaseHint: phaseHint ?? chapter.phase_hint,
+          chapterIndex: chapterIndex ?? chapter.index_in_band,
+          closedChapterCount,
+          plotState: opts.plotState !== undefined ? opts.plotState : plotState,
+          timeline: opts.timeline !== undefined ? opts.timeline : timeline,
+          allCast: opts.allCast ?? allCast,
+          continuation: opts.continuation,
+          continuationPrompt: opts.continuationPrompt,
+          storyLocale,
+          memoryStreamTurns,
+          onLoreCount: setLoreCount,
+          signal: abortRef.current.signal,
+        },
+        (delta) => {
+          // Live text for the generating indicator; cleared after persist.
+          if (!opts.background) {
+            setLiveStreamText((prev) => (prev ?? "") + delta);
+          }
+        },
+      );
       full = reply.content;
       llmCostCents = reply.llmCostCents;
     } catch (e) {
@@ -1518,11 +1528,13 @@ export function ChatView({
     if (aborted) {
       chatBusyRef.current = false;
       if (!opts.background) setGenerating(false);
+      setLiveStreamText(null);
       return false;
     }
     if (!full.trim()) {
       chatBusyRef.current = false;
       if (!opts.background) setGenerating(false);
+      setLiveStreamText(null);
       setError(t("chat.emptyModelReply"));
       return false;
     }
@@ -1552,6 +1564,7 @@ export function ChatView({
 
     chatBusyRef.current = false;
     if (!opts.background) setGenerating(false);
+    setLiveStreamText(null);
     return true;
   };
 
@@ -2422,6 +2435,16 @@ export function ChatView({
                 label={t("chat.generating")}
                 onCancel={cancelWork}
               />
+              {liveStreamText ? (
+                <div className="mt-1 rounded-lg border border-surface-border bg-surface-raised/60 px-2.5 py-2">
+                  <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-zinc-300">
+                    {liveStreamText}
+                  </p>
+                  <p className="mt-1 text-[9px] uppercase tracking-wide text-zinc-600">
+                    {t("chat.generating")}…
+                  </p>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </ChatScrollPane>
