@@ -384,48 +384,80 @@ export async function POST(req: Request) {
   const currentTitle = (chapter.title ?? "").trim() || `Chapter ${chapter.index_in_band}`;
   const phaseHint = chapter.phase_hint ?? null;
 
-  // 1+2. Plot-state extraction and chapter summary run in parallel —
-  // they share chatTurns + title but are otherwise independent.
-  // Saves ~5-8s on typical chapters (25-40 turns).
+  // 1+2. Plot-state extraction, chapter summary AND the reflection run in
+  // parallel — they share chatTurns + title but are otherwise independent.
+  // The reflection only needs a ONE-LINE plot summary as context, so it
+  // starts from the PREVIOUS plot state while the fresh one is being
+  // computed. Saves ~5-8s on typical chapters (25-40 turns).
   let plot;
   let summary: string;
-  {
-    const existingPlot = (() => {
-      try {
-        const settingsJson = story.settings as Record<string, unknown> | null;
-        return (settingsJson?.plotState as Parameters<typeof extractPlotState>[2]) ?? null;
-      } catch {
-        return null;
-      }
-    })();
 
-    const [plotSettled, summarySettled] = await Promise.allSettled([
+  // Pre-compute reflection inputs from the CURRENT (previous) plot state.
+  const existingPlot = (() => {
+    try {
+      const settingsJson = story.settings as Record<string, unknown> | null;
+      return (settingsJson?.plotState as Parameters<typeof extractPlotState>[2]) ?? null;
+    } catch {
+      return null;
+    }
+  })();
+  const storySettingsForReflection =
+    (story.settings as Record<string, unknown>) ?? {};
+  const existingContainer = parseReflections(
+    storySettingsForReflection.storyReflections,
+  );
+  const lastReflection =
+    existingContainer.reflections.length > 0
+      ? existingContainer.reflections[existingContainer.reflections.length - 1]
+      : null;
+  const prevPlotSummary = existingPlot?.timeLabel
+    ? `${existingPlot.timeLabel} — ${existingPlot.location ?? "unknown location"}`
+    : (existingPlot?.location ?? "ongoing story");
+
+  const [plotSettled, summarySettled, reflectionSettled] =
+    await Promise.allSettled([
       extractPlotState(settings, chatTurns, existingPlot, {
         chapterTitle: currentTitle,
         phaseHint,
       }),
       summarizeChapter(settings, chatTurns, currentTitle),
+      // Reflection is best-effort and independent: uses the previous
+      // plot summary — relationships/open questions barely change from
+      // one chapter's location label.
+      generateReflectionCore(
+        (msgs, opts) =>
+          serverCompleteOpenRouter(msgs, {
+            maxTokens: opts.maxTokens,
+            temperature: opts.temperature,
+            responseFormat: opts.responseFormat,
+          }).then((r: { content: string }) => r.content),
+        {
+          turns: chatTurns,
+          existing: lastReflection,
+          plotStateSummary: prevPlotSummary,
+          currentTurnIndex: rows[rows.length - 1].index_in_chapter,
+        },
+      ),
     ]);
 
-    if (plotSettled.status === "rejected") {
-      console.warn("close-chapter: plot-state extraction failed", plotSettled.reason);
-      return jsonError(
-        502,
-        "Plot-Stand konnte nicht gesichert werden. Bitte erneut versuchen.",
-        "plot_extraction_failed",
-      );
-    }
-    if (summarySettled.status === "rejected") {
-      console.warn("close-chapter: summarize failed", summarySettled.reason);
-      return jsonError(
-        502,
-        "Zusammenfassung konnte nicht erstellt werden.",
-        "summarize_failed",
-      );
-    }
-    plot = plotSettled.value;
-    summary = summarySettled.value;
+  if (plotSettled.status === "rejected") {
+    console.warn("close-chapter: plot-state extraction failed", plotSettled.reason);
+    return jsonError(
+      502,
+      "Plot-Stand konnte nicht gesichert werden. Bitte erneut versuchen.",
+      "plot_extraction_failed",
+    );
   }
+  if (summarySettled.status === "rejected") {
+    console.warn("close-chapter: summarize failed", summarySettled.reason);
+    return jsonError(
+      502,
+      "Zusammenfassung konnte nicht erstellt werden.",
+      "summarize_failed",
+    );
+  }
+  plot = plotSettled.value;
+  summary = summarySettled.value;
 
   // Persist plot + summary.
   const closedAt = new Date().toISOString();
@@ -486,39 +518,19 @@ export async function POST(req: Request) {
   }
 
   // 2.5. Reflection layer update (Diagnose Task 2B).
-  // Best-effort: generates a high-level story state snapshot for the
-  // LLM system prompt. Failure here does NOT roll back the chapter close.
-  try {
-    const storySettings = (story.settings as Record<string, unknown>) ?? {};
-    const existingContainer = parseReflections(storySettings.storyReflections);
-    const lastReflection =
-      existingContainer.reflections.length > 0
-        ? existingContainer.reflections[existingContainer.reflections.length - 1]
-        : null;
-    const plotSummary = plot.timeLabel
-      ? `${plot.timeLabel} — ${plot.location ?? "unknown location"}`
-      : (plot.location ?? "unknown location");
-
-    const newReflection = await generateReflectionCore(
-      (msgs, opts) =>
-        serverCompleteOpenRouter(msgs, {
-          maxTokens: opts.maxTokens,
-          temperature: opts.temperature,
-          responseFormat: opts.responseFormat,
-        }).then((r: { content: string }) => r.content),
-      {
-        turns: chatTurns,
-        existing: lastReflection,
-        plotStateSummary: plotSummary,
-        currentTurnIndex: rows[rows.length - 1].index_in_chapter,
-      },
-    );
-
-    const updated = appendReflection(existingContainer, newReflection);
-    storySettings.storyReflections = updated;
-    await admin.from("stories").update({ settings: storySettings }).eq("id", storyId);
-  } catch (e) {
-    console.warn("close-chapter: reflection update failed", e);
+  // The reflection was generated IN PARALLEL with plot + summary (step
+  // 1+2) using the previous plot summary as one-line context. Here we
+  // only persist the result — best-effort, failure does NOT roll back
+  // the chapter close.
+  if (reflectionSettled.status === "fulfilled") {
+    try {
+      const updated = appendReflection(existingContainer, reflectionSettled.value);
+      const storySettings = (story.settings as Record<string, unknown>) ?? {};
+      storySettings.storyReflections = updated;
+      await admin.from("stories").update({ settings: storySettings }).eq("id", storyId);
+    } catch (e) {
+      console.warn("close-chapter: reflection update failed", e);
+    }
   }
 
   // 3. Resolve next-phase hint from the freshly extracted plot state.
