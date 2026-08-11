@@ -387,6 +387,8 @@ export const enMessages: Messages = {
     deleteChapterAria: "Delete {title}",
     statusActive: "Active",
     statusClosed: "Done",
+    reopenChapter: "Reopen",
+    reopenChapterHint: "Set a closed chapter back to active",
     play: "Play",
     read: "Read",
     less: "Less",

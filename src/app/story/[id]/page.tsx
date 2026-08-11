@@ -15,6 +15,7 @@ import {
 } from "@/lib/db/stories";
 import { normalizeStoryLocale } from "@/lib/tts/ttsLocaleRouting";
 import { useUiLocale } from "@/lib/i18n/UiLocaleProvider";
+import { authFetch } from "@/lib/supabase/authFetch";
 
 export default function StoryHubPage() {
   const { t } = useUiLocale();
@@ -32,6 +33,7 @@ export default function StoryHubPage() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [titleBusy, setTitleBusy] = useState(false);
+  const [reopenBusyId, setReopenBusyId] = useState<string | null>(null);
   const { userId, authReady } = useStorySession(router);
 
   const load = useCallback(
@@ -73,6 +75,29 @@ export default function StoryHubPage() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setDeleteBusyId(null);
+    }
+  };
+
+  const handleReopenChapter = async (ch: ChapterRow) => {
+    setError(null);
+    setReopenBusyId(ch.id);
+    try {
+      const res = await authFetch("/api/chapter/reopen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chapterId: ch.id, storyId }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(j?.error ?? `Reopen fehlgeschlagen (${res.status})`);
+      }
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setReopenBusyId(null);
     }
   };
 
@@ -166,6 +191,8 @@ export default function StoryHubPage() {
         onCancelRename={() => setEditingTitle(false)}
         onDeleteChapter={handleDeleteChapter}
         onToggleSummary={setExpandedSummaryId}
+        reopenBusyId={reopenBusyId}
+        onReopenChapter={handleReopenChapter}
       />
     </main>
   );

@@ -103,6 +103,7 @@ export function StoryHubView({
   titleBusy,
   expandedSummaryId,
   deleteBusyId,
+  reopenBusyId,
   canDeleteAny,
   onCoverUpdated,
   onStartRename,
@@ -111,6 +112,7 @@ export function StoryHubView({
   onCancelRename,
   onDeleteChapter,
   onToggleSummary,
+  onReopenChapter,
   onCastUpdated,
   onLocaleUpdated,
   onConceptSaved,
@@ -135,6 +137,7 @@ export function StoryHubView({
   titleBusy: boolean;
   expandedSummaryId: string | null;
   deleteBusyId: string | null;
+  reopenBusyId: string | null;
   canDeleteAny: boolean;
   onCoverUpdated: (path: string | null) => void;
   onStartRename: () => void;
@@ -143,6 +146,7 @@ export function StoryHubView({
   onCancelRename: () => void;
   onDeleteChapter: (ch: ChapterRow) => void;
   onToggleSummary: (id: string | null) => void;
+  onReopenChapter: (ch: ChapterRow) => void;
   onCastUpdated?: () => void;
   onLocaleUpdated?: () => void;
   onConceptSaved?: () => void;
@@ -372,6 +376,17 @@ export function StoryHubView({
                         >
                           {isActive ? t("storyHub.play") : t("storyHub.read")}
                         </Link>
+                        {!isActive ? (
+                          <button
+                            type="button"
+                            disabled={reopenBusyId === ch.id}
+                            onClick={() => onReopenChapter(ch)}
+                            className="shrink-0 rounded-lg border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[10px] text-amber-300 hover:border-amber-400/60"
+                            title={t("storyHub.reopenChapterHint")}
+                          >
+                            {reopenBusyId === ch.id ? "…" : t("storyHub.reopenChapter")}
+                          </button>
+                        ) : null}
                         {canDeleteAny ? (
                           <button
                             type="button"

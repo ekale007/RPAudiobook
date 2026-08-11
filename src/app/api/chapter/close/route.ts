@@ -594,6 +594,20 @@ export async function POST(req: Request) {
     .select("id")
     .single();
   if (createErr || !newChapter) {
+    // Atomicity: roll the closed chapter back to "active" so the story
+    // never ends up without an active chapter when the follow-up fails.
+    console.warn(
+      "close-chapter: next chapter creation failed, rolling back chapter status",
+      createErr,
+    );
+    try {
+      await supabase
+        .from("chapters")
+        .update({ status: "active" })
+        .eq("id", chapterId);
+    } catch (e) {
+      console.warn("close-chapter: rollback failed", e);
+    }
     return jsonError(500, "Failed to create next chapter", "db_error");
   }
   const newChapterId = newChapter.id as string;

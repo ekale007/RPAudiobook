@@ -385,6 +385,8 @@ export const deMessages = {
     deleteChapterAria: "{title} löschen",
     statusActive: "Aktiv",
     statusClosed: "Zu",
+    reopenChapter: "Wieder öffnen",
+    reopenChapterHint: "Geschlossenes Chapter wieder als aktiv setzen",
     play: "Spielen",
     read: "Lesen",
     less: "Weniger",
