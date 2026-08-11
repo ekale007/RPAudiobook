@@ -116,6 +116,10 @@ export interface StorySettings {
   timeline?: StoryTimeline | null;
   /** Short pitch / logline — overrides template default in prompts */
   storyConcept?: string | null;
+  /** Genre label (1-4 words), e.g. "Space Opera" — AI/editor metadata */
+  storyGenre?: string | null;
+  /** Tone label, e.g. "grim, poetic" — AI/editor metadata */
+  storyTone?: string | null;
   /** Phase 7.3: higher-level reflection layer (Diagnose Task 2B) */
   storyReflections?: ReflectionsContainer | null;
 }

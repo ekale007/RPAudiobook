@@ -126,6 +126,10 @@ export default function StoryHubPage() {
     storySettings,
     data.narrator as StoryCharacterCard,
   );
+  const storyGenre = (storySettings as { storyGenre?: unknown })
+    .storyGenre as string | null | undefined;
+  const storyTone = (storySettings as { storyTone?: unknown })
+    .storyTone as string | null | undefined;
 
   const saveTitle = async () => {
     setTitleBusy(true);
@@ -149,6 +153,8 @@ export default function StoryHubPage() {
         userId={userId}
         title={data.story.title as string}
         storyConcept={storyConcept}
+        storyGenre={storyGenre}
+        storyTone={storyTone}
         coverStoragePath={
           (data.story as { cover_storage_path?: string | null })
             .cover_storage_path

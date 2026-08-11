@@ -88,6 +88,8 @@ export function StoryHubView({
   userId,
   title,
   storyConcept,
+  storyGenre,
+  storyTone,
   coverStoragePath,
   settings,
   storySettings,
@@ -122,6 +124,8 @@ export function StoryHubView({
   userId: string | null;
   title: string;
   storyConcept: string | null;
+  storyGenre?: string | null;
+  storyTone?: string | null;
   coverStoragePath?: string | null;
   settings: Record<string, unknown>;
   storySettings: StorySettings;
@@ -240,6 +244,9 @@ export function StoryHubView({
             <StoryHubEditSection
               storyId={storyId}
               storyConcept={storyConcept}
+              storyGenre={storyGenre}
+              storyTone={storyTone}
+              storyLocale={storyLocale}
               onConceptSaved={onConceptSaved}
             />
 
