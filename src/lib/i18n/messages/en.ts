@@ -554,7 +554,10 @@ export const enMessages: Messages = {
     few_days: "Days",
     next_week: "1 week",
     next_month: "1 month",
-  },
+
+    custom: "Custom…",
+    customPlaceholder: "e.g. when Auriel arrives, announcement",
+    customGo: "Go",  },
   tts: {
     driveListen: "Drive / listen:",
     driveMinutes: "{minutes} min",

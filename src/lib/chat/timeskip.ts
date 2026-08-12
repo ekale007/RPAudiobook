@@ -12,7 +12,8 @@ export type TimeSkipId =
   | "next_day"
   | "few_days"
   | "next_week"
-  | "next_month";
+  | "next_month"
+  | "custom";
 
 export type TimeSkipMode = "direct" | "montage";
 
@@ -40,6 +41,7 @@ const TIME_HINTS_DE: Record<TimeSkipId, string> = {
   few_days: "ein paar Tage später",
   next_week: "etwa eine Woche später",
   next_month: "etwa einen Monat später",
+  custom: "gewünschter Zeitpunkt",
 };
 
 const TIME_HINTS_EN: Record<TimeSkipId, string> = {
@@ -49,6 +51,7 @@ const TIME_HINTS_EN: Record<TimeSkipId, string> = {
   few_days: "a few days later",
   next_week: "about a week later",
   next_month: "about a month later",
+  custom: "requested time",
 };
 
 const LABELS_DE: Record<TimeSkipId, string> = {
@@ -58,6 +61,7 @@ const LABELS_DE: Record<TimeSkipId, string> = {
   few_days: "Ein paar Tage",
   next_week: "Nächste Woche",
   next_month: "Nächster Monat",
+  custom: "Benutzerdefiniert",
 };
 
 const LABELS_EN: Record<TimeSkipId, string> = {
@@ -67,6 +71,7 @@ const LABELS_EN: Record<TimeSkipId, string> = {
   few_days: "A few days",
   next_week: "Next week",
   next_month: "Next month",
+  custom: "Custom",
 };
 
 function timeSkipLabel(id: TimeSkipId, locale: "de" | "en"): string {
@@ -93,13 +98,32 @@ export function formatTimeSkipUserTurn(
   return formatSteeringUserTurnContent(`${TIME_SKIP_MARKER}${label}${preview}`);
 }
 
+/** Custom time skip with a free-text target (e.g. "Erscheinen von Auriel"). */
+export function formatCustomTimeSkipUserTurn(
+  customText: string,
+  mode: TimeSkipMode,
+  storyLocale?: string | null,
+): string {
+  const locale = normalizeStoryLocale(storyLocale);
+  const preview =
+    mode === "montage"
+      ? locale === "de"
+        ? PREVIEW_SUFFIX_DE
+        : PREVIEW_SUFFIX_EN
+      : "";
+  const body = customText.trim() || (locale === "de" ? "Zeitsprung" : "Time skip");
+  return formatSteeringUserTurnContent(
+    `${TIME_SKIP_MARKER}${body}${preview}`,
+  );
+}
+
 export function isTimeSkipSteeringDisplay(display: string): boolean {
   return stripSteeringTurnPrefix(display).trimStart().startsWith(TIME_SKIP_MARKER);
 }
 
 export function parseTimeSkipSteeringDisplay(
   display: string,
-): { id: TimeSkipId; mode: TimeSkipMode } | null {
+): { id: TimeSkipId; mode: TimeSkipMode; customText?: string } | null {
   let body = stripSteeringTurnPrefix(display).trim();
   if (!body.startsWith(TIME_SKIP_MARKER)) return null;
   body = body.slice(TIME_SKIP_MARKER.length).trim();
@@ -119,7 +143,8 @@ export function parseTimeSkipSteeringDisplay(
       return { id, mode };
     }
   }
-  return null;
+  // Not a preset — treat as a custom free-text time skip.
+  return { id: "custom", mode, customText: label };
 }
 
 export function buildTimeSkipContinuationPrompt(
@@ -129,7 +154,10 @@ export function buildTimeSkipContinuationPrompt(
   const parsed = parseTimeSkipSteeringDisplay(display);
   const locale = normalizeStoryLocale(storyLocale);
   const hint = parsed
-    ? timeSkipHint(parsed.id, locale)
+    ? parsed.id === "custom"
+      ? (parsed.customText?.trim() ||
+         (locale === "de" ? "dem gewünschten Zeitpunkt" : "the requested time"))
+      : timeSkipHint(parsed.id, locale)
     : locale === "de"
       ? "dem gewünschten Zeitpunkt"
       : "the requested time";

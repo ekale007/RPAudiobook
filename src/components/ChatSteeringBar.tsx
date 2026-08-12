@@ -29,6 +29,7 @@ export function ChatSteeringBar({
   onSend,
   onQuickReaction,
   onTimeSkip,
+  onCustomTimeSkip,
   onEnsureExpanded,
   placeholder,
   disabled,
@@ -47,6 +48,7 @@ export function ChatSteeringBar({
   onSend: () => void;
   onQuickReaction: (id: QuickReactionId) => void;
   onTimeSkip?: (id: TimeSkipId, mode: TimeSkipMode) => void;
+  onCustomTimeSkip?: (customText: string, mode: TimeSkipMode) => void;
   onEnsureExpanded?: () => void;
   placeholder: string;
   disabled?: boolean;
@@ -185,6 +187,7 @@ export function ChatSteeringBar({
           <TimeSkipBar
             disabled={disabled || generating}
             onTimeSkip={onTimeSkip}
+            onCustomTimeSkip={onCustomTimeSkip}
           />
         ) : null}
 

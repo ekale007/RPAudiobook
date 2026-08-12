@@ -552,7 +552,10 @@ export const deMessages = {
     few_days: "Tage",
     next_week: "1 Woche",
     next_month: "1 Monat",
-  },
+
+    custom: "Benutzerdefiniert…",
+    customPlaceholder: "z. B. Erscheinen von Auriel, Bekanntgabe",
+    customGo: "Springen",  },
   tts: {
     driveListen: "Fahren / Hören:",
     driveMinutes: "{minutes} Min",

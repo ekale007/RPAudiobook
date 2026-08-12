@@ -12,12 +12,16 @@ import { ui } from "@/lib/ui/classes";
 export function TimeSkipBar({
   disabled,
   onTimeSkip,
+  onCustomTimeSkip,
 }: {
   disabled?: boolean;
   onTimeSkip: (id: TimeSkipId, mode: TimeSkipMode) => void;
+  onCustomTimeSkip?: (customText: string, mode: TimeSkipMode) => void;
 }) {
   const { t } = useUiLocale();
   const [mode, setMode] = useState<TimeSkipMode>("direct");
+  const [customText, setCustomText] = useState("");
+  const [showCustom, setShowCustom] = useState(false);
   const selectRef = useRef<HTMLSelectElement>(null);
 
   const modeBtn = (value: TimeSkipMode) =>
@@ -28,8 +32,22 @@ export function TimeSkipBar({
     }`;
 
   const handlePresetPick = (raw: string) => {
+    if (raw === "custom") {
+      setShowCustom(true);
+      if (selectRef.current) selectRef.current.selectedIndex = 0;
+      return;
+    }
     if (!raw) return;
     onTimeSkip(raw as TimeSkipId, mode);
+    if (selectRef.current) selectRef.current.selectedIndex = 0;
+  };
+
+  const submitCustom = () => {
+    const value = customText.trim();
+    if (!value || !onCustomTimeSkip) return;
+    onCustomTimeSkip(value, mode);
+    setCustomText("");
+    setShowCustom(false);
     if (selectRef.current) selectRef.current.selectedIndex = 0;
   };
 
@@ -82,8 +100,44 @@ export function TimeSkipBar({
               {t(preset.labelKey)}
             </option>
           ))}
+          <option value="custom">{t("timeskip.custom")}</option>
         </select>
       </div>
+      {showCustom ? (
+        <div className="mt-2 flex items-center gap-1.5">
+          <input
+            type="text"
+            value={customText}
+            onChange={(e) => setCustomText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitCustom();
+            }}
+            autoFocus
+            placeholder={t("timeskip.customPlaceholder")}
+            className={`${ui.input} min-h-0 flex-1 py-1.5 text-xs`}
+            aria-label={t("timeskip.customPlaceholder")}
+          />
+          <button
+            type="button"
+            disabled={disabled || !customText.trim()}
+            onClick={submitCustom}
+            className={ui.btnPrimary}
+          >
+            {t("timeskip.customGo")}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowCustom(false);
+              setCustomText("");
+              if (selectRef.current) selectRef.current.selectedIndex = 0;
+            }}
+            className={`${ui.btn} px-2 py-0.5 text-[10px] text-zinc-400`}
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
