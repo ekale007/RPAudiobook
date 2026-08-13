@@ -71,6 +71,56 @@ const DEFAULT_CATALOG: LlmModelOptionWithProvider[] = [
     provider: "groq",
     providerModelId: "google/gemma-4-31b-it",
   },
+  // Roleplay / Creative — community favourites (paid, high quality)
+  {
+    id: "z-ai/glm-4.6",
+    label: "GLM 4.6 (RP-Favorit)",
+    promptCentsPer1k: 0.055,
+    completionCentsPer1k: 0.22,
+  },
+  {
+    id: "meta-llama/llama-3.3-70b-instruct",
+    label: "Llama 3.3 70B (RP-Favorit)",
+    promptCentsPer1k: 0.02,
+    completionCentsPer1k: 0.07,
+  },
+  {
+    id: "meta-llama/llama-4-maverick",
+    label: "Llama 4 Maverick (1M ctx)",
+    promptCentsPer1k: 0.018,
+    completionCentsPer1k: 0.064,
+  },
+  {
+    id: "qwen/qwen3-235b-a22b",
+    label: "Qwen3 235B (RP-Favorit)",
+    promptCentsPer1k: 0.09,
+    completionCentsPer1k: 0.28,
+  },
+  {
+    id: "deepseek/deepseek-chat-v3-0324",
+    label: "DeepSeek V3 Chat",
+    promptCentsPer1k: 0.025,
+    completionCentsPer1k: 0.103,
+  },
+  {
+    id: "google/gemma-3-27b-it",
+    label: "Gemma 3 27B (Kreativ)",
+    promptCentsPer1k: 0.021,
+    completionCentsPer1k: 0.084,
+  },
+  {
+    id: "anthropic/claude-sonnet-4",
+    label: "Claude Sonnet 4 (Premium)",
+    promptCentsPer1k: 0.276,
+    completionCentsPer1k: 1.38,
+  },
+  {
+    id: "openai/gpt-oss-20b:free",
+    label: "GPT-OSS 20B (gratis)",
+    promptCentsPer1k: 0,
+    completionCentsPer1k: 0,
+  },
+
   // Free models (0¢ via OpenRouter) — great for free tier
   {
     id: "nvidia/nemotron-3-ultra-550b-a55b:free",

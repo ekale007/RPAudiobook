@@ -29,6 +29,7 @@ const FREE_MODEL_IDS = [
   "google/gemini-2.5-pro",
   "groq/llama-4-maverick",
   "groq/gemma-4-31b-it",
+  "openai/gpt-oss-20b:free",
 ] as const;
 
 const CACHE_TTL_MS = 30_000;
